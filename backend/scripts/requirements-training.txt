@@ -1,0 +1,6 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+numpy==2.5.4
+torch==2.8.0+cpu
+shapely==2.2.0
+# Optional figures were rendered with global Python matplotlib 3.10.1.
+# Install matplotlib==3.10.1 separately only if figure rendering is required.

@@ -1,0 +1,78 @@
+{
+  "jobId": "f5c38c1b9fc9444e999c51f2bb96914b",
+  "status": "complete",
+  "progress": 1,
+  "frames": [
+    {
+      "id": "frame-0",
+      "url": "/uploads/video_frames/f5c38c1b9fc9444e999c51f2bb96914b/frame-000.jpg",
+      "timestamp": 0.1,
+      "sharpness": 938.19,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "frame-1",
+      "url": "/uploads/video_frames/f5c38c1b9fc9444e999c51f2bb96914b/frame-001.jpg",
+      "timestamp": 1.5,
+      "sharpness": 934.54,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "id": "frame-2",
+      "url": "/uploads/video_frames/f5c38c1b9fc9444e999c51f2bb96914b/frame-002.jpg",
+      "timestamp": 2.9,
+      "sharpness": 937.243,
+      "width": 640,
+      "height": 360
+    }
+  ],
+  "candidates": [],
+  "detector": {
+    "available": true,
+    "detectorUnavailable": false,
+    "name": "YOLOX-Tiny (COCO pretrained)",
+    "source": "https://github.com/Megvii-BaseDetection/YOLOX",
+    "repositoryLicense": "Apache-2.0",
+    "categoryCoverage": [
+      "chair",
+      "sofa",
+      "bed",
+      "dining_table"
+    ],
+    "trainedByTeam": false,
+    "message": "检测候选需要人工确认。",
+    "limits": {
+      "maxBytes": 104857600,
+      "maxSeconds": 120.0,
+      "maxFrames": 32
+    },
+    "limitations": [
+      "候选物品须人工确认类别、数量、真实尺寸、房内位置和保留状态。",
+      "仅识别COCO中的椅子、沙发、床和餐桌；柜子、窗帘等需手动补录。",
+      "仅使用短时二维框关联；镜头离开后再拍同一家具可能产生重复，必须人工合并。",
+      "视频不提供绝对尺度、精确房间坐标或可独立拖动的完整三维网格。",
+      "通用预训练检测器并未在本项目真实搬家视频上验证准确率。"
+    ]
+  },
+  "limitations": [
+    "候选物品须人工确认类别、数量、真实尺寸、房内位置和保留状态。",
+    "仅识别COCO中的椅子、沙发、床和餐桌；柜子、窗帘等需手动补录。",
+    "仅使用短时二维框关联；镜头离开后再拍同一家具可能产生重复，必须人工合并。",
+    "视频不提供绝对尺度、精确房间坐标或可独立拖动的完整三维网格。",
+    "通用预训练检测器并未在本项目真实搬家视频上验证准确率。"
+  ],
+  "requiresConfirmation": true,
+  "createdAt": 1791727704.9943173,
+  "video": {
+    "duration": 3.0,
+    "fps": 10.0,
+    "width": 640,
+    "height": 360,
+    "frameCount": 30
+  },
+  "detectorUnavailable": false,
+  "detectorPartial": false,
+  "completedAt": 1791727705.348502
+}

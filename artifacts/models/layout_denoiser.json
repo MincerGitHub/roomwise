@@ -1,0 +1,66 @@
+{
+  "trained": true,
+  "trained_at": "2026-10-11",
+  "architecture": "set Transformer, hidden=64, layers=2, heads=4",
+  "parameters": 73604,
+  "train_rooms": 4514,
+  "validation_rooms": 696,
+  "seed": 20261011,
+  "epochs_run": 144,
+  "best_epoch": 132,
+  "steps": 5184,
+  "duration_seconds": 278.5,
+  "device": "cpu",
+  "threads": 4,
+  "best_validation": {
+    "position_mae_m": 0.22471040239923015,
+    "position_rmse_m": 0.30487316219207905,
+    "angle_mae_deg": 8.289795174444961,
+    "evaluated_movable_items": 2241
+  },
+  "validation_identity": {
+    "position_mae_m": 0.5642209360368857,
+    "position_rmse_m": 0.6346696533868942,
+    "angle_mae_deg": 24.222860003816407,
+    "evaluated_movable_items": 2241
+  },
+  "noise_position_std_m": [
+    0.1,
+    0.3,
+    0.6,
+    1.0
+  ],
+  "noise_angle_std_deg": [
+    8,
+    20,
+    40,
+    65
+  ],
+  "locks": "random probability 0..0.45; no noise applied to locked items; runtime forcibly preserves locks",
+  "augmentation": "quarter-turn room rotations and online noise, after house split",
+  "objective": "movable-item metre-squared coordinate loss + 0.4 trig orientation squared loss",
+  "scope": "supervised denoising of existing bedroom coordinates, not from-scratch furniture selection or 3D reconstruction",
+  "code_sha256": {
+    "training": "5bdf95a01ae51ba9c0c31cb471696577ab260b669205d39363082bddf1b14a27",
+    "model": "e82eb48aa8af73efbea99a162be2b6296d5f80134bc4691116b691b3e841bd8e"
+  },
+  "checkpoint_sha256": "38da9124acb334253d2d02f88a083c390953488bd86a4bea42ed5978e4058dde",
+  "training_stages": [
+    {
+      "epochs": 90,
+      "seconds": 174.77,
+      "checkpoint_sha256": "d75d2f183eed32eadf4b3982a844589798dc210dcaa3c529bf84d0f11a97dd8b",
+      "initial_lr": 0.0015,
+      "resumed": false
+    },
+    {
+      "epochs": 54,
+      "seconds": 103.74,
+      "checkpoint_sha256": "38da9124acb334253d2d02f88a083c390953488bd86a4bea42ed5978e4058dde",
+      "initial_lr": 0.0003,
+      "resumed": true,
+      "optimiser_reset": true,
+      "resume_from_best_epoch": 86
+    }
+  ]
+}

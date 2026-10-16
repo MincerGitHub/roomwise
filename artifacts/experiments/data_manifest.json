@@ -1,0 +1,120 @@
+{
+  "source": "LEGO-Net author preprocessed 3D-FRONT bedrooms; non-augmented boxes.npz",
+  "source_url": "https://ivl.cs.brown.edu/research/lego-net.html",
+  "archive_sha256": "7c127573c880ac5934792b8483cba10098fc521b5e31403d143a1d5142049a4f",
+  "archive_records": 5892,
+  "accepted_rooms": 5892,
+  "rejected": [],
+  "categories": [
+    "armchair",
+    "bookshelf",
+    "cabinet",
+    "chair",
+    "children_cabinet",
+    "coffee_table",
+    "desk",
+    "double_bed",
+    "dressing_chair",
+    "dressing_table",
+    "kids_bed",
+    "nightstand",
+    "shelf",
+    "single_bed",
+    "sofa",
+    "stool",
+    "table",
+    "tv_stand",
+    "wardrobe"
+  ],
+  "house_split_seed": "roomwise-house-2026",
+  "splits": {
+    "train": {
+      "rooms": 4514,
+      "houses": 3192
+    },
+    "validation": {
+      "rooms": 696,
+      "houses": 514
+    },
+    "test": {
+      "rooms": 682,
+      "houses": 498
+    }
+  },
+  "category_counts": {
+    "train": {
+      "armchair": 123,
+      "bookshelf": 169,
+      "cabinet": 565,
+      "chair": 621,
+      "children_cabinet": 138,
+      "coffee_table": 34,
+      "desk": 374,
+      "double_bed": 3916,
+      "dressing_chair": 135,
+      "dressing_table": 514,
+      "kids_bed": 153,
+      "nightstand": 6191,
+      "shelf": 196,
+      "single_bed": 451,
+      "sofa": 46,
+      "stool": 289,
+      "table": 545,
+      "tv_stand": 922,
+      "wardrobe": 3968
+    },
+    "validation": {
+      "armchair": 8,
+      "bookshelf": 18,
+      "cabinet": 78,
+      "chair": 90,
+      "children_cabinet": 28,
+      "coffee_table": 8,
+      "desk": 50,
+      "double_bed": 602,
+      "dressing_chair": 21,
+      "dressing_table": 59,
+      "kids_bed": 28,
+      "nightstand": 981,
+      "shelf": 34,
+      "single_bed": 68,
+      "sofa": 6,
+      "stool": 33,
+      "table": 66,
+      "tv_stand": 148,
+      "wardrobe": 596
+    },
+    "test": {
+      "armchair": 28,
+      "bookshelf": 30,
+      "cabinet": 78,
+      "chair": 89,
+      "children_cabinet": 17,
+      "coffee_table": 2,
+      "desk": 57,
+      "double_bed": 576,
+      "dressing_chair": 21,
+      "dressing_table": 66,
+      "kids_bed": 17,
+      "nightstand": 973,
+      "shelf": 25,
+      "single_bed": 89,
+      "sofa": 9,
+      "stool": 45,
+      "table": 75,
+      "tv_stand": 140,
+      "wardrobe": 604
+    }
+  },
+  "house_intersections": [
+    0,
+    0,
+    0
+  ],
+  "size_conversion": "width/depth/height = source sizes[x/z/y] * 2",
+  "rotation": "source angles in radians -> Three.js positive-y yaw in degrees, NOT negated",
+  "position": "source translations[x/z] minus floor-polygon bounding-box center; metres",
+  "model_scope": "19 bedroom categories; coordinate/orientation denoising, no mesh reconstruction",
+  "cache": "D:\\Desktop\\AI-project\\智能家装设计\\data\\Roomwise\\bedrooms_prepared.npz",
+  "redistribution": "Local restricted dataset cache; do not redistribute raw arrays"
+}

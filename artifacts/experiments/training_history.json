@@ -1,0 +1,1730 @@
+[
+  {
+    "epoch": 1,
+    "train_loss": 0.6627709252966775,
+    "validation": {
+      "position_mae_m": 0.5137631246853851,
+      "position_rmse_m": 0.5811211419844886,
+      "angle_mae_deg": 21.651449529715375,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 1.56,
+    "steps": 36
+  },
+  {
+    "epoch": 2,
+    "train_loss": 0.5375790115859773,
+    "validation": {
+      "position_mae_m": 0.44914019808376915,
+      "position_rmse_m": 0.511917320720258,
+      "angle_mae_deg": 21.3652446823691,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 3.12,
+    "steps": 72
+  },
+  {
+    "epoch": 3,
+    "train_loss": 0.4473871952957577,
+    "validation": {
+      "position_mae_m": 0.4076269309942395,
+      "position_rmse_m": 0.4721985021965996,
+      "angle_mae_deg": 18.880972736208882,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 4.68,
+    "steps": 108
+  },
+  {
+    "epoch": 4,
+    "train_loss": 0.39969563153054977,
+    "validation": {
+      "position_mae_m": 0.38010733324736823,
+      "position_rmse_m": 0.44777423286296203,
+      "angle_mae_deg": 16.64467061703269,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 6.27,
+    "steps": 144
+  },
+  {
+    "epoch": 5,
+    "train_loss": 0.38291853417952854,
+    "validation": {
+      "position_mae_m": 0.3718081360505805,
+      "position_rmse_m": 0.43806039389176726,
+      "angle_mae_deg": 15.492778491228819,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 7.86,
+    "steps": 180
+  },
+  {
+    "epoch": 6,
+    "train_loss": 0.3605155191487736,
+    "validation": {
+      "position_mae_m": 0.3775443645224906,
+      "position_rmse_m": 0.43811858539050735,
+      "angle_mae_deg": 13.958897193139464,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 9.57,
+    "steps": 216
+  },
+  {
+    "epoch": 7,
+    "train_loss": 0.3526018386085828,
+    "validation": {
+      "position_mae_m": 0.36752490155928624,
+      "position_rmse_m": 0.43005488707166256,
+      "angle_mae_deg": 13.320501634065952,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 11.19,
+    "steps": 252
+  },
+  {
+    "epoch": 8,
+    "train_loss": 0.3287531261642774,
+    "validation": {
+      "position_mae_m": 0.34395654488361843,
+      "position_rmse_m": 0.41426641269518333,
+      "angle_mae_deg": 12.986675877960911,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 12.84,
+    "steps": 288
+  },
+  {
+    "epoch": 9,
+    "train_loss": 0.3232881873846054,
+    "validation": {
+      "position_mae_m": 0.3514682693911584,
+      "position_rmse_m": 0.41572287737072827,
+      "angle_mae_deg": 12.166969018278087,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 14.52,
+    "steps": 324
+  },
+  {
+    "epoch": 10,
+    "train_loss": 0.332387746622165,
+    "validation": {
+      "position_mae_m": 0.3374885552194741,
+      "position_rmse_m": 0.4034411146148352,
+      "angle_mae_deg": 12.231997997701262,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 16.22,
+    "steps": 360
+  },
+  {
+    "epoch": 11,
+    "train_loss": 0.32172314036223626,
+    "validation": {
+      "position_mae_m": 0.33324268784868194,
+      "position_rmse_m": 0.4010518560009603,
+      "angle_mae_deg": 11.890639815555003,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 17.89,
+    "steps": 396
+  },
+  {
+    "epoch": 12,
+    "train_loss": 0.32064809319045806,
+    "validation": {
+      "position_mae_m": 0.3254295148915441,
+      "position_rmse_m": 0.3929630841049769,
+      "angle_mae_deg": 11.71056119374409,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 19.58,
+    "steps": 432
+  },
+  {
+    "epoch": 13,
+    "train_loss": 0.3187697438730134,
+    "validation": {
+      "position_mae_m": 0.3301414117997912,
+      "position_rmse_m": 0.39616806182757713,
+      "angle_mae_deg": 11.353102842086168,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 21.32,
+    "steps": 468
+  },
+  {
+    "epoch": 14,
+    "train_loss": 0.31977344759636456,
+    "validation": {
+      "position_mae_m": 0.33016660181652846,
+      "position_rmse_m": 0.39861087481911334,
+      "angle_mae_deg": 10.981923276903238,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 23.02,
+    "steps": 504
+  },
+  {
+    "epoch": 15,
+    "train_loss": 0.2981517112089528,
+    "validation": {
+      "position_mae_m": 0.3141108533362363,
+      "position_rmse_m": 0.38622020085769154,
+      "angle_mae_deg": 10.675757718765334,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 24.66,
+    "steps": 540
+  },
+  {
+    "epoch": 16,
+    "train_loss": 0.3042297897239526,
+    "validation": {
+      "position_mae_m": 0.30770389568971124,
+      "position_rmse_m": 0.3807163449692356,
+      "angle_mae_deg": 10.401659094572848,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 26.32,
+    "steps": 576
+  },
+  {
+    "epoch": 17,
+    "train_loss": 0.2846922766831186,
+    "validation": {
+      "position_mae_m": 0.30238737634427915,
+      "position_rmse_m": 0.37337135636311863,
+      "angle_mae_deg": 10.303260061407105,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 28.01,
+    "steps": 612
+  },
+  {
+    "epoch": 18,
+    "train_loss": 0.30208082497119904,
+    "validation": {
+      "position_mae_m": 0.3051873862127244,
+      "position_rmse_m": 0.37851645229309955,
+      "angle_mae_deg": 10.556545131120886,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 29.81,
+    "steps": 648
+  },
+  {
+    "epoch": 19,
+    "train_loss": 0.29607363417744637,
+    "validation": {
+      "position_mae_m": 0.3004447754960893,
+      "position_rmse_m": 0.3713510968645923,
+      "angle_mae_deg": 9.994695153929149,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 31.46,
+    "steps": 684
+  },
+  {
+    "epoch": 20,
+    "train_loss": 0.2788694952097204,
+    "validation": {
+      "position_mae_m": 0.3050631430968815,
+      "position_rmse_m": 0.37641688810434215,
+      "angle_mae_deg": 10.086451095900234,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 33.14,
+    "steps": 720
+  },
+  {
+    "epoch": 21,
+    "train_loss": 0.27405740610427326,
+    "validation": {
+      "position_mae_m": 0.2969247231289746,
+      "position_rmse_m": 0.36774207664230274,
+      "angle_mae_deg": 10.054689900794086,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 34.83,
+    "steps": 756
+  },
+  {
+    "epoch": 22,
+    "train_loss": 0.2785172565943665,
+    "validation": {
+      "position_mae_m": 0.30529174724855784,
+      "position_rmse_m": 0.3737576833508975,
+      "angle_mae_deg": 9.708194882927108,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 36.66,
+    "steps": 792
+  },
+  {
+    "epoch": 23,
+    "train_loss": 0.27650966950588757,
+    "validation": {
+      "position_mae_m": 0.2964612017665714,
+      "position_rmse_m": 0.3655515623697614,
+      "angle_mae_deg": 10.331704078506473,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 38.71,
+    "steps": 828
+  },
+  {
+    "epoch": 24,
+    "train_loss": 0.2798871083392037,
+    "validation": {
+      "position_mae_m": 0.29104098983799687,
+      "position_rmse_m": 0.36266886835372264,
+      "angle_mae_deg": 9.69633472209258,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 40.91,
+    "steps": 864
+  },
+  {
+    "epoch": 25,
+    "train_loss": 0.2708595854540666,
+    "validation": {
+      "position_mae_m": 0.29535298467217747,
+      "position_rmse_m": 0.3651253056534983,
+      "angle_mae_deg": 10.263923832806729,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 42.88,
+    "steps": 900
+  },
+  {
+    "epoch": 26,
+    "train_loss": 0.2825825897355874,
+    "validation": {
+      "position_mae_m": 0.2861105008621995,
+      "position_rmse_m": 0.35808414642829245,
+      "angle_mae_deg": 10.031261670980756,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 44.84,
+    "steps": 936
+  },
+  {
+    "epoch": 27,
+    "train_loss": 0.2681293185386393,
+    "validation": {
+      "position_mae_m": 0.28860424980124005,
+      "position_rmse_m": 0.3598926846006255,
+      "angle_mae_deg": 10.229137598186192,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 46.56,
+    "steps": 972
+  },
+  {
+    "epoch": 28,
+    "train_loss": 0.27343698259856963,
+    "validation": {
+      "position_mae_m": 0.2830627454941855,
+      "position_rmse_m": 0.3578190596901771,
+      "angle_mae_deg": 10.10820557412856,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 48.32,
+    "steps": 1008
+  },
+  {
+    "epoch": 29,
+    "train_loss": 0.26980458448330563,
+    "validation": {
+      "position_mae_m": 0.28127321598592875,
+      "position_rmse_m": 0.35743498903442766,
+      "angle_mae_deg": 9.975530097032081,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 50.38,
+    "steps": 1044
+  },
+  {
+    "epoch": 30,
+    "train_loss": 0.2625216303600205,
+    "validation": {
+      "position_mae_m": 0.29309162749271206,
+      "position_rmse_m": 0.3645275451503303,
+      "angle_mae_deg": 9.982562852329437,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 52.39,
+    "steps": 1080
+  },
+  {
+    "epoch": 31,
+    "train_loss": 0.24698536098003387,
+    "validation": {
+      "position_mae_m": 0.2825249592015402,
+      "position_rmse_m": 0.3526172113525773,
+      "angle_mae_deg": 9.674297156777635,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 54.24,
+    "steps": 1116
+  },
+  {
+    "epoch": 32,
+    "train_loss": 0.2656465425259537,
+    "validation": {
+      "position_mae_m": 0.2725416904202851,
+      "position_rmse_m": 0.346780593721619,
+      "angle_mae_deg": 9.603830314561876,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 55.96,
+    "steps": 1152
+  },
+  {
+    "epoch": 33,
+    "train_loss": 0.2639672669271628,
+    "validation": {
+      "position_mae_m": 0.2805658562526986,
+      "position_rmse_m": 0.3552595351913487,
+      "angle_mae_deg": 9.66201744485372,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 57.71,
+    "steps": 1188
+  },
+  {
+    "epoch": 34,
+    "train_loss": 0.25074207534392673,
+    "validation": {
+      "position_mae_m": 0.2733310889674542,
+      "position_rmse_m": 0.34620396364409234,
+      "angle_mae_deg": 9.843853361338594,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 59.53,
+    "steps": 1224
+  },
+  {
+    "epoch": 35,
+    "train_loss": 0.26527748795019257,
+    "validation": {
+      "position_mae_m": 0.26674218618727497,
+      "position_rmse_m": 0.344054749664782,
+      "angle_mae_deg": 9.813401120944102,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 61.38,
+    "steps": 1260
+  },
+  {
+    "epoch": 36,
+    "train_loss": 0.24882876707447898,
+    "validation": {
+      "position_mae_m": 0.2704834970065759,
+      "position_rmse_m": 0.34604164699141854,
+      "angle_mae_deg": 9.76545219058,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 63.23,
+    "steps": 1296
+  },
+  {
+    "epoch": 37,
+    "train_loss": 0.2647203645772404,
+    "validation": {
+      "position_mae_m": 0.2693222503133128,
+      "position_rmse_m": 0.34347203984339914,
+      "angle_mae_deg": 9.572105681655934,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 64.99,
+    "steps": 1332
+  },
+  {
+    "epoch": 38,
+    "train_loss": 0.24128613248467445,
+    "validation": {
+      "position_mae_m": 0.27563175267932666,
+      "position_rmse_m": 0.34648330002012556,
+      "angle_mae_deg": 9.718107325518664,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 66.73,
+    "steps": 1368
+  },
+  {
+    "epoch": 39,
+    "train_loss": 0.25671429228451514,
+    "validation": {
+      "position_mae_m": 0.2664405328297944,
+      "position_rmse_m": 0.3410995674583917,
+      "angle_mae_deg": 9.505211321502067,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 68.46,
+    "steps": 1404
+  },
+  {
+    "epoch": 40,
+    "train_loss": 0.2501871685187022,
+    "validation": {
+      "position_mae_m": 0.2622427535334174,
+      "position_rmse_m": 0.3362401745890236,
+      "angle_mae_deg": 9.296576600439106,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 70.17,
+    "steps": 1440
+  },
+  {
+    "epoch": 41,
+    "train_loss": 0.2469242794646157,
+    "validation": {
+      "position_mae_m": 0.26599120859722564,
+      "position_rmse_m": 0.33760009919372547,
+      "angle_mae_deg": 9.606988047508514,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 71.93,
+    "steps": 1476
+  },
+  {
+    "epoch": 42,
+    "train_loss": 0.25562557619478965,
+    "validation": {
+      "position_mae_m": 0.2815813423872981,
+      "position_rmse_m": 0.34855512255615545,
+      "angle_mae_deg": 9.074630856542928,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 73.66,
+    "steps": 1512
+  },
+  {
+    "epoch": 43,
+    "train_loss": 0.2494045446316401,
+    "validation": {
+      "position_mae_m": 0.2665405368791022,
+      "position_rmse_m": 0.33991207277331453,
+      "angle_mae_deg": 9.08448192835117,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 75.44,
+    "steps": 1548
+  },
+  {
+    "epoch": 44,
+    "train_loss": 0.2493798298140367,
+    "validation": {
+      "position_mae_m": 0.2622496068460993,
+      "position_rmse_m": 0.33845755534112776,
+      "angle_mae_deg": 9.17978929439689,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 77.25,
+    "steps": 1584
+  },
+  {
+    "epoch": 45,
+    "train_loss": 0.2476367387506697,
+    "validation": {
+      "position_mae_m": 0.2629411230898281,
+      "position_rmse_m": 0.33838496810603075,
+      "angle_mae_deg": 9.148903940902313,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 79.01,
+    "steps": 1620
+  },
+  {
+    "epoch": 46,
+    "train_loss": 0.24415988268123734,
+    "validation": {
+      "position_mae_m": 0.2582547343880934,
+      "position_rmse_m": 0.33460435397983185,
+      "angle_mae_deg": 9.41818284219846,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 80.73,
+    "steps": 1656
+  },
+  {
+    "epoch": 47,
+    "train_loss": 0.23690912624200186,
+    "validation": {
+      "position_mae_m": 0.2575793713558465,
+      "position_rmse_m": 0.3311041445077414,
+      "angle_mae_deg": 9.239600990319614,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 82.46,
+    "steps": 1692
+  },
+  {
+    "epoch": 48,
+    "train_loss": 0.23726637785633406,
+    "validation": {
+      "position_mae_m": 0.25747656567901794,
+      "position_rmse_m": 0.3335596107414901,
+      "angle_mae_deg": 9.049803103803777,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 84.22,
+    "steps": 1728
+  },
+  {
+    "epoch": 49,
+    "train_loss": 0.249731860227055,
+    "validation": {
+      "position_mae_m": 0.25325085383939744,
+      "position_rmse_m": 0.33110690587772507,
+      "angle_mae_deg": 9.120946932582184,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 85.96,
+    "steps": 1764
+  },
+  {
+    "epoch": 50,
+    "train_loss": 0.22698321317632994,
+    "validation": {
+      "position_mae_m": 0.2569942898098622,
+      "position_rmse_m": 0.33091556187249205,
+      "angle_mae_deg": 9.26081440065394,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 87.74,
+    "steps": 1800
+  },
+  {
+    "epoch": 51,
+    "train_loss": 0.24618558958172798,
+    "validation": {
+      "position_mae_m": 0.2555240803019642,
+      "position_rmse_m": 0.3328444769329173,
+      "angle_mae_deg": 9.287580326981066,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 89.5,
+    "steps": 1836
+  },
+  {
+    "epoch": 52,
+    "train_loss": 0.2445937767624855,
+    "validation": {
+      "position_mae_m": 0.2608321923038887,
+      "position_rmse_m": 0.335189182761254,
+      "angle_mae_deg": 9.09054223942737,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 91.47,
+    "steps": 1872
+  },
+  {
+    "epoch": 53,
+    "train_loss": 0.2534206517868572,
+    "validation": {
+      "position_mae_m": 0.25969104335351156,
+      "position_rmse_m": 0.33140183841755755,
+      "angle_mae_deg": 9.40542838869934,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 93.58,
+    "steps": 1908
+  },
+  {
+    "epoch": 54,
+    "train_loss": 0.24293720349669456,
+    "validation": {
+      "position_mae_m": 0.2569825321239744,
+      "position_rmse_m": 0.3303626100599396,
+      "angle_mae_deg": 9.327975786793264,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 95.5,
+    "steps": 1944
+  },
+  {
+    "epoch": 55,
+    "train_loss": 0.23345239584644636,
+    "validation": {
+      "position_mae_m": 0.25481392314383866,
+      "position_rmse_m": 0.32751771725739226,
+      "angle_mae_deg": 9.34135430247822,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 97.74,
+    "steps": 1980
+  },
+  {
+    "epoch": 56,
+    "train_loss": 0.22674736960066688,
+    "validation": {
+      "position_mae_m": 0.25186437331154593,
+      "position_rmse_m": 0.32454378047265525,
+      "angle_mae_deg": 9.450790373331234,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 99.5,
+    "steps": 2016
+  },
+  {
+    "epoch": 57,
+    "train_loss": 0.23638218061791527,
+    "validation": {
+      "position_mae_m": 0.25124041649472373,
+      "position_rmse_m": 0.3260250049775666,
+      "angle_mae_deg": 9.090812381918477,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 101.45,
+    "steps": 2052
+  },
+  {
+    "epoch": 58,
+    "train_loss": 0.2418857113354736,
+    "validation": {
+      "position_mae_m": 0.2530932895194819,
+      "position_rmse_m": 0.32568774711393567,
+      "angle_mae_deg": 8.939118247393932,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 103.65,
+    "steps": 2088
+  },
+  {
+    "epoch": 59,
+    "train_loss": 0.2378141772415903,
+    "validation": {
+      "position_mae_m": 0.2528351307184512,
+      "position_rmse_m": 0.3251158296514434,
+      "angle_mae_deg": 9.01404826869744,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 105.95,
+    "steps": 2124
+  },
+  {
+    "epoch": 60,
+    "train_loss": 0.23836378380656242,
+    "validation": {
+      "position_mae_m": 0.255061767075833,
+      "position_rmse_m": 0.3293327530418165,
+      "angle_mae_deg": 9.15040872615705,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 114.09,
+    "steps": 2160
+  },
+  {
+    "epoch": 61,
+    "train_loss": 0.23269765368766254,
+    "validation": {
+      "position_mae_m": 0.25287468167967514,
+      "position_rmse_m": 0.3254364149075053,
+      "angle_mae_deg": 8.969837265976945,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 118.49,
+    "steps": 2196
+  },
+  {
+    "epoch": 62,
+    "train_loss": 0.2293616607785225,
+    "validation": {
+      "position_mae_m": 0.25170593791480583,
+      "position_rmse_m": 0.3267016501403955,
+      "angle_mae_deg": 9.216581910314645,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 120.93,
+    "steps": 2232
+  },
+  {
+    "epoch": 63,
+    "train_loss": 0.2315413181980451,
+    "validation": {
+      "position_mae_m": 0.25173623826307184,
+      "position_rmse_m": 0.3295798554318718,
+      "angle_mae_deg": 8.959433269739465,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 123.04,
+    "steps": 2268
+  },
+  {
+    "epoch": 64,
+    "train_loss": 0.2316041940616237,
+    "validation": {
+      "position_mae_m": 0.25161505607243134,
+      "position_rmse_m": 0.32885734229480523,
+      "angle_mae_deg": 8.669830224418284,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 124.91,
+    "steps": 2304
+  },
+  {
+    "epoch": 65,
+    "train_loss": 0.2241726815700531,
+    "validation": {
+      "position_mae_m": 0.24627387309615395,
+      "position_rmse_m": 0.32141382099394283,
+      "angle_mae_deg": 8.767820230463482,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 126.88,
+    "steps": 2340
+  },
+  {
+    "epoch": 66,
+    "train_loss": 0.2315380954080158,
+    "validation": {
+      "position_mae_m": 0.24591357376648787,
+      "position_rmse_m": 0.3224645326849522,
+      "angle_mae_deg": 8.853838172130075,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 128.95,
+    "steps": 2376
+  },
+  {
+    "epoch": 67,
+    "train_loss": 0.24154804315831926,
+    "validation": {
+      "position_mae_m": 0.2427308783620696,
+      "position_rmse_m": 0.3189185033419983,
+      "angle_mae_deg": 8.891187999265037,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 130.98,
+    "steps": 2412
+  },
+  {
+    "epoch": 68,
+    "train_loss": 0.21579613619380528,
+    "validation": {
+      "position_mae_m": 0.24636315189485977,
+      "position_rmse_m": 0.32064129581739753,
+      "angle_mae_deg": 8.946038241486267,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 133.03,
+    "steps": 2448
+  },
+  {
+    "epoch": 69,
+    "train_loss": 0.24380070840319,
+    "validation": {
+      "position_mae_m": 0.24761442929881178,
+      "position_rmse_m": 0.3246290975089546,
+      "angle_mae_deg": 8.904736856387968,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 135.0,
+    "steps": 2484
+  },
+  {
+    "epoch": 70,
+    "train_loss": 0.2338831933836142,
+    "validation": {
+      "position_mae_m": 0.2480912263178764,
+      "position_rmse_m": 0.32611959700492155,
+      "angle_mae_deg": 8.901201364524086,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 136.94,
+    "steps": 2520
+  },
+  {
+    "epoch": 71,
+    "train_loss": 0.23378805071115494,
+    "validation": {
+      "position_mae_m": 0.248187550243121,
+      "position_rmse_m": 0.323835784796909,
+      "angle_mae_deg": 8.923468082096358,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 138.86,
+    "steps": 2556
+  },
+  {
+    "epoch": 72,
+    "train_loss": 0.2300783097743988,
+    "validation": {
+      "position_mae_m": 0.24413879451053686,
+      "position_rmse_m": 0.3236829456334772,
+      "angle_mae_deg": 8.595727082372346,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 140.84,
+    "steps": 2592
+  },
+  {
+    "epoch": 73,
+    "train_loss": 0.23929250116149584,
+    "validation": {
+      "position_mae_m": 0.24675409125998699,
+      "position_rmse_m": 0.3239987527830504,
+      "angle_mae_deg": 8.854858829194619,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 142.96,
+    "steps": 2628
+  },
+  {
+    "epoch": 74,
+    "train_loss": 0.2280744587381681,
+    "validation": {
+      "position_mae_m": 0.2504980886999656,
+      "position_rmse_m": 0.3245198649190956,
+      "angle_mae_deg": 8.882177745319927,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 145.1,
+    "steps": 2664
+  },
+  {
+    "epoch": 75,
+    "train_loss": 0.2397731136944559,
+    "validation": {
+      "position_mae_m": 0.24665448929002845,
+      "position_rmse_m": 0.32213271192634446,
+      "angle_mae_deg": 8.794242360456765,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 147.37,
+    "steps": 2700
+  },
+  {
+    "epoch": 76,
+    "train_loss": 0.2262401075826751,
+    "validation": {
+      "position_mae_m": 0.250451986263306,
+      "position_rmse_m": 0.32444271598784297,
+      "angle_mae_deg": 8.836273943648461,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 149.44,
+    "steps": 2736
+  },
+  {
+    "epoch": 77,
+    "train_loss": 0.23758579956160653,
+    "validation": {
+      "position_mae_m": 0.25277205495022187,
+      "position_rmse_m": 0.32531084505605595,
+      "angle_mae_deg": 8.980737293083399,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 151.51,
+    "steps": 2772
+  },
+  {
+    "epoch": 78,
+    "train_loss": 0.22411417216062546,
+    "validation": {
+      "position_mae_m": 0.2445344773369546,
+      "position_rmse_m": 0.31873151026083224,
+      "angle_mae_deg": 8.871049135356378,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 153.56,
+    "steps": 2808
+  },
+  {
+    "epoch": 79,
+    "train_loss": 0.22717568857802284,
+    "validation": {
+      "position_mae_m": 0.24310799017737006,
+      "position_rmse_m": 0.32029860716890973,
+      "angle_mae_deg": 8.860533956185304,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 155.64,
+    "steps": 2844
+  },
+  {
+    "epoch": 80,
+    "train_loss": 0.22459889575839043,
+    "validation": {
+      "position_mae_m": 0.24704828420266964,
+      "position_rmse_m": 0.31892544699102243,
+      "angle_mae_deg": 8.708863444098728,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 157.46,
+    "steps": 2880
+  },
+  {
+    "epoch": 81,
+    "train_loss": 0.2240695994761255,
+    "validation": {
+      "position_mae_m": 0.24101864892450853,
+      "position_rmse_m": 0.3149714775730423,
+      "angle_mae_deg": 8.798533404333574,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 159.27,
+    "steps": 2916
+  },
+  {
+    "epoch": 82,
+    "train_loss": 0.2341113934914271,
+    "validation": {
+      "position_mae_m": 0.24538426693214463,
+      "position_rmse_m": 0.31988647716364055,
+      "angle_mae_deg": 8.720800717657326,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 161.1,
+    "steps": 2952
+  },
+  {
+    "epoch": 83,
+    "train_loss": 0.2174343802034855,
+    "validation": {
+      "position_mae_m": 0.25095510276917704,
+      "position_rmse_m": 0.3249284157666415,
+      "angle_mae_deg": 8.568313033624388,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 162.9,
+    "steps": 2988
+  },
+  {
+    "epoch": 84,
+    "train_loss": 0.21412263272537124,
+    "validation": {
+      "position_mae_m": 0.24264199052707677,
+      "position_rmse_m": 0.3198411615052058,
+      "angle_mae_deg": 8.63774615568248,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 164.67,
+    "steps": 3024
+  },
+  {
+    "epoch": 85,
+    "train_loss": 0.21864608551065126,
+    "validation": {
+      "position_mae_m": 0.24023056841929835,
+      "position_rmse_m": 0.315071610323868,
+      "angle_mae_deg": 8.668837413383415,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 166.36,
+    "steps": 3060
+  },
+  {
+    "epoch": 86,
+    "train_loss": 0.22022454771730635,
+    "validation": {
+      "position_mae_m": 0.23824086297736904,
+      "position_rmse_m": 0.3131484911773135,
+      "angle_mae_deg": 8.980536953912889,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 168.05,
+    "steps": 3096
+  },
+  {
+    "epoch": 87,
+    "train_loss": 0.23980632424354553,
+    "validation": {
+      "position_mae_m": 0.24661656748238026,
+      "position_rmse_m": 0.31942318243200774,
+      "angle_mae_deg": 8.764110774232186,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 169.74,
+    "steps": 3132
+  },
+  {
+    "epoch": 88,
+    "train_loss": 0.22117731389072207,
+    "validation": {
+      "position_mae_m": 0.24187568944923082,
+      "position_rmse_m": 0.31567334764866606,
+      "angle_mae_deg": 8.571586923136872,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 171.41,
+    "steps": 3168
+  },
+  {
+    "epoch": 89,
+    "train_loss": 0.22706763818860054,
+    "validation": {
+      "position_mae_m": 0.24523309724216255,
+      "position_rmse_m": 0.3195040533226441,
+      "angle_mae_deg": 8.724639157224255,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 173.08,
+    "steps": 3204
+  },
+  {
+    "epoch": 90,
+    "train_loss": 0.22450985180007088,
+    "validation": {
+      "position_mae_m": 0.24435465014976224,
+      "position_rmse_m": 0.31832352573016404,
+      "angle_mae_deg": 8.502615974952372,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 174.77,
+    "steps": 3240
+  },
+  {
+    "epoch": 91,
+    "train_loss": 0.23253857923878563,
+    "validation": {
+      "position_mae_m": 0.2364046558385792,
+      "position_rmse_m": 0.3123840017372463,
+      "angle_mae_deg": 8.915369524956061,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 176.35,
+    "steps": 3276
+  },
+  {
+    "epoch": 92,
+    "train_loss": 0.22214225969380802,
+    "validation": {
+      "position_mae_m": 0.23945447958758898,
+      "position_rmse_m": 0.3145624317016883,
+      "angle_mae_deg": 8.601560861890636,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 177.92,
+    "steps": 3312
+  },
+  {
+    "epoch": 93,
+    "train_loss": 0.21962476583818594,
+    "validation": {
+      "position_mae_m": 0.23607695830149295,
+      "position_rmse_m": 0.31176129359422383,
+      "angle_mae_deg": 8.706695363361668,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 179.53,
+    "steps": 3348
+  },
+  {
+    "epoch": 94,
+    "train_loss": 0.224272637317578,
+    "validation": {
+      "position_mae_m": 0.23859971881973605,
+      "position_rmse_m": 0.3151035607884245,
+      "angle_mae_deg": 8.728721270451048,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 181.14,
+    "steps": 3384
+  },
+  {
+    "epoch": 95,
+    "train_loss": 0.22525544381803936,
+    "validation": {
+      "position_mae_m": 0.23629471744179437,
+      "position_rmse_m": 0.31605725301929216,
+      "angle_mae_deg": 8.393357329211968,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 182.74,
+    "steps": 3420
+  },
+  {
+    "epoch": 96,
+    "train_loss": 0.2139998223218653,
+    "validation": {
+      "position_mae_m": 0.23928516196897112,
+      "position_rmse_m": 0.31215742724437556,
+      "angle_mae_deg": 8.490080385670396,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 184.39,
+    "steps": 3456
+  },
+  {
+    "epoch": 97,
+    "train_loss": 0.21772784946693313,
+    "validation": {
+      "position_mae_m": 0.23845850169750218,
+      "position_rmse_m": 0.31248518109820383,
+      "angle_mae_deg": 8.441317953108216,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 186.12,
+    "steps": 3492
+  },
+  {
+    "epoch": 98,
+    "train_loss": 0.2232259346379174,
+    "validation": {
+      "position_mae_m": 0.23533439563274341,
+      "position_rmse_m": 0.3114415634971265,
+      "angle_mae_deg": 8.544372800481286,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 187.77,
+    "steps": 3528
+  },
+  {
+    "epoch": 99,
+    "train_loss": 0.21268540082706344,
+    "validation": {
+      "position_mae_m": 0.23609843431761995,
+      "position_rmse_m": 0.3114528199403654,
+      "angle_mae_deg": 8.54987778525558,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 189.44,
+    "steps": 3564
+  },
+  {
+    "epoch": 100,
+    "train_loss": 0.22507709968421194,
+    "validation": {
+      "position_mae_m": 0.24155190622697095,
+      "position_rmse_m": 0.3143651915258875,
+      "angle_mae_deg": 8.83944523293826,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 191.08,
+    "steps": 3600
+  },
+  {
+    "epoch": 101,
+    "train_loss": 0.20956221181485388,
+    "validation": {
+      "position_mae_m": 0.24030697237031376,
+      "position_rmse_m": 0.31409492317490134,
+      "angle_mae_deg": 8.462658021131686,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 192.61,
+    "steps": 3636
+  },
+  {
+    "epoch": 102,
+    "train_loss": 0.2213172304133574,
+    "validation": {
+      "position_mae_m": 0.23699459081839006,
+      "position_rmse_m": 0.31225956715938036,
+      "angle_mae_deg": 8.552955045321106,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 194.14,
+    "steps": 3672
+  },
+  {
+    "epoch": 103,
+    "train_loss": 0.22257674775189823,
+    "validation": {
+      "position_mae_m": 0.23691092295145272,
+      "position_rmse_m": 0.31253014119993733,
+      "angle_mae_deg": 8.414345360064733,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 195.68,
+    "steps": 3708
+  },
+  {
+    "epoch": 104,
+    "train_loss": 0.21679740192161667,
+    "validation": {
+      "position_mae_m": 0.23824902008643908,
+      "position_rmse_m": 0.31379299923969484,
+      "angle_mae_deg": 8.418047199156183,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 197.23,
+    "steps": 3744
+  },
+  {
+    "epoch": 105,
+    "train_loss": 0.2188112830950154,
+    "validation": {
+      "position_mae_m": 0.23724526262640078,
+      "position_rmse_m": 0.31275542633537223,
+      "angle_mae_deg": 8.315726983257159,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 198.75,
+    "steps": 3780
+  },
+  {
+    "epoch": 106,
+    "train_loss": 0.21649232672320473,
+    "validation": {
+      "position_mae_m": 0.23704154412656245,
+      "position_rmse_m": 0.31173300243936575,
+      "angle_mae_deg": 8.310957434528387,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 200.34,
+    "steps": 3816
+  },
+  {
+    "epoch": 107,
+    "train_loss": 0.22740122551719347,
+    "validation": {
+      "position_mae_m": 0.2315657299894467,
+      "position_rmse_m": 0.31023353930173964,
+      "angle_mae_deg": 8.132156747692257,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 201.9,
+    "steps": 3852
+  },
+  {
+    "epoch": 108,
+    "train_loss": 0.21698854780859417,
+    "validation": {
+      "position_mae_m": 0.23453559374216962,
+      "position_rmse_m": 0.31136222382464857,
+      "angle_mae_deg": 8.282677689825864,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 203.49,
+    "steps": 3888
+  },
+  {
+    "epoch": 109,
+    "train_loss": 0.21348887061079344,
+    "validation": {
+      "position_mae_m": 0.2303046754666005,
+      "position_rmse_m": 0.3086045473134835,
+      "angle_mae_deg": 8.151867118259226,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 205.19,
+    "steps": 3924
+  },
+  {
+    "epoch": 110,
+    "train_loss": 0.21086118494470915,
+    "validation": {
+      "position_mae_m": 0.22923509032745534,
+      "position_rmse_m": 0.30937932177767485,
+      "angle_mae_deg": 8.244429252046553,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 206.92,
+    "steps": 3960
+  },
+  {
+    "epoch": 111,
+    "train_loss": 0.2119057315091292,
+    "validation": {
+      "position_mae_m": 0.2341011972445749,
+      "position_rmse_m": 0.3088888728852995,
+      "angle_mae_deg": 8.187002256990668,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 208.92,
+    "steps": 3996
+  },
+  {
+    "epoch": 112,
+    "train_loss": 0.22018313863211209,
+    "validation": {
+      "position_mae_m": 0.2318398332651016,
+      "position_rmse_m": 0.3086773198236428,
+      "angle_mae_deg": 8.232995797257098,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 211.09,
+    "steps": 4032
+  },
+  {
+    "epoch": 113,
+    "train_loss": 0.2150759200255076,
+    "validation": {
+      "position_mae_m": 0.23143215209258614,
+      "position_rmse_m": 0.3076727906905286,
+      "angle_mae_deg": 8.344128227656736,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 213.49,
+    "steps": 4068
+  },
+  {
+    "epoch": 114,
+    "train_loss": 0.2088094593750106,
+    "validation": {
+      "position_mae_m": 0.23132634458813447,
+      "position_rmse_m": 0.30858063626631116,
+      "angle_mae_deg": 8.300528071659466,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 218.39,
+    "steps": 4104
+  },
+  {
+    "epoch": 115,
+    "train_loss": 0.22523579208387268,
+    "validation": {
+      "position_mae_m": 0.23161148494810507,
+      "position_rmse_m": 0.30904128722467045,
+      "angle_mae_deg": 8.48291474732172,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 222.84,
+    "steps": 4140
+  },
+  {
+    "epoch": 116,
+    "train_loss": 0.21314902520842022,
+    "validation": {
+      "position_mae_m": 0.23200534725212996,
+      "position_rmse_m": 0.30916745815990615,
+      "angle_mae_deg": 8.34260025334213,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 227.66,
+    "steps": 4176
+  },
+  {
+    "epoch": 117,
+    "train_loss": 0.21906419760651058,
+    "validation": {
+      "position_mae_m": 0.23246770439900172,
+      "position_rmse_m": 0.3085388852397928,
+      "angle_mae_deg": 8.452606700269746,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 231.78,
+    "steps": 4212
+  },
+  {
+    "epoch": 118,
+    "train_loss": 0.21335568030675253,
+    "validation": {
+      "position_mae_m": 0.23654842690091893,
+      "position_rmse_m": 0.3093101485702504,
+      "angle_mae_deg": 8.475012875813928,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 233.57,
+    "steps": 4248
+  },
+  {
+    "epoch": 119,
+    "train_loss": 0.20652759075164795,
+    "validation": {
+      "position_mae_m": 0.2309992399438584,
+      "position_rmse_m": 0.30606860051977075,
+      "angle_mae_deg": 8.308612577279046,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 235.33,
+    "steps": 4284
+  },
+  {
+    "epoch": 120,
+    "train_loss": 0.21597938239574432,
+    "validation": {
+      "position_mae_m": 0.23369338629025885,
+      "position_rmse_m": 0.30757729487548446,
+      "angle_mae_deg": 8.430052360841685,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 237.17,
+    "steps": 4320
+  },
+  {
+    "epoch": 121,
+    "train_loss": 0.20584752865963513,
+    "validation": {
+      "position_mae_m": 0.2265586891981078,
+      "position_rmse_m": 0.3045611358635591,
+      "angle_mae_deg": 8.2957949865826,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 238.86,
+    "steps": 4356
+  },
+  {
+    "epoch": 122,
+    "train_loss": 0.21148232536183464,
+    "validation": {
+      "position_mae_m": 0.2274913176817933,
+      "position_rmse_m": 0.30420991978715917,
+      "angle_mae_deg": 8.289685545890103,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 240.64,
+    "steps": 4392
+  },
+  {
+    "epoch": 123,
+    "train_loss": 0.20605913197828662,
+    "validation": {
+      "position_mae_m": 0.22560900283895968,
+      "position_rmse_m": 0.3050343273168995,
+      "angle_mae_deg": 8.21363851583387,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 242.46,
+    "steps": 4428
+  },
+  {
+    "epoch": 124,
+    "train_loss": 0.20905406400561333,
+    "validation": {
+      "position_mae_m": 0.22728260523575564,
+      "position_rmse_m": 0.3053493490917523,
+      "angle_mae_deg": 8.199378082046097,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 244.13,
+    "steps": 4464
+  },
+  {
+    "epoch": 125,
+    "train_loss": 0.21395486262109545,
+    "validation": {
+      "position_mae_m": 0.2291101580658602,
+      "position_rmse_m": 0.30514829148841016,
+      "angle_mae_deg": 8.306152294358203,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 245.79,
+    "steps": 4500
+  },
+  {
+    "epoch": 126,
+    "train_loss": 0.22294455642501512,
+    "validation": {
+      "position_mae_m": 0.22962626139557202,
+      "position_rmse_m": 0.3056602184318054,
+      "angle_mae_deg": 8.367244424603603,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 247.71,
+    "steps": 4536
+  },
+  {
+    "epoch": 127,
+    "train_loss": 0.21892133520709145,
+    "validation": {
+      "position_mae_m": 0.23081600682115988,
+      "position_rmse_m": 0.30537701482928437,
+      "angle_mae_deg": 8.281034951580152,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 249.45,
+    "steps": 4572
+  },
+  {
+    "epoch": 128,
+    "train_loss": 0.22291424435873827,
+    "validation": {
+      "position_mae_m": 0.22571826445410362,
+      "position_rmse_m": 0.30393371684639153,
+      "angle_mae_deg": 8.288374808269934,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 251.19,
+    "steps": 4608
+  },
+  {
+    "epoch": 129,
+    "train_loss": 0.21528000053432253,
+    "validation": {
+      "position_mae_m": 0.22937886180046552,
+      "position_rmse_m": 0.3070470311426491,
+      "angle_mae_deg": 8.333126068560915,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 252.86,
+    "steps": 4644
+  },
+  {
+    "epoch": 130,
+    "train_loss": 0.21272930544283655,
+    "validation": {
+      "position_mae_m": 0.2261685423065911,
+      "position_rmse_m": 0.3045721977148575,
+      "angle_mae_deg": 8.353574319326789,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 254.5,
+    "steps": 4680
+  },
+  {
+    "epoch": 131,
+    "train_loss": 0.2118411459442642,
+    "validation": {
+      "position_mae_m": 0.2289085124878171,
+      "position_rmse_m": 0.306437315481384,
+      "angle_mae_deg": 8.293961131508597,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 256.13,
+    "steps": 4716
+  },
+  {
+    "epoch": 132,
+    "train_loss": 0.2088343364497026,
+    "validation": {
+      "position_mae_m": 0.22471040239923015,
+      "position_rmse_m": 0.30487316219207905,
+      "angle_mae_deg": 8.289795174444961,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 257.76,
+    "steps": 4752
+  },
+  {
+    "epoch": 133,
+    "train_loss": 0.20087340805265638,
+    "validation": {
+      "position_mae_m": 0.22817334911105333,
+      "position_rmse_m": 0.30654516644178537,
+      "angle_mae_deg": 8.350394217415905,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 259.42,
+    "steps": 4788
+  },
+  {
+    "epoch": 134,
+    "train_loss": 0.20827562320563528,
+    "validation": {
+      "position_mae_m": 0.2267417929255659,
+      "position_rmse_m": 0.30490065990763676,
+      "angle_mae_deg": 8.293659546717683,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 261.14,
+    "steps": 4824
+  },
+  {
+    "epoch": 135,
+    "train_loss": 0.22008165468772253,
+    "validation": {
+      "position_mae_m": 0.2301946536354337,
+      "position_rmse_m": 0.30551860946542586,
+      "angle_mae_deg": 8.359281686384035,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 262.87,
+    "steps": 4860
+  },
+  {
+    "epoch": 136,
+    "train_loss": 0.21213302885492644,
+    "validation": {
+      "position_mae_m": 0.22789455956790666,
+      "position_rmse_m": 0.30436904411928484,
+      "angle_mae_deg": 8.234320613919719,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 264.55,
+    "steps": 4896
+  },
+  {
+    "epoch": 137,
+    "train_loss": 0.2074835490849283,
+    "validation": {
+      "position_mae_m": 0.22598825713321147,
+      "position_rmse_m": 0.3039119026534707,
+      "angle_mae_deg": 8.165028940998067,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 266.21,
+    "steps": 4932
+  },
+  {
+    "epoch": 138,
+    "train_loss": 0.21785297493139902,
+    "validation": {
+      "position_mae_m": 0.2254646493090915,
+      "position_rmse_m": 0.30482321755878045,
+      "angle_mae_deg": 8.181589502133948,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 267.91,
+    "steps": 4968
+  },
+  {
+    "epoch": 139,
+    "train_loss": 0.21488342392775747,
+    "validation": {
+      "position_mae_m": 0.22660806418663712,
+      "position_rmse_m": 0.3043460974079362,
+      "angle_mae_deg": 8.241484508550416,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 269.56,
+    "steps": 5004
+  },
+  {
+    "epoch": 140,
+    "train_loss": 0.21166639195548165,
+    "validation": {
+      "position_mae_m": 0.22640794401594877,
+      "position_rmse_m": 0.3034489774997326,
+      "angle_mae_deg": 8.226495639124275,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 271.21,
+    "steps": 5040
+  },
+  {
+    "epoch": 141,
+    "train_loss": 0.20142039449678528,
+    "validation": {
+      "position_mae_m": 0.2258801635696201,
+      "position_rmse_m": 0.3035521951071574,
+      "angle_mae_deg": 8.212817383173356,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 272.98,
+    "steps": 5076
+  },
+  {
+    "epoch": 142,
+    "train_loss": 0.20879202832778296,
+    "validation": {
+      "position_mae_m": 0.2266787271387422,
+      "position_rmse_m": 0.30424231964355614,
+      "angle_mae_deg": 8.262989088404439,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 274.79,
+    "steps": 5112
+  },
+  {
+    "epoch": 143,
+    "train_loss": 0.21338659607701832,
+    "validation": {
+      "position_mae_m": 0.22777089315931875,
+      "position_rmse_m": 0.3053593562845033,
+      "angle_mae_deg": 8.328114742560137,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 276.7,
+    "steps": 5148
+  },
+  {
+    "epoch": 144,
+    "train_loss": 0.2066118497815397,
+    "validation": {
+      "position_mae_m": 0.22656605756510662,
+      "position_rmse_m": 0.30458822376856115,
+      "angle_mae_deg": 8.26922817110677,
+      "evaluated_movable_items": 2241
+    },
+    "seconds": 278.5,
+    "steps": 5184
+  }
+]

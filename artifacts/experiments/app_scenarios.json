@@ -1,0 +1,1434 @@
+[
+  {
+    "scene": {
+      "id": "engineering-00",
+      "name": "自制工程场景1",
+      "version": 0,
+      "room": {
+        "width": 5.2,
+        "depth": 4.2,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.85,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 0.6230429725886577,
+          "z": 1.8676641535688754,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 4.3500000000000005,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 2.2090587727411357,
+          "z": 2.514467942651946,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 1.0899580680212857,
+          "z": 2.169082994005745,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 2.6434760081297117,
+          "z": 1.497660299603187,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "可移动旧家具与锁定房内衣柜",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-01",
+      "name": "自制工程场景2",
+      "version": 0,
+      "room": {
+        "width": 5.2,
+        "depth": 4.2,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.85,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 3.7048511433582574,
+          "z": 3.054817078917627,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 4.3500000000000005,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 3.0872461886890803,
+          "z": 0.89071754831684,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 3.404246983898108,
+          "z": 3.2849556173767334,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 1.391127279736637,
+          "z": 2.075337493209351,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "可移动旧家具与锁定房内衣柜",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-02",
+      "name": "自制工程场景3",
+      "version": 0,
+      "room": {
+        "width": 4.6,
+        "depth": 3.8,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.5499999999999998,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 0.4287076251967505,
+          "z": 1.956114191557821,
+          "rotation": 90.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 3.7499999999999996,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 2.94630318148343,
+          "z": 2.6609444865672067,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 2.7164236366565913,
+          "z": 1.6533895554079292,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 3.0096711735335884,
+          "z": 1.7203443211686449,
+          "rotation": 90.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "可移动旧家具与锁定房内衣柜",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-03",
+      "name": "自制工程场景4",
+      "version": 0,
+      "room": {
+        "width": 6.0,
+        "depth": 5.0,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 2.25,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 5.352363263811544,
+          "z": 3.7979749345896616,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 5.15,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 3.765037425673007,
+          "z": 4.495684511067084,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 2.2216898053940053,
+          "z": 1.6872608507443916,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 4.727010009905051,
+          "z": 3.386517768575125,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "可移动旧家具与锁定房内衣柜",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-04",
+      "name": "自制工程场景5",
+      "version": 0,
+      "room": {
+        "width": 5.4,
+        "depth": 4.5,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.9500000000000002,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 1.0,
+          "z": 3.45,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 4.550000000000001,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 1.3965744388934687,
+          "z": 2.190960653060597,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 4.702091019522487,
+          "z": 2.731400769806032,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 2.183784567346246,
+          "z": 2.1304809290083906,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "固定床和衣柜，调整其余物品",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-05",
+      "name": "自制工程场景6",
+      "version": 0,
+      "room": {
+        "width": 5.6,
+        "depth": 4.4,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 2.05,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 0.7413147623513587,
+          "z": 3.9646844020320766,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 4.75,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 3.029513419069935,
+          "z": 3.7216707284556256,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 5.03167941239552,
+          "z": 2.4863722981354694,
+          "rotation": 90.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 1.5840684797600955,
+          "z": 3.3173169501301847,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "category": "bookshelf",
+          "label": "书架",
+          "width": 0.8,
+          "depth": 0.3,
+          "height": 1.8,
+          "id": "bookshelf-extra",
+          "x": 2.8,
+          "z": 2.2,
+          "rotation": 0,
+          "locked": false,
+          "keep": true,
+          "source": "new"
+        },
+        {
+          "category": "rug",
+          "label": "地毯",
+          "width": 1.8,
+          "depth": 1.3,
+          "height": 0.02,
+          "id": "rug-extra",
+          "x": 2.8,
+          "z": 2.2,
+          "rotation": 0,
+          "locked": false,
+          "keep": true,
+          "source": "new"
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "加入书架和允许重叠的地毯",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-06",
+      "name": "自制工程场景7",
+      "version": 0,
+      "room": {
+        "width": 4.8,
+        "depth": 4.0,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.65,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 4.221006091553296,
+          "z": 3.09341183061957,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 3.9499999999999997,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 0.575497671542876,
+          "z": 1.1464836230085098,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 2.2489904994345324,
+          "z": 1.3953497621218358,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "四件家具的紧凑房间",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-07",
+      "name": "自制工程场景8",
+      "version": 0,
+      "room": {
+        "width": 5.2,
+        "depth": 4.2,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.85,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 4.5502370033842485,
+          "z": 0.9873366726390418,
+          "rotation": 90.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 4.3500000000000005,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 4.040844672707945,
+          "z": 1.4578272565965391,
+          "rotation": 90.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 1.7150024422965737,
+          "z": 1.6842389164241833,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 2.9597285572899317,
+          "z": 2.0220184343622156,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        },
+        {
+          "kind": "min_move",
+          "itemId": "bed-1"
+        }
+      ]
+    },
+    "condition": "同时设置靠窗与少移动软偏好",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-08",
+      "name": "自制工程场景9",
+      "version": 0,
+      "room": {
+        "width": 5.2,
+        "depth": 4.2,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "east",
+          "offset": 2.0,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.85,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 3.93511190861091,
+          "z": 2.1898869594658086,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 4.3500000000000005,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 2.80849437087144,
+          "z": 1.5484285999325,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 2.2551980319025864,
+          "z": 3.1438873063082755,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 1.6120660923869798,
+          "z": 1.1944159286469103,
+          "rotation": 90.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "入口换到东墙",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-09",
+      "name": "自制工程场景10",
+      "version": 0,
+      "room": {
+        "width": 3.8,
+        "depth": 4.4,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.15,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 3.1669903966466952,
+          "z": 0.6650691083702007,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 2.9499999999999997,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 1.3366131390328349,
+          "z": 1.463270684032992,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 3.221760519864486,
+          "z": 2.84967885864273,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 1.107433258008092,
+          "z": 0.8870836550695933,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "更窄的房间",
+    "expected_failure": false
+  },
+  {
+    "scene": {
+      "id": "engineering-10",
+      "name": "自制工程场景11",
+      "version": 0,
+      "room": {
+        "width": 5.2,
+        "depth": 4.2,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.85,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 8,
+          "depth": 8,
+          "height": 0.55,
+          "x": 1.6073378997523577,
+          "z": 3.009579073359461,
+          "rotation": 90.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 4.3500000000000005,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 2.9588903919628073,
+          "z": 0.7703074338351825,
+          "rotation": 180.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 0.8915847265484759,
+          "z": 2.705540339946006,
+          "rotation": 90.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 1.269035342284871,
+          "z": 2.822523539202068,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "床占地大于整个房间，应明确失败",
+    "expected_failure": true
+  },
+  {
+    "scene": {
+      "id": "engineering-11",
+      "name": "自制工程场景12",
+      "version": 0,
+      "room": {
+        "width": 5.2,
+        "depth": 4.2,
+        "height": 2.7,
+        "polygon": null,
+        "door": {
+          "wall": "south",
+          "offset": 0.4,
+          "width": 0.9,
+          "clearance": 0.9
+        },
+        "windows": [
+          {
+            "id": "window-1",
+            "wall": "north",
+            "offset": 1.85,
+            "width": 1.5,
+            "sillHeight": 0.9
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "bed-1",
+          "label": "旧双人床",
+          "category": "double_bed",
+          "width": 1.8,
+          "depth": 2,
+          "height": 0.55,
+          "x": 1.9990083258042728,
+          "z": 3.7069703678197383,
+          "rotation": 270.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "wardrobe-1",
+          "label": "房内衣柜",
+          "category": "wardrobe",
+          "width": 1.5,
+          "depth": 0.6,
+          "height": 2.1,
+          "x": 6.2,
+          "z": 0.42,
+          "rotation": 0,
+          "locked": true,
+          "keep": true,
+          "source": "existing",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "desk-1",
+          "label": "旧书桌",
+          "category": "desk",
+          "width": 1.2,
+          "depth": 0.6,
+          "height": 0.75,
+          "x": 2.2920868912691676,
+          "z": 1.1109255731869698,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "chair-1",
+          "label": "办公椅",
+          "category": "chair",
+          "width": 0.48,
+          "depth": 0.5,
+          "height": 0.85,
+          "x": 0.7421156054012272,
+          "z": 3.301066171045487,
+          "rotation": 0.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        },
+        {
+          "id": "nightstand-1",
+          "label": "旧床头柜",
+          "category": "nightstand",
+          "width": 0.45,
+          "depth": 0.4,
+          "height": 0.5,
+          "x": 0.6596813452813092,
+          "z": 1.420667091439499,
+          "rotation": 90.0,
+          "locked": false,
+          "keep": true,
+          "source": "brought",
+          "assetUrl": null,
+          "photoUrl": null
+        }
+      ],
+      "preferences": [
+        {
+          "kind": "near_window",
+          "itemId": "desk-1"
+        }
+      ]
+    },
+    "condition": "锁定衣柜在房外，应明确失败",
+    "expected_failure": true
+  }
+]

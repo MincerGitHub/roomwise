@@ -1,0 +1,52 @@
+{
+  "name": "YOLOX-Tiny",
+  "file": "yolox_tiny.onnx",
+  "source": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_tiny.onnx",
+  "repository": "https://github.com/Megvii-BaseDetection/YOLOX",
+  "documentation": "https://github.com/Megvii-BaseDetection/YOLOX/blob/main/demo/ONNXRuntime/README.md",
+  "preprocessingReferences": [
+    "https://github.com/Megvii-BaseDetection/YOLOX/blob/main/yolox/data/data_augment.py",
+    "https://github.com/Megvii-BaseDetection/YOLOX/blob/main/yolox/utils/demo_utils.py"
+  ],
+  "repositoryLicense": "Apache-2.0",
+  "licenseFile": "YOLOX_LICENSE.txt",
+  "licenseSource": "https://github.com/Megvii-BaseDetection/YOLOX/blob/main/LICENSE",
+  "licenseNote": "Official model linked from Apache-2.0 repository; retain upstream notices. No separate model license document is supplied in this release.",
+  "downloadedAtUtc": "2026-10-11T13:34:46Z",
+  "sha256": "427cc366d34e27ff7a03e2899b5e3671425c262ea2291f88bb942bc1cc70b0f7",
+  "bytes": 20219662,
+  "inputSize": [
+    416,
+    416
+  ],
+  "dataset": "COCO pretrained, not trained by the Roomwise team",
+  "categoryCoverage": [
+    "chair",
+    "couch",
+    "bed",
+    "dining table"
+  ],
+  "runtime": "ONNX Runtime CPU",
+  "validation": "onnxruntime_session_loaded",
+  "inputTensor": [
+    {
+      "name": "images",
+      "shape": [
+        1,
+        3,
+        416,
+        416
+      ]
+    }
+  ],
+  "outputTensor": [
+    {
+      "name": "output",
+      "shape": [
+        1,
+        3549,
+        85
+      ]
+    }
+  ]
+}

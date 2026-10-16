@@ -1,0 +1,1230 @@
+{
+  "evaluated_at": "2026-10-11",
+  "test_rooms": 682,
+  "test_houses": 498,
+  "split": "house-level deterministic SHA256 split; test not used for model selection",
+  "seed": 96117,
+  "task": "recover professionally designed layouts from simulated perturbations, not real moving-house observations",
+  "important_limitations": [
+    "A reference is one reasonable layout, not a unique optimum.",
+    "No door/window/route annotations in the chosen arrays; no circulation or accessibility claim.",
+    "No new-furniture selection, mesh reconstruction, natural-language evaluation, or real household user study.",
+    "Simple rule is clamp-to-room-bounds + cardinal-angle snap, not app's multistart geometry planner."
+  ],
+  "levels": [
+    {
+      "position_noise_std_m": 0.2,
+      "angle_noise_std_deg": 15,
+      "methods": {
+        "identity": {
+          "position_mae_m": 0.25240422177854566,
+          "position_rmse_m": 0.2854752132368565,
+          "angle_mae_deg": 12.209011758495127,
+          "evaluated_movable_items": 2288,
+          "footprint_outside_items": 1344,
+          "footprint_outside_item_rate": 0.45698741924515474,
+          "overlapping_footprint_pairs": 806,
+          "overlap_pair_rate": 0.1475649945075064,
+          "rooms_with_overlap": 524,
+          "rooms_with_overlap_rate": 0.7683284457478006,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.22794390425422173
+            },
+            "bookshelf": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.28088436686954826
+            },
+            "cabinet": {
+              "movable_item_count": 62,
+              "position_mae_m": 0.2790055684346645
+            },
+            "chair": {
+              "movable_item_count": 69,
+              "position_mae_m": 0.2549362208168786
+            },
+            "children_cabinet": {
+              "movable_item_count": 15,
+              "position_mae_m": 0.2638409908288532
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 0.22936682785642787
+            },
+            "desk": {
+              "movable_item_count": 40,
+              "position_mae_m": 0.2317744207136244
+            },
+            "double_bed": {
+              "movable_item_count": 455,
+              "position_mae_m": 0.24529401850166402
+            },
+            "dressing_chair": {
+              "movable_item_count": 17,
+              "position_mae_m": 0.2900453969560131
+            },
+            "dressing_table": {
+              "movable_item_count": 43,
+              "position_mae_m": 0.24140551474356778
+            },
+            "kids_bed": {
+              "movable_item_count": 16,
+              "position_mae_m": 0.29260954025754643
+            },
+            "nightstand": {
+              "movable_item_count": 756,
+              "position_mae_m": 0.25112389466187723
+            },
+            "shelf": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.23189775550868183
+            },
+            "single_bed": {
+              "movable_item_count": 72,
+              "position_mae_m": 0.25459128969494293
+            },
+            "sofa": {
+              "movable_item_count": 6,
+              "position_mae_m": 0.0998618292941108
+            },
+            "stool": {
+              "movable_item_count": 35,
+              "position_mae_m": 0.2416610611383483
+            },
+            "table": {
+              "movable_item_count": 54,
+              "position_mae_m": 0.23581837809776524
+            },
+            "tv_stand": {
+              "movable_item_count": 110,
+              "position_mae_m": 0.26218873196429526
+            },
+            "wardrobe": {
+              "movable_item_count": 467,
+              "position_mae_m": 0.26011488816870315
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        },
+        "rule": {
+          "position_mae_m": 0.196064162515601,
+          "position_rmse_m": 0.2382136080260483,
+          "angle_mae_deg": 1.2354018966426445,
+          "evaluated_movable_items": 2288,
+          "footprint_outside_items": 109,
+          "footprint_outside_item_rate": 0.03706222373342401,
+          "overlapping_footprint_pairs": 893,
+          "overlap_pair_rate": 0.16349322592456975,
+          "rooms_with_overlap": 557,
+          "rooms_with_overlap_rate": 0.8167155425219942,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.19395192405472994
+            },
+            "bookshelf": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.22173202325086747
+            },
+            "cabinet": {
+              "movable_item_count": 62,
+              "position_mae_m": 0.2301402440683203
+            },
+            "chair": {
+              "movable_item_count": 69,
+              "position_mae_m": 0.2513748021079331
+            },
+            "children_cabinet": {
+              "movable_item_count": 15,
+              "position_mae_m": 0.13058357619234404
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 0.22936682785642787
+            },
+            "desk": {
+              "movable_item_count": 40,
+              "position_mae_m": 0.16558286426085797
+            },
+            "double_bed": {
+              "movable_item_count": 455,
+              "position_mae_m": 0.19817910676971437
+            },
+            "dressing_chair": {
+              "movable_item_count": 17,
+              "position_mae_m": 0.2647408847982965
+            },
+            "dressing_table": {
+              "movable_item_count": 43,
+              "position_mae_m": 0.1998858405357837
+            },
+            "kids_bed": {
+              "movable_item_count": 16,
+              "position_mae_m": 0.18849180148012298
+            },
+            "nightstand": {
+              "movable_item_count": 756,
+              "position_mae_m": 0.20150781031913548
+            },
+            "shelf": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.2029716170959455
+            },
+            "single_bed": {
+              "movable_item_count": 72,
+              "position_mae_m": 0.17927718972802476
+            },
+            "sofa": {
+              "movable_item_count": 6,
+              "position_mae_m": 0.0998618292941108
+            },
+            "stool": {
+              "movable_item_count": 35,
+              "position_mae_m": 0.23243753570520828
+            },
+            "table": {
+              "movable_item_count": 54,
+              "position_mae_m": 0.20574904664140026
+            },
+            "tv_stand": {
+              "movable_item_count": 110,
+              "position_mae_m": 0.22133161623618863
+            },
+            "wardrobe": {
+              "movable_item_count": 467,
+              "position_mae_m": 0.1670000977033935
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        },
+        "model_1_steps": {
+          "position_mae_m": 0.15486470880863482,
+          "position_rmse_m": 0.201149533234876,
+          "angle_mae_deg": 4.636003273762544,
+          "evaluated_movable_items": 2288,
+          "footprint_outside_items": 857,
+          "footprint_outside_item_rate": 0.29139748384903097,
+          "overlapping_footprint_pairs": 827,
+          "overlap_pair_rate": 0.15140974002196997,
+          "rooms_with_overlap": 530,
+          "rooms_with_overlap_rate": 0.7771260997067448,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.2089462370660054
+            },
+            "bookshelf": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.2436800126092327
+            },
+            "cabinet": {
+              "movable_item_count": 62,
+              "position_mae_m": 0.1991031366497889
+            },
+            "chair": {
+              "movable_item_count": 69,
+              "position_mae_m": 0.23936195522684064
+            },
+            "children_cabinet": {
+              "movable_item_count": 15,
+              "position_mae_m": 0.15932425761843913
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 0.3884055075577123
+            },
+            "desk": {
+              "movable_item_count": 40,
+              "position_mae_m": 0.18049733048884067
+            },
+            "double_bed": {
+              "movable_item_count": 455,
+              "position_mae_m": 0.1294031704085819
+            },
+            "dressing_chair": {
+              "movable_item_count": 17,
+              "position_mae_m": 0.24191756173097226
+            },
+            "dressing_table": {
+              "movable_item_count": 43,
+              "position_mae_m": 0.13113080643893038
+            },
+            "kids_bed": {
+              "movable_item_count": 16,
+              "position_mae_m": 0.16144534182216866
+            },
+            "nightstand": {
+              "movable_item_count": 756,
+              "position_mae_m": 0.13649096276313394
+            },
+            "shelf": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.2308139632861994
+            },
+            "single_bed": {
+              "movable_item_count": 72,
+              "position_mae_m": 0.16129206501426363
+            },
+            "sofa": {
+              "movable_item_count": 6,
+              "position_mae_m": 0.150977861313026
+            },
+            "stool": {
+              "movable_item_count": 35,
+              "position_mae_m": 0.27505260482936394
+            },
+            "table": {
+              "movable_item_count": 54,
+              "position_mae_m": 0.15673192352561516
+            },
+            "tv_stand": {
+              "movable_item_count": 110,
+              "position_mae_m": 0.19935417249494353
+            },
+            "wardrobe": {
+              "movable_item_count": 467,
+              "position_mae_m": 0.1550882493171514
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        },
+        "model_3_steps": {
+          "position_mae_m": 0.15917448010947402,
+          "position_rmse_m": 0.21009781196762412,
+          "angle_mae_deg": 4.762456288258556,
+          "evaluated_movable_items": 2288,
+          "footprint_outside_items": 921,
+          "footprint_outside_item_rate": 0.31315878952737164,
+          "overlapping_footprint_pairs": 824,
+          "overlap_pair_rate": 0.1508604906627609,
+          "rooms_with_overlap": 525,
+          "rooms_with_overlap_rate": 0.7697947214076246,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.2209278170615059
+            },
+            "bookshelf": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.25654213219539596
+            },
+            "cabinet": {
+              "movable_item_count": 62,
+              "position_mae_m": 0.20643261798832258
+            },
+            "chair": {
+              "movable_item_count": 69,
+              "position_mae_m": 0.25512812510119465
+            },
+            "children_cabinet": {
+              "movable_item_count": 15,
+              "position_mae_m": 0.17276551236662385
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 0.4524803711570461
+            },
+            "desk": {
+              "movable_item_count": 40,
+              "position_mae_m": 0.1881810797713285
+            },
+            "double_bed": {
+              "movable_item_count": 455,
+              "position_mae_m": 0.1309757840231462
+            },
+            "dressing_chair": {
+              "movable_item_count": 17,
+              "position_mae_m": 0.24838706468076535
+            },
+            "dressing_table": {
+              "movable_item_count": 43,
+              "position_mae_m": 0.13874898679461098
+            },
+            "kids_bed": {
+              "movable_item_count": 16,
+              "position_mae_m": 0.14248989255373073
+            },
+            "nightstand": {
+              "movable_item_count": 756,
+              "position_mae_m": 0.13998990833281452
+            },
+            "shelf": {
+              "movable_item_count": 23,
+              "position_mae_m": 0.25116966198003965
+            },
+            "single_bed": {
+              "movable_item_count": 72,
+              "position_mae_m": 0.16029976849179567
+            },
+            "sofa": {
+              "movable_item_count": 6,
+              "position_mae_m": 0.18717232336169165
+            },
+            "stool": {
+              "movable_item_count": 35,
+              "position_mae_m": 0.2860674794682566
+            },
+            "table": {
+              "movable_item_count": 54,
+              "position_mae_m": 0.1707498980589172
+            },
+            "tv_stand": {
+              "movable_item_count": 110,
+              "position_mae_m": 0.19631093446647888
+            },
+            "wardrobe": {
+              "movable_item_count": 467,
+              "position_mae_m": 0.15978478861648598
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        }
+      },
+      "reference_footprint_geometry": {
+        "footprint_outside_items": 93,
+        "footprint_outside_item_rate": 0.03162189731383883,
+        "overlapping_footprint_pairs": 670,
+        "overlap_pair_rate": 0.1226656902233614,
+        "rooms_with_overlap": 401,
+        "rooms_with_overlap_rate": 0.5879765395894428,
+        "checked_items": 2941,
+        "checked_pairs": 5462,
+        "area_tolerance_m2": 0.01,
+        "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact"
+      }
+    },
+    {
+      "position_noise_std_m": 0.45,
+      "angle_noise_std_deg": 30,
+      "methods": {
+        "identity": {
+          "position_mae_m": 0.5642335692263771,
+          "position_rmse_m": 0.6346780086647789,
+          "angle_mae_deg": 23.962850885545667,
+          "evaluated_movable_items": 2287,
+          "footprint_outside_items": 1524,
+          "footprint_outside_item_rate": 0.5181910914654879,
+          "overlapping_footprint_pairs": 881,
+          "overlap_pair_rate": 0.16129622848773342,
+          "rooms_with_overlap": 527,
+          "rooms_with_overlap_rate": 0.7727272727272727,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 21,
+              "position_mae_m": 0.5145803964881696
+            },
+            "bookshelf": {
+              "movable_item_count": 20,
+              "position_mae_m": 0.6416473495067079
+            },
+            "cabinet": {
+              "movable_item_count": 61,
+              "position_mae_m": 0.5281266017366036
+            },
+            "chair": {
+              "movable_item_count": 74,
+              "position_mae_m": 0.516884901166001
+            },
+            "children_cabinet": {
+              "movable_item_count": 16,
+              "position_mae_m": 0.44234570226805714
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 0.9367723566677577
+            },
+            "desk": {
+              "movable_item_count": 39,
+              "position_mae_m": 0.6121812870592572
+            },
+            "double_bed": {
+              "movable_item_count": 448,
+              "position_mae_m": 0.5655489874472128
+            },
+            "dressing_chair": {
+              "movable_item_count": 15,
+              "position_mae_m": 0.4576597656548496
+            },
+            "dressing_table": {
+              "movable_item_count": 53,
+              "position_mae_m": 0.5822569568588578
+            },
+            "kids_bed": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.6450188103191122
+            },
+            "nightstand": {
+              "movable_item_count": 770,
+              "position_mae_m": 0.5632111499836332
+            },
+            "shelf": {
+              "movable_item_count": 19,
+              "position_mae_m": 0.45291101190721694
+            },
+            "single_bed": {
+              "movable_item_count": 63,
+              "position_mae_m": 0.5407096350084631
+            },
+            "sofa": {
+              "movable_item_count": 7,
+              "position_mae_m": 0.48544138063847025
+            },
+            "stool": {
+              "movable_item_count": 35,
+              "position_mae_m": 0.565792257526721
+            },
+            "table": {
+              "movable_item_count": 60,
+              "position_mae_m": 0.5403327136348287
+            },
+            "tv_stand": {
+              "movable_item_count": 100,
+              "position_mae_m": 0.6007722860161986
+            },
+            "wardrobe": {
+              "movable_item_count": 471,
+              "position_mae_m": 0.577399932147691
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        },
+        "rule": {
+          "position_mae_m": 0.4254973266787118,
+          "position_rmse_m": 0.5161907018214242,
+          "angle_mae_deg": 11.472493727300396,
+          "evaluated_movable_items": 2287,
+          "footprint_outside_items": 136,
+          "footprint_outside_item_rate": 0.046242774566473986,
+          "overlapping_footprint_pairs": 1024,
+          "overlap_pair_rate": 0.18747711461003294,
+          "rooms_with_overlap": 565,
+          "rooms_with_overlap_rate": 0.8284457478005866,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 21,
+              "position_mae_m": 0.41393819469931603
+            },
+            "bookshelf": {
+              "movable_item_count": 20,
+              "position_mae_m": 0.41966037579491333
+            },
+            "cabinet": {
+              "movable_item_count": 61,
+              "position_mae_m": 0.4297763029225967
+            },
+            "chair": {
+              "movable_item_count": 74,
+              "position_mae_m": 0.47945628680306934
+            },
+            "children_cabinet": {
+              "movable_item_count": 16,
+              "position_mae_m": 0.2573058408799811
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 0.8817172785781398
+            },
+            "desk": {
+              "movable_item_count": 39,
+              "position_mae_m": 0.44247916107593727
+            },
+            "double_bed": {
+              "movable_item_count": 448,
+              "position_mae_m": 0.43930391294297694
+            },
+            "dressing_chair": {
+              "movable_item_count": 15,
+              "position_mae_m": 0.4368547852315739
+            },
+            "dressing_table": {
+              "movable_item_count": 53,
+              "position_mae_m": 0.4221042305161084
+            },
+            "kids_bed": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.3202603500501625
+            },
+            "nightstand": {
+              "movable_item_count": 770,
+              "position_mae_m": 0.4183361139904213
+            },
+            "shelf": {
+              "movable_item_count": 19,
+              "position_mae_m": 0.3035519068922922
+            },
+            "single_bed": {
+              "movable_item_count": 63,
+              "position_mae_m": 0.3907889895542015
+            },
+            "sofa": {
+              "movable_item_count": 7,
+              "position_mae_m": 0.4546962011958334
+            },
+            "stool": {
+              "movable_item_count": 35,
+              "position_mae_m": 0.5083059104524007
+            },
+            "table": {
+              "movable_item_count": 60,
+              "position_mae_m": 0.4420673490878798
+            },
+            "tv_stand": {
+              "movable_item_count": 100,
+              "position_mae_m": 0.5175080857999557
+            },
+            "wardrobe": {
+              "movable_item_count": 471,
+              "position_mae_m": 0.4024268106684245
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        },
+        "model_1_steps": {
+          "position_mae_m": 0.22390155928251934,
+          "position_rmse_m": 0.2960175714959362,
+          "angle_mae_deg": 7.571953424467974,
+          "evaluated_movable_items": 2287,
+          "footprint_outside_items": 918,
+          "footprint_outside_item_rate": 0.31213872832369943,
+          "overlapping_footprint_pairs": 868,
+          "overlap_pair_rate": 0.15891614793116074,
+          "rooms_with_overlap": 539,
+          "rooms_with_overlap_rate": 0.7903225806451613,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 21,
+              "position_mae_m": 0.32586946526965016
+            },
+            "bookshelf": {
+              "movable_item_count": 20,
+              "position_mae_m": 0.33105885431955073
+            },
+            "cabinet": {
+              "movable_item_count": 61,
+              "position_mae_m": 0.3311249261365304
+            },
+            "chair": {
+              "movable_item_count": 74,
+              "position_mae_m": 0.38832487316714465
+            },
+            "children_cabinet": {
+              "movable_item_count": 16,
+              "position_mae_m": 0.2589275536830312
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 0.5556672099421245
+            },
+            "desk": {
+              "movable_item_count": 39,
+              "position_mae_m": 0.3359893866527474
+            },
+            "double_bed": {
+              "movable_item_count": 448,
+              "position_mae_m": 0.18898382800238497
+            },
+            "dressing_chair": {
+              "movable_item_count": 15,
+              "position_mae_m": 0.2813056778696443
+            },
+            "dressing_table": {
+              "movable_item_count": 53,
+              "position_mae_m": 0.2640880703124304
+            },
+            "kids_bed": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.23600660433488277
+            },
+            "nightstand": {
+              "movable_item_count": 770,
+              "position_mae_m": 0.18331985431932307
+            },
+            "shelf": {
+              "movable_item_count": 19,
+              "position_mae_m": 0.23940949978327275
+            },
+            "single_bed": {
+              "movable_item_count": 63,
+              "position_mae_m": 0.20073623440217256
+            },
+            "sofa": {
+              "movable_item_count": 7,
+              "position_mae_m": 0.43839821302504134
+            },
+            "stool": {
+              "movable_item_count": 35,
+              "position_mae_m": 0.39148358542929534
+            },
+            "table": {
+              "movable_item_count": 60,
+              "position_mae_m": 0.3285478073069507
+            },
+            "tv_stand": {
+              "movable_item_count": 100,
+              "position_mae_m": 0.22255511453113783
+            },
+            "wardrobe": {
+              "movable_item_count": 471,
+              "position_mae_m": 0.22986490466506665
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        },
+        "model_3_steps": {
+          "position_mae_m": 0.22939079721054212,
+          "position_rmse_m": 0.30134290003539665,
+          "angle_mae_deg": 7.765124286059015,
+          "evaluated_movable_items": 2287,
+          "footprint_outside_items": 1087,
+          "footprint_outside_item_rate": 0.36960217613056784,
+          "overlapping_footprint_pairs": 833,
+          "overlap_pair_rate": 0.15250823874038813,
+          "rooms_with_overlap": 531,
+          "rooms_with_overlap_rate": 0.7785923753665689,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 21,
+              "position_mae_m": 0.3350958832734062
+            },
+            "bookshelf": {
+              "movable_item_count": 20,
+              "position_mae_m": 0.33330274164022095
+            },
+            "cabinet": {
+              "movable_item_count": 61,
+              "position_mae_m": 0.3334800936812043
+            },
+            "chair": {
+              "movable_item_count": 74,
+              "position_mae_m": 0.38527654550882673
+            },
+            "children_cabinet": {
+              "movable_item_count": 16,
+              "position_mae_m": 0.2686577075030232
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 0.5230447295177615
+            },
+            "desk": {
+              "movable_item_count": 39,
+              "position_mae_m": 0.33435853839101476
+            },
+            "double_bed": {
+              "movable_item_count": 448,
+              "position_mae_m": 0.1947628821461183
+            },
+            "dressing_chair": {
+              "movable_item_count": 15,
+              "position_mae_m": 0.26566303561700383
+            },
+            "dressing_table": {
+              "movable_item_count": 53,
+              "position_mae_m": 0.2523379399989619
+            },
+            "kids_bed": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.23548808929597503
+            },
+            "nightstand": {
+              "movable_item_count": 770,
+              "position_mae_m": 0.1908982952980999
+            },
+            "shelf": {
+              "movable_item_count": 19,
+              "position_mae_m": 0.24375226432520805
+            },
+            "single_bed": {
+              "movable_item_count": 63,
+              "position_mae_m": 0.20036638970589968
+            },
+            "sofa": {
+              "movable_item_count": 7,
+              "position_mae_m": 0.4307517121560313
+            },
+            "stool": {
+              "movable_item_count": 35,
+              "position_mae_m": 0.38629044674857566
+            },
+            "table": {
+              "movable_item_count": 60,
+              "position_mae_m": 0.333084470778417
+            },
+            "tv_stand": {
+              "movable_item_count": 100,
+              "position_mae_m": 0.22930210882792185
+            },
+            "wardrobe": {
+              "movable_item_count": 471,
+              "position_mae_m": 0.23844075702746897
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        }
+      },
+      "reference_footprint_geometry": {
+        "footprint_outside_items": 93,
+        "footprint_outside_item_rate": 0.03162189731383883,
+        "overlapping_footprint_pairs": 670,
+        "overlap_pair_rate": 0.1226656902233614,
+        "rooms_with_overlap": 401,
+        "rooms_with_overlap_rate": 0.5879765395894428,
+        "checked_items": 2941,
+        "checked_pairs": 5462,
+        "area_tolerance_m2": 0.01,
+        "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact"
+      }
+    },
+    {
+      "position_noise_std_m": 0.8,
+      "angle_noise_std_deg": 50,
+      "methods": {
+        "identity": {
+          "position_mae_m": 0.9920899543239454,
+          "position_rmse_m": 1.1199250851265423,
+          "angle_mae_deg": 40.08565330299316,
+          "evaluated_movable_items": 2300,
+          "footprint_outside_items": 1661,
+          "footprint_outside_item_rate": 0.564773886433186,
+          "overlapping_footprint_pairs": 817,
+          "overlap_pair_rate": 0.14957890882460637,
+          "rooms_with_overlap": 505,
+          "rooms_with_overlap_rate": 0.7404692082111437,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 25,
+              "position_mae_m": 1.0402465358840642
+            },
+            "bookshelf": {
+              "movable_item_count": 25,
+              "position_mae_m": 1.0552272701202348
+            },
+            "cabinet": {
+              "movable_item_count": 57,
+              "position_mae_m": 0.9501556510873207
+            },
+            "chair": {
+              "movable_item_count": 66,
+              "position_mae_m": 1.009931505520592
+            },
+            "children_cabinet": {
+              "movable_item_count": 13,
+              "position_mae_m": 1.052954560862695
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 1.267663214504954
+            },
+            "desk": {
+              "movable_item_count": 44,
+              "position_mae_m": 1.064777513982003
+            },
+            "double_bed": {
+              "movable_item_count": 455,
+              "position_mae_m": 0.9816858465669269
+            },
+            "dressing_chair": {
+              "movable_item_count": 17,
+              "position_mae_m": 1.0091153073192
+            },
+            "dressing_table": {
+              "movable_item_count": 48,
+              "position_mae_m": 1.078909880914088
+            },
+            "kids_bed": {
+              "movable_item_count": 13,
+              "position_mae_m": 1.3562367602261687
+            },
+            "nightstand": {
+              "movable_item_count": 735,
+              "position_mae_m": 0.9788826609721359
+            },
+            "shelf": {
+              "movable_item_count": 20,
+              "position_mae_m": 0.8657761450468024
+            },
+            "single_bed": {
+              "movable_item_count": 76,
+              "position_mae_m": 0.9600297697651381
+            },
+            "sofa": {
+              "movable_item_count": 7,
+              "position_mae_m": 1.0117779847309476
+            },
+            "stool": {
+              "movable_item_count": 34,
+              "position_mae_m": 0.9937504188976852
+            },
+            "table": {
+              "movable_item_count": 64,
+              "position_mae_m": 0.9191651660081587
+            },
+            "tv_stand": {
+              "movable_item_count": 107,
+              "position_mae_m": 0.9057445148518176
+            },
+            "wardrobe": {
+              "movable_item_count": 492,
+              "position_mae_m": 1.0282992771079098
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        },
+        "rule": {
+          "position_mae_m": 0.7129434012436682,
+          "position_rmse_m": 0.861399864709811,
+          "angle_mae_deg": 34.36921489765554,
+          "evaluated_movable_items": 2300,
+          "footprint_outside_items": 179,
+          "footprint_outside_item_rate": 0.060863651819109146,
+          "overlapping_footprint_pairs": 1180,
+          "overlap_pair_rate": 0.21603808128890517,
+          "rooms_with_overlap": 601,
+          "rooms_with_overlap_rate": 0.8812316715542522,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 25,
+              "position_mae_m": 0.7670240204517161
+            },
+            "bookshelf": {
+              "movable_item_count": 25,
+              "position_mae_m": 0.6613298274721885
+            },
+            "cabinet": {
+              "movable_item_count": 57,
+              "position_mae_m": 0.7224785649322643
+            },
+            "chair": {
+              "movable_item_count": 66,
+              "position_mae_m": 0.8581692925017328
+            },
+            "children_cabinet": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.6280421934921526
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 1.267663214504954
+            },
+            "desk": {
+              "movable_item_count": 44,
+              "position_mae_m": 0.7383024206207388
+            },
+            "double_bed": {
+              "movable_item_count": 455,
+              "position_mae_m": 0.6609037252945354
+            },
+            "dressing_chair": {
+              "movable_item_count": 17,
+              "position_mae_m": 0.7065050236867475
+            },
+            "dressing_table": {
+              "movable_item_count": 48,
+              "position_mae_m": 0.6924013435625849
+            },
+            "kids_bed": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.6286144148966856
+            },
+            "nightstand": {
+              "movable_item_count": 735,
+              "position_mae_m": 0.7095497168019262
+            },
+            "shelf": {
+              "movable_item_count": 20,
+              "position_mae_m": 0.5798172500440718
+            },
+            "single_bed": {
+              "movable_item_count": 76,
+              "position_mae_m": 0.6439138186187469
+            },
+            "sofa": {
+              "movable_item_count": 7,
+              "position_mae_m": 0.783978187687097
+            },
+            "stool": {
+              "movable_item_count": 34,
+              "position_mae_m": 0.8890892583980574
+            },
+            "table": {
+              "movable_item_count": 64,
+              "position_mae_m": 0.699680638320437
+            },
+            "tv_stand": {
+              "movable_item_count": 107,
+              "position_mae_m": 0.7794365208300711
+            },
+            "wardrobe": {
+              "movable_item_count": 492,
+              "position_mae_m": 0.7377587879309444
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        },
+        "model_1_steps": {
+          "position_mae_m": 0.36720477961945086,
+          "position_rmse_m": 0.5169477590770925,
+          "angle_mae_deg": 13.643318807915088,
+          "evaluated_movable_items": 2300,
+          "footprint_outside_items": 929,
+          "footprint_outside_item_rate": 0.3158789527371642,
+          "overlapping_footprint_pairs": 1017,
+          "overlap_pair_rate": 0.18619553277187842,
+          "rooms_with_overlap": 573,
+          "rooms_with_overlap_rate": 0.8401759530791789,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 25,
+              "position_mae_m": 0.6124075474024883
+            },
+            "bookshelf": {
+              "movable_item_count": 25,
+              "position_mae_m": 0.5682026478240473
+            },
+            "cabinet": {
+              "movable_item_count": 57,
+              "position_mae_m": 0.48271549495482263
+            },
+            "chair": {
+              "movable_item_count": 66,
+              "position_mae_m": 0.6409683260269122
+            },
+            "children_cabinet": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.44350673832871534
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 1.0551748861764654
+            },
+            "desk": {
+              "movable_item_count": 44,
+              "position_mae_m": 0.6000146365788416
+            },
+            "double_bed": {
+              "movable_item_count": 455,
+              "position_mae_m": 0.25798830998125843
+            },
+            "dressing_chair": {
+              "movable_item_count": 17,
+              "position_mae_m": 0.4136578893277498
+            },
+            "dressing_table": {
+              "movable_item_count": 48,
+              "position_mae_m": 0.44537568396146715
+            },
+            "kids_bed": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.4140749728368889
+            },
+            "nightstand": {
+              "movable_item_count": 735,
+              "position_mae_m": 0.3223729678693003
+            },
+            "shelf": {
+              "movable_item_count": 20,
+              "position_mae_m": 0.513876886619623
+            },
+            "single_bed": {
+              "movable_item_count": 76,
+              "position_mae_m": 0.26876725606935525
+            },
+            "sofa": {
+              "movable_item_count": 7,
+              "position_mae_m": 0.7421872356907544
+            },
+            "stool": {
+              "movable_item_count": 34,
+              "position_mae_m": 0.6527580928910224
+            },
+            "table": {
+              "movable_item_count": 64,
+              "position_mae_m": 0.48869247158470214
+            },
+            "tv_stand": {
+              "movable_item_count": 107,
+              "position_mae_m": 0.2918142761650765
+            },
+            "wardrobe": {
+              "movable_item_count": 492,
+              "position_mae_m": 0.41106723451197064
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        },
+        "model_3_steps": {
+          "position_mae_m": 0.4284910791667279,
+          "position_rmse_m": 0.5720386604789801,
+          "angle_mae_deg": 14.943916952722356,
+          "evaluated_movable_items": 2300,
+          "footprint_outside_items": 1249,
+          "footprint_outside_item_rate": 0.4246854811288677,
+          "overlapping_footprint_pairs": 883,
+          "overlap_pair_rate": 0.16166239472720614,
+          "rooms_with_overlap": 536,
+          "rooms_with_overlap_rate": 0.7859237536656891,
+          "checked_items": 2941,
+          "checked_pairs": 5462,
+          "area_tolerance_m2": 0.01,
+          "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact",
+          "category_position_errors": {
+            "armchair": {
+              "movable_item_count": 25,
+              "position_mae_m": 0.6554068363374772
+            },
+            "bookshelf": {
+              "movable_item_count": 25,
+              "position_mae_m": 0.5941110912061178
+            },
+            "cabinet": {
+              "movable_item_count": 57,
+              "position_mae_m": 0.5007986225046522
+            },
+            "chair": {
+              "movable_item_count": 66,
+              "position_mae_m": 0.6435423471608225
+            },
+            "children_cabinet": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.5189852311755581
+            },
+            "coffee_table": {
+              "movable_item_count": 2,
+              "position_mae_m": 1.019629358272994
+            },
+            "desk": {
+              "movable_item_count": 44,
+              "position_mae_m": 0.6553830602517947
+            },
+            "double_bed": {
+              "movable_item_count": 455,
+              "position_mae_m": 0.34940644682601446
+            },
+            "dressing_chair": {
+              "movable_item_count": 17,
+              "position_mae_m": 0.47332096625837916
+            },
+            "dressing_table": {
+              "movable_item_count": 48,
+              "position_mae_m": 0.512038269994589
+            },
+            "kids_bed": {
+              "movable_item_count": 13,
+              "position_mae_m": 0.5778644855409619
+            },
+            "nightstand": {
+              "movable_item_count": 735,
+              "position_mae_m": 0.391239262096406
+            },
+            "shelf": {
+              "movable_item_count": 20,
+              "position_mae_m": 0.5741163404730207
+            },
+            "single_bed": {
+              "movable_item_count": 76,
+              "position_mae_m": 0.3573758763668266
+            },
+            "sofa": {
+              "movable_item_count": 7,
+              "position_mae_m": 0.7307313541206943
+            },
+            "stool": {
+              "movable_item_count": 34,
+              "position_mae_m": 0.6297057256710145
+            },
+            "table": {
+              "movable_item_count": 64,
+              "position_mae_m": 0.5129328219336107
+            },
+            "tv_stand": {
+              "movable_item_count": 107,
+              "position_mae_m": 0.3383651513666771
+            },
+            "wardrobe": {
+              "movable_item_count": 492,
+              "position_mae_m": 0.4568520205625065
+            }
+          },
+          "locked_position_max_change_m": 0.0,
+          "locked_angle_max_change_deg": 0.0
+        }
+      },
+      "reference_footprint_geometry": {
+        "footprint_outside_items": 93,
+        "footprint_outside_item_rate": 0.03162189731383883,
+        "overlapping_footprint_pairs": 670,
+        "overlap_pair_rate": 0.1226656902233614,
+        "rooms_with_overlap": 401,
+        "rooms_with_overlap_rate": 0.5879765395894428,
+        "checked_items": 2941,
+        "checked_pairs": 5462,
+        "area_tolerance_m2": 0.01,
+        "interpretation": "2D full bounding-box footprints; intersections may overestimate real mesh collisions or intentional contact"
+      }
+    }
+  ],
+  "figure_status": "matplotlib unavailable",
+  "clean_layout_drift": {
+    "position_mae_m": 0.13435433627503016,
+    "position_rmse_m": 0.18007260063322728,
+    "angle_mae_deg": 3.2323563608901655,
+    "evaluated_movable_items": 2294
+  },
+  "elapsed_seconds": 4.78
+}

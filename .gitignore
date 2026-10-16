@@ -1,0 +1,115 @@
+# Python environments and package caches
+.venv/
+venv/
+env/
+ENV/
+.conda/
+.wheelhouse/
+pip-wheel-metadata/
+*.egg-info/
+
+# Python bytecode and tool caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+.tox/
+.nox/
+.hypothesis/
+.ipynb_checkpoints/
+
+# Python build, test, and coverage output
+build/
+dist/
+*.whl
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+junit*.xml
+docs/pytest-results.xml
+docs/final_checks.json
+
+# Node.js dependencies, caches, logs, and build output
+node_modules/
+.npm/
+.npm-cache/
+frontend/.npm-probe.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+frontend/test-results/
+frontend/playwright-report/
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
+test-results/
+playwright-report/
+
+# Local runtime state and user data
+runtime/
+*.sqlite3
+*.db
+*.log
+*.pid
+
+# Local datasets, caches, and generated model weights
+/data/
+/datasets/
+/models/
+*.npy
+*.npz
+artifacts/models/*.pt
+artifacts/models/*.pth
+artifacts/models/*.ckpt
+artifacts/models/*.safetensors
+artifacts/models/*.bin
+!artifacts/models/layout_denoiser.pt
+artifacts/detectors/*.onnx
+artifacts/detectors/*.engine
+artifacts/detectors/*.pt
+artifacts/detectors/*.bin
+!artifacts/detectors/yolox_tiny.onnx
+
+# Demo deliverables are kept locally and regenerated or distributed separately
+artifacts/demo/
+artifacts/screenshots/
+
+# Generated source packages and release archives
+release/
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Environment files and private credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Temporary files and operating-system metadata
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE metadata that is local by default
+.idea/
+.vscode/*.log

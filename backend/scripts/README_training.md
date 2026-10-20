@@ -20,7 +20,7 @@
 
 ```powershell
 conda activate roomwise
-Set-Location D:\code\pythonProjects\roomwise\app
+Set-Location D:\code\roomwise
 $env:PYTHONPATH = "$PWD\backend"
 python backend\scripts\prepare_data.py
 python backend\scripts\train_layout.py --threads 4 --epochs 90 --max-seconds 600

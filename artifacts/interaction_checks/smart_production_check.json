@@ -1,0 +1,663 @@
+{
+  "checkedAt": "2026-10-20T12:03:03.451Z",
+  "url": "http://127.0.0.1:8765",
+  "paidCommandRequests": 0,
+  "languageText": "说说你想怎么调整\ndeepseek-flash 理解要求 · 约束程序执行",
+  "generation": {
+    "baseVersion": 0,
+    "candidates": [
+      {
+        "id": "c77eaef1eefa",
+        "scene": {
+          "id": "demo",
+          "name": "搬家后的卧室",
+          "version": 0,
+          "room": {
+            "width": 5.2,
+            "depth": 4.2,
+            "height": 2.7,
+            "polygon": null,
+            "referenceImageUrl": null,
+            "door": {
+              "wall": "south",
+              "offset": 0.45,
+              "width": 0.9,
+              "clearance": 0.9
+            },
+            "windows": [
+              {
+                "id": "window-1",
+                "wall": "north",
+                "offset": 2.3,
+                "width": 1.5,
+                "sillHeight": 0.9
+              }
+            ]
+          },
+          "items": [
+            {
+              "id": "bed-1",
+              "label": "旧双人床",
+              "category": "double_bed",
+              "width": 1.8,
+              "depth": 2,
+              "height": 0.55,
+              "x": 3.991666666666667,
+              "z": 3.17,
+              "rotation": 180,
+              "locked": false,
+              "keep": true,
+              "source": "brought",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "wardrobe-1",
+              "label": "房内衣柜",
+              "category": "wardrobe",
+              "width": 1.8,
+              "depth": 0.6,
+              "height": 2.1,
+              "x": 1.15,
+              "z": 3.8,
+              "rotation": 0,
+              "locked": true,
+              "keep": true,
+              "source": "existing",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "desk-1",
+              "label": "旧书桌",
+              "category": "desk",
+              "width": 1.2,
+              "depth": 0.6,
+              "height": 0.75,
+              "x": 3.725714285714286,
+              "z": 0.32999999999999996,
+              "rotation": 0,
+              "locked": false,
+              "keep": true,
+              "source": "brought",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "chair-1",
+              "label": "办公椅",
+              "category": "chair",
+              "width": 0.5,
+              "depth": 0.5,
+              "height": 0.85,
+              "x": 3.725714285714286,
+              "z": 1,
+              "rotation": 180,
+              "locked": false,
+              "keep": true,
+              "source": "brought",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "nightstand-1",
+              "label": "床头柜",
+              "category": "nightstand",
+              "width": 0.5,
+              "depth": 0.45,
+              "height": 0.5,
+              "x": 2.761666666666667,
+              "z": 3.8449999999999998,
+              "rotation": 180,
+              "locked": false,
+              "keep": true,
+              "source": "existing",
+              "assetUrl": null,
+              "photoUrl": null
+            }
+          ],
+          "preferences": []
+        },
+        "validation": {
+          "valid": true,
+          "issues": [],
+          "metrics": {
+            "collisions": 0,
+            "outOfBounds": 0,
+            "doorConflicts": 0,
+            "reachable": true,
+            "checkedItems": 5,
+            "roomArea": 21.84,
+            "freeArea": 15.965,
+            "accessibility": {
+              "evaluated": true,
+              "reachable": true,
+              "unreachableItemIds": [],
+              "gridStep": 0.18,
+              "walkingDiameter": 0.3,
+              "reachableCells": 349,
+              "freeCells": 349,
+              "reason": "基于家具外围和入口的近似步行检查，未模拟柜门开启"
+            }
+          },
+          "limitations": [
+            "以确认后的二维占地和高度检查，未使用精细家具网格",
+            "局部桌椅交叠与地毯按类别例外处理",
+            "通行检查为工程近似，不能代表建筑规范验收"
+          ]
+        },
+        "score": 78.84,
+        "mode": "rules",
+        "summary": "5件家具全部保留，1件保持锁定；通过占地与入口近似检查。本次按床与床头柜、桌椅等功能组搜索摆放，使用规则模板，未运行布局网络。",
+        "quality": {
+          "penalty": 0.2685,
+          "components": {
+            "wallAnchoring": 0,
+            "axisAlignment": 0,
+            "functionalGrouping": 0,
+            "clearance": 0.06,
+            "openCenter": 0.0001,
+            "rugPlacement": 0,
+            "backAlignment": 0.2084,
+            "seatFacing": 0,
+            "bedsidePlacement": 0
+          },
+          "preferencePenalty": 0
+        },
+        "requirements": {
+          "satisfied": true,
+          "checks": [],
+          "unsatisfied": [],
+          "thresholds": {
+            "maxWindowGapMeters": 0.6,
+            "windowProjectionToleranceMeters": 0.15,
+            "maxFacingAngleDegrees": 20,
+            "maxWallGapMeters": 0.15,
+            "maxWallBackAngleDegrees": 20
+          },
+          "note": "靠墙、靠窗和朝向阈值是本产品的可调整默认值，不是建筑或人体工学标准；靠墙默认家具背面朝墙、正面朝室内。"
+        },
+        "provenance": {
+          "initialization": "functional_group_template",
+          "layoutNetwork": false,
+          "geometricRepair": false,
+          "functionalGroups": true
+        }
+      },
+      {
+        "id": "1ef93196307d",
+        "scene": {
+          "id": "demo",
+          "name": "搬家后的卧室",
+          "version": 0,
+          "room": {
+            "width": 5.2,
+            "depth": 4.2,
+            "height": 2.7,
+            "polygon": null,
+            "referenceImageUrl": null,
+            "door": {
+              "wall": "south",
+              "offset": 0.45,
+              "width": 0.9,
+              "clearance": 0.9
+            },
+            "windows": [
+              {
+                "id": "window-1",
+                "wall": "north",
+                "offset": 2.3,
+                "width": 1.5,
+                "sillHeight": 0.9
+              }
+            ]
+          },
+          "items": [
+            {
+              "id": "bed-1",
+              "label": "旧双人床",
+              "category": "double_bed",
+              "width": 1.8,
+              "depth": 2,
+              "height": 0.55,
+              "x": 4.2700000000000005,
+              "z": 3.06,
+              "rotation": 180,
+              "locked": false,
+              "keep": true,
+              "source": "brought",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "wardrobe-1",
+              "label": "房内衣柜",
+              "category": "wardrobe",
+              "width": 1.8,
+              "depth": 0.6,
+              "height": 2.1,
+              "x": 1.15,
+              "z": 3.8,
+              "rotation": 0,
+              "locked": true,
+              "keep": true,
+              "source": "existing",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "desk-1",
+              "label": "旧书桌",
+              "category": "desk",
+              "width": 1.2,
+              "depth": 0.6,
+              "height": 0.75,
+              "x": 3.725714285714286,
+              "z": 0.32999999999999996,
+              "rotation": 0,
+              "locked": false,
+              "keep": true,
+              "source": "brought",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "chair-1",
+              "label": "办公椅",
+              "category": "chair",
+              "width": 0.5,
+              "depth": 0.5,
+              "height": 0.85,
+              "x": 3.725714285714286,
+              "z": 1,
+              "rotation": 180,
+              "locked": false,
+              "keep": true,
+              "source": "brought",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "nightstand-1",
+              "label": "床头柜",
+              "category": "nightstand",
+              "width": 0.5,
+              "depth": 0.45,
+              "height": 0.5,
+              "x": 3.0400000000000005,
+              "z": 3.7350000000000003,
+              "rotation": 180,
+              "locked": false,
+              "keep": true,
+              "source": "existing",
+              "assetUrl": null,
+              "photoUrl": null
+            }
+          ],
+          "preferences": []
+        },
+        "validation": {
+          "valid": true,
+          "issues": [],
+          "metrics": {
+            "collisions": 0,
+            "outOfBounds": 0,
+            "doorConflicts": 0,
+            "reachable": true,
+            "checkedItems": 5,
+            "roomArea": 21.84,
+            "freeArea": 15.965,
+            "accessibility": {
+              "evaluated": true,
+              "reachable": true,
+              "unreachableItemIds": [],
+              "gridStep": 0.18,
+              "walkingDiameter": 0.3,
+              "reachableCells": 371,
+              "freeCells": 371,
+              "reason": "基于家具外围和入口的近似步行检查，未模拟柜门开启"
+            }
+          },
+          "limitations": [
+            "以确认后的二维占地和高度检查，未使用精细家具网格",
+            "局部桌椅交叠与地毯按类别例外处理",
+            "通行检查为工程近似，不能代表建筑规范验收"
+          ]
+        },
+        "score": 78.84,
+        "mode": "rules",
+        "summary": "5件家具全部保留，1件保持锁定；通过占地与入口近似检查。本次按床与床头柜、桌椅等功能组搜索摆放，使用规则模板，未运行布局网络。",
+        "quality": {
+          "penalty": 0.2684,
+          "components": {
+            "wallAnchoring": 0,
+            "axisAlignment": 0,
+            "functionalGrouping": 0,
+            "clearance": 0.06,
+            "openCenter": 0,
+            "rugPlacement": 0,
+            "backAlignment": 0.2084,
+            "seatFacing": 0,
+            "bedsidePlacement": 0
+          },
+          "preferencePenalty": 0
+        },
+        "requirements": {
+          "satisfied": true,
+          "checks": [],
+          "unsatisfied": [],
+          "thresholds": {
+            "maxWindowGapMeters": 0.6,
+            "windowProjectionToleranceMeters": 0.15,
+            "maxFacingAngleDegrees": 20,
+            "maxWallGapMeters": 0.15,
+            "maxWallBackAngleDegrees": 20
+          },
+          "note": "靠墙、靠窗和朝向阈值是本产品的可调整默认值，不是建筑或人体工学标准；靠墙默认家具背面朝墙、正面朝室内。"
+        },
+        "provenance": {
+          "initialization": "functional_group_template",
+          "layoutNetwork": false,
+          "geometricRepair": false,
+          "functionalGroups": true
+        }
+      },
+      {
+        "id": "a8de8bb82794",
+        "scene": {
+          "id": "demo",
+          "name": "搬家后的卧室",
+          "version": 0,
+          "room": {
+            "width": 5.2,
+            "depth": 4.2,
+            "height": 2.7,
+            "polygon": null,
+            "referenceImageUrl": null,
+            "door": {
+              "wall": "south",
+              "offset": 0.45,
+              "width": 0.9,
+              "clearance": 0.9
+            },
+            "windows": [
+              {
+                "id": "window-1",
+                "wall": "north",
+                "offset": 2.3,
+                "width": 1.5,
+                "sillHeight": 0.9
+              }
+            ]
+          },
+          "items": [
+            {
+              "id": "bed-1",
+              "label": "旧双人床",
+              "category": "double_bed",
+              "width": 1.8,
+              "depth": 2,
+              "height": 0.55,
+              "x": 4.2700000000000005,
+              "z": 3.06,
+              "rotation": 180,
+              "locked": false,
+              "keep": true,
+              "source": "brought",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "wardrobe-1",
+              "label": "房内衣柜",
+              "category": "wardrobe",
+              "width": 1.8,
+              "depth": 0.6,
+              "height": 2.1,
+              "x": 1.15,
+              "z": 3.8,
+              "rotation": 0,
+              "locked": true,
+              "keep": true,
+              "source": "existing",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "desk-1",
+              "label": "旧书桌",
+              "category": "desk",
+              "width": 1.2,
+              "depth": 0.6,
+              "height": 0.75,
+              "x": 3.7,
+              "z": 0.32999999999999996,
+              "rotation": 0,
+              "locked": false,
+              "keep": true,
+              "source": "brought",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "chair-1",
+              "label": "办公椅",
+              "category": "chair",
+              "width": 0.5,
+              "depth": 0.5,
+              "height": 0.85,
+              "x": 3.6,
+              "z": 1,
+              "rotation": 180,
+              "locked": false,
+              "keep": true,
+              "source": "brought",
+              "assetUrl": null,
+              "photoUrl": null
+            },
+            {
+              "id": "nightstand-1",
+              "label": "床头柜",
+              "category": "nightstand",
+              "width": 0.5,
+              "depth": 0.45,
+              "height": 0.5,
+              "x": 3.0400000000000005,
+              "z": 3.7350000000000003,
+              "rotation": 180,
+              "locked": false,
+              "keep": true,
+              "source": "existing",
+              "assetUrl": null,
+              "photoUrl": null
+            }
+          ],
+          "preferences": []
+        },
+        "validation": {
+          "valid": true,
+          "issues": [],
+          "metrics": {
+            "collisions": 0,
+            "outOfBounds": 0,
+            "doorConflicts": 0,
+            "reachable": true,
+            "checkedItems": 5,
+            "roomArea": 21.84,
+            "freeArea": 15.965,
+            "accessibility": {
+              "evaluated": true,
+              "reachable": true,
+              "unreachableItemIds": [],
+              "gridStep": 0.18,
+              "walkingDiameter": 0.3,
+              "reachableCells": 372,
+              "freeCells": 372,
+              "reason": "基于家具外围和入口的近似步行检查，未模拟柜门开启"
+            }
+          },
+          "limitations": [
+            "以确认后的二维占地和高度检查，未使用精细家具网格",
+            "局部桌椅交叠与地毯按类别例外处理",
+            "通行检查为工程近似，不能代表建筑规范验收"
+          ]
+        },
+        "score": 78.57,
+        "mode": "rules",
+        "summary": "5件家具全部保留，1件保持锁定；通过占地与入口近似检查。本次按床与床头柜、桌椅等功能组搜索摆放，使用规则模板，未运行布局网络。",
+        "quality": {
+          "penalty": 0.2728,
+          "components": {
+            "wallAnchoring": 0,
+            "axisAlignment": 0,
+            "functionalGrouping": 0,
+            "clearance": 0.06,
+            "openCenter": 0,
+            "rugPlacement": 0,
+            "backAlignment": 0.2084,
+            "seatFacing": 0.0044,
+            "bedsidePlacement": 0
+          },
+          "preferencePenalty": 0
+        },
+        "requirements": {
+          "satisfied": true,
+          "checks": [],
+          "unsatisfied": [],
+          "thresholds": {
+            "maxWindowGapMeters": 0.6,
+            "windowProjectionToleranceMeters": 0.15,
+            "maxFacingAngleDegrees": 20,
+            "maxWallGapMeters": 0.15,
+            "maxWallBackAngleDegrees": 20
+          },
+          "note": "靠墙、靠窗和朝向阈值是本产品的可调整默认值，不是建筑或人体工学标准；靠墙默认家具背面朝墙、正面朝室内。"
+        },
+        "provenance": {
+          "initialization": "functional_group_template",
+          "layoutNetwork": false,
+          "geometricRepair": false,
+          "functionalGroups": true
+        }
+      }
+    ],
+    "diagnostics": {
+      "modelStatus": {
+        "available": true,
+        "loaded": true,
+        "architecture": "2-layer 64-dimensional set Transformer",
+        "checkpoint": "layout_denoiser.pt",
+        "scope": "卧室家具位置与朝向去噪；不生成网格、不保证几何可行",
+        "training": {
+          "trained": true,
+          "trained_at": "2026-10-11",
+          "architecture": "set Transformer, hidden=64, layers=2, heads=4",
+          "parameters": 73604,
+          "train_rooms": 4514,
+          "validation_rooms": 696,
+          "seed": 20261011,
+          "epochs_run": 144,
+          "best_epoch": 132,
+          "steps": 5184,
+          "duration_seconds": 278.5,
+          "device": "cpu",
+          "threads": 4,
+          "best_validation": {
+            "position_mae_m": 0.22471040239923015,
+            "position_rmse_m": 0.30487316219207905,
+            "angle_mae_deg": 8.289795174444961,
+            "evaluated_movable_items": 2241
+          },
+          "validation_identity": {
+            "position_mae_m": 0.5642209360368857,
+            "position_rmse_m": 0.6346696533868942,
+            "angle_mae_deg": 24.222860003816407,
+            "evaluated_movable_items": 2241
+          },
+          "noise_position_std_m": [
+            0.1,
+            0.3,
+            0.6,
+            1
+          ],
+          "noise_angle_std_deg": [
+            8,
+            20,
+            40,
+            65
+          ],
+          "locks": "random probability 0..0.45; no noise applied to locked items; runtime forcibly preserves locks",
+          "augmentation": "quarter-turn room rotations and online noise, after house split",
+          "objective": "movable-item metre-squared coordinate loss + 0.4 trig orientation squared loss",
+          "scope": "supervised denoising of existing bedroom coordinates, not from-scratch furniture selection or 3D reconstruction",
+          "code_sha256": {
+            "training": "5bdf95a01ae51ba9c0c31cb471696577ab260b669205d39363082bddf1b14a27",
+            "model": "e82eb48aa8af73efbea99a162be2b6296d5f80134bc4691116b691b3e841bd8e"
+          },
+          "checkpoint_sha256": "38da9124acb334253d2d02f88a083c390953488bd86a4bea42ed5978e4058dde",
+          "training_stages": [
+            {
+              "epochs": 90,
+              "seconds": 174.77,
+              "checkpoint_sha256": "d75d2f183eed32eadf4b3982a844589798dc210dcaa3c529bf84d0f11a97dd8b",
+              "initial_lr": 0.0015,
+              "resumed": false
+            },
+            {
+              "epochs": 54,
+              "seconds": 103.74,
+              "checkpoint_sha256": "38da9124acb334253d2d02f88a083c390953488bd86a4bea42ed5978e4058dde",
+              "initial_lr": 0.0003,
+              "resumed": true,
+              "optimiser_reset": true,
+              "resume_from_best_epoch": 86
+            }
+          ]
+        },
+        "limitation": "主要训练类别是床、床头柜、衣柜；任意组合及大幅搬家重排仍需约束检查"
+      },
+      "seed": 42,
+      "attempts": 3,
+      "modelProposals": 0,
+      "rawModelAccepted": 0,
+      "repairedModelAccepted": 0,
+      "rejected": {
+        "geometry": 0,
+        "requirements": 0,
+        "placementFailed": 0,
+        "model": 0
+      },
+      "searchLimits": {
+        "items": 32,
+        "seconds": 8,
+        "placementChecks": 12000
+      },
+      "message": "已找到3个通过检查的候选；分数只表示定义的布局偏好，不代表设计质量概率。",
+      "limitations": [
+        "候选必须通过独立占地、门口及近似可达性检查",
+        "未找到候选不能证明所有数学可能性都无解；请调整条件后重试"
+      ],
+      "requirements": {
+        "satisfied": true,
+        "checks": [],
+        "unsatisfied": [],
+        "thresholds": {
+          "maxWindowGapMeters": 0.6,
+          "windowProjectionToleranceMeters": 0.15,
+          "maxFacingAngleDegrees": 20,
+          "maxWallGapMeters": 0.15,
+          "maxWallBackAngleDegrees": 20
+        },
+        "note": "靠墙、靠窗和朝向阈值是本产品的可调整默认值，不是建筑或人体工学标准；靠墙默认家具背面朝墙、正面朝室内。"
+      },
+      "functionalTemplates": {
+        "attempts": 3,
+        "accepted": 3
+      },
+      "elapsedSeconds": 4.278,
+      "searchBudgetExhausted": false
+    }
+  },
+  "previewAvailable": true,
+  "pageErrors": []
+}

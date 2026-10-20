@@ -113,3 +113,15 @@ Desktop.ini
 # IDE metadata that is local by default
 .idea/
 .vscode/*.log
+
+# Public language configuration templates; real local configuration stays private.
+!.env.language.example
+/language.local.json
+
+# Only the self-made language benchmark is public; never include dataset arrays.
+!/data/
+/data/*
+!/data/interaction_benchmark_v1.jsonl
+
+# Generated machine-specific test reports remain local.
+docs/*checks.xml

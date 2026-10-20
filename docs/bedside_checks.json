@@ -1,0 +1,49 @@
+{
+  "checkedAt": "2026-10-20T15:10:17.287567+00:00",
+  "backendFullSuite": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "4",
+    "tests": "328",
+    "time": "41.757",
+    "timestamp": "2026-10-20T23:03:56.540781+08:00",
+    "hostname": "\u8ffd\u661f\u8005"
+  },
+  "additionalNewApiTests": {
+    "passed": 2,
+    "path": "backend/tests/test_bedside_api.py"
+  },
+  "totalBackendPassed": 326,
+  "browser": {
+    "passed": 10,
+    "apiPort": 8766,
+    "provider": "disabled"
+  },
+  "build": "passed",
+  "additionalPaidCalls": 0,
+  "screenshotScenarioCandidates": 3,
+  "productionGenerationSeconds": 2.752,
+  "independentChecks": [
+    {
+      "localX": 1.2299999999999998,
+      "localZ": -0.6950000000000005,
+      "right": true,
+      "atHead": true
+    },
+    {
+      "localX": 1.2299999999999998,
+      "localZ": -0.6950000000000005,
+      "right": true,
+      "atHead": true
+    },
+    {
+      "localX": 1.23,
+      "localZ": -0.595,
+      "right": true,
+      "atHead": true
+    }
+  ],
+  "pageErrors": [],
+  "limitation": "Engineering fixture reconstructed from screenshot details; not broad instruction accuracy or user preference research."
+}

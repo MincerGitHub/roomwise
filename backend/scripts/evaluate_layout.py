@@ -7,6 +7,7 @@ are unavailable in these source arrays and are not claimed as ML test metrics.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
@@ -17,9 +18,9 @@ import numpy as np
 
 APP = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(APP / "backend"))
-from roomwise.learning import _load_model, torch
+from roomwise.learning import MODEL_PATH, load_checkpoint, torch
 from roomwise.learning import CATEGORIES
-from train_layout import noisy_batch, predict, metrics
+from train_layout import file_sha256, noisy_batch, predict, metrics
 
 
 def box_corners(position, size, angle):
@@ -98,22 +99,48 @@ def plot_examples(data,indices,polygons,batch,outputs,destination):
     fig.tight_layout();fig.savefig(destination,dpi=140);plt.close(fig)
 
 
-def main():
+def main(argv=None):
     parser=argparse.ArgumentParser()
     parser.add_argument("--data",type=Path,default=APP.parent/"data/Roomwise/bedrooms_prepared.npz")
     parser.add_argument("--threads",type=int,default=4)
     parser.add_argument("--batch-size",type=int,default=128)
-    args=parser.parse_args()
+    parser.add_argument("--device",choices=("cpu","cuda"),default="cpu")
+    parser.add_argument("--checkpoint",type=Path,default=MODEL_PATH)
+    parser.add_argument("--output-dir",type=Path,
+                        help="isolated run root; writes experiments/ without replacing live metrics")
+    parser.add_argument("--evaluate-split",choices=("validation","test"),default="test",
+                        help="use validation for research model selection, reserve test for a final selected configuration")
+    parser.add_argument("--no-figures",action="store_true",
+                        help="skip source-derived plot caches and figures, and do not import matplotlib")
+    args=parser.parse_args(argv)
+    if torch is None:
+        raise RuntimeError("Install PyTorch in the project's virtual environment first.")
+    if args.threads<1 or args.batch_size<1:
+        parser.error("threads and batch-size must be positive")
+    if args.output_dir:
+        output=args.output_dir.resolve()
+        production=(APP/"artifacts").resolve()
+        if output==production or production in output.parents:
+            parser.error("Explicit research output-dir must be outside production artifacts; omit it only for the legacy evaluation workflow")
     torch.set_num_threads(args.threads)
     with np.load(args.data,allow_pickle=False) as source:
         data={k:source[k] for k in source.files}
     all_polygons=json.loads(args.data.with_suffix(".polygons.json").read_text(encoding="utf-8"))
-    test=np.flatnonzero(data["split"]==2)
+    test=np.flatnonzero(data["split"]==(1 if args.evaluate_split=="validation" else 2))
+    if len(test)==0:
+        raise ValueError("Chosen evaluation split has no rooms.")
     polygons=[all_polygons[i] for i in test]
-    model=_load_model()
-    if model is None: raise RuntimeError("No real trained checkpoint present")
+    model=load_checkpoint(args.checkpoint,args.device)
     model.eval(); start=time.perf_counter()
-    report={"evaluated_at":"2026-10-11","test_rooms":len(test),"test_houses":len(set(data["house"][test])),
+    experiment_dir=(args.output_dir or APP/"artifacts")/"experiments"
+    experiment_dir.mkdir(parents=True,exist_ok=True)
+    report={"evaluated_at":datetime.now(timezone.utc).isoformat(),
+            "evaluated_rooms":len(test),"evaluated_houses":len(set(data["house"][test])),
+            "evaluation_split":args.evaluate_split,"device":args.device,"threads":args.threads,
+            "checkpoint":str(args.checkpoint),"checkpoint_sha256":file_sha256(args.checkpoint),
+            "environment":{"python":sys.version,"pytorch":torch.__version__,"numpy":np.__version__,
+                           "cuda_runtime":torch.version.cuda,
+                           "gpu_name":torch.cuda.get_device_name() if args.device=="cuda" else None},
             "split":"house-level deterministic SHA256 split; test not used for model selection",
             "seed":96117,"task":"recover professionally designed layouts from simulated perturbations, not real moving-house observations",
             "important_limitations":["A reference is one reasonable layout, not a unique optimum.",
@@ -121,6 +148,8 @@ def main():
                                      "No new-furniture selection, mesh reconstruction, natural-language evaluation, or real household user study.",
                                      "Simple rule is clamp-to-room-bounds + cardinal-angle snap, not app's multistart geometry planner."],
             "levels":[]}
+    report[f"{args.evaluate_split}_rooms"]=len(test)
+    report[f"{args.evaluate_split}_houses"]=len(set(data["house"][test]))
     for level,(std,angle_std) in enumerate(((.2,15),(.45,30),(.8,50))):
         batch=noisy_batch(data,test,np.random.default_rng(96117+level),noise=(std,angle_std))
         outputs={"identity":(batch["noisy_pos"],batch["noisy_angle"]),"rule":simple_rule(batch["noisy_pos"],batch["noisy_angle"],batch)}
@@ -148,16 +177,19 @@ def main():
             row["methods"][method]=m
         report["levels"].append(row)
         print(json.dumps(row),flush=True)
-        if level==1:
+        if level==1 and not args.no_figures:
             # A plot-only cache outside the distributable app lets global Python
             # render figures if the minimal API venv has no matplotlib.
-            np.savez_compressed(args.data.parent/"heldout_plot_cache.npz",
+            cache_dir=experiment_dir if args.output_dir else args.data.parent
+            cache_name="validation_plot" if args.evaluate_split=="validation" else "heldout_plot"
+            np.savez_compressed(cache_dir/f"{cache_name}_cache.npz",
                                 **{k:v[:3] for k,v in batch.items()},
                                 rule_pos=outputs["rule"][0][:3], rule_angle=outputs["rule"][1][:3],
                                 model_pos=outputs["model_3_steps"][0][:3],model_angle=outputs["model_3_steps"][1][:3])
-            (args.data.parent/"heldout_plot_polygons.json").write_text(json.dumps(polygons[:3]),encoding="utf-8")
+            (cache_dir/f"{cache_name}_polygons.json").write_text(json.dumps(polygons[:3]),encoding="utf-8")
             try:
-                plot_examples(data,test,polygons,batch,outputs,APP/"artifacts/experiments/heldout_examples.png")
+                plot_examples(data,test,polygons,batch,outputs,
+                              experiment_dir/("validation_examples.png" if args.evaluate_split=="validation" else "heldout_examples.png"))
             except ImportError:
                 report["figure_status"]="matplotlib unavailable"
     clean=noisy_batch(data,test,np.random.default_rng(1294),noise=(0,0))
@@ -167,7 +199,7 @@ def main():
         pieces.append(predict(model,sub,iterations=3))
     report["clean_layout_drift"]=metrics(np.concatenate([p[0] for p in pieces]),np.concatenate([p[1] for p in pieces]),clean)
     report["elapsed_seconds"]=round(time.perf_counter()-start,2)
-    outfile=APP/"artifacts/experiments/heldout_metrics.json"
+    outfile=experiment_dir/("validation_metrics.json" if args.evaluate_split=="validation" else "heldout_metrics.json")
     outfile.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps({"saved":str(outfile),"elapsed_seconds":report["elapsed_seconds"],"clean_layout_drift":report["clean_layout_drift"]}),flush=True)
 

@@ -9,6 +9,7 @@ meta=json.loads((ROOT/'artifacts/models/layout_denoiser.json').read_text(encodin
 evals=json.loads((ROOT/'artifacts/experiments/heldout_metrics.json').read_text(encoding='utf-8'))
 app=json.loads((ROOT/'artifacts/experiments/app_metrics.json').read_text(encoding='utf-8'))
 level=evals['levels'][1];methods=level['methods'];checks={}
+if (OUT/'final_checks.json').exists():checks=json.loads((OUT/'final_checks.json').read_text(encoding='utf-8'))
 
 def esc(x):return html.escape(str(x))
 def table(headers,rows):return '<table><thead><tr>'+''.join('<th>'+esc(x)+'</th>' for x in headers)+'</tr></thead><tbody>'+''.join('<tr>'+''.join('<td>'+esc(x)+'</td>' for x in row)+'</tr>' for row in rows)+'</tbody></table>'

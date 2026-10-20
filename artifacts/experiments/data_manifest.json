@@ -115,6 +115,6 @@
   "rotation": "source angles in radians -> Three.js positive-y yaw in degrees, NOT negated",
   "position": "source translations[x/z] minus floor-polygon bounding-box center; metres",
   "model_scope": "19 bedroom categories; coordinate/orientation denoising, no mesh reconstruction",
-  "cache": "D:\\Desktop\\AI-project\\智能家装设计\\data\\Roomwise\\bedrooms_prepared.npz",
+  "cache": "D:/code\\data\\Roomwise\\bedrooms_prepared.npz",
   "redistribution": "Local restricted dataset cache; do not redistribute raw arrays"
 }

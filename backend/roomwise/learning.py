@@ -96,14 +96,37 @@ def _load_model():
     return _cached_model(MODEL_PATH.stat().st_mtime_ns)
 
 
+def resolve_device(requested: str = "cpu"):
+    """Choose a device explicitly; the web application's default stays CPU.
+
+    Do not automatically claim CUDA support or silently fall back from an
+    explicitly requested GPU. Merely importing this module does not initialise
+    a CUDA context, which matters when a separate acquisition job owns the GPU.
+    """
+    if torch is None:
+        raise RuntimeError("PyTorch is not installed.")
+    if requested not in ("cpu", "cuda"):
+        raise ValueError("Device must be cpu or cuda.")
+    if requested == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was explicitly requested, but PyTorch cannot use a GPU.")
+    return torch.device(requested)
+
+
+def load_checkpoint(checkpoint_path: Path, device: str = "cpu"):
+    """Load an explicitly named research checkpoint, independently of the API cache."""
+    selected = resolve_device(device)
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+    model = LayoutDenoiser(hidden=checkpoint.get("hidden", 64), layers=checkpoint.get("layers", 2))
+    model.load_state_dict(checkpoint["state_dict"])
+    model.to(selected)
+    model.eval()
+    return model
+
+
 @lru_cache(maxsize=1)
 def _cached_model(checkpoint_mtime: int):
     torch.set_num_threads(min(4, torch.get_num_threads()))
-    checkpoint = torch.load(MODEL_PATH, map_location="cpu", weights_only=True)
-    model = LayoutDenoiser(hidden=checkpoint.get("hidden", 64), layers=checkpoint.get("layers", 2))
-    model.load_state_dict(checkpoint["state_dict"])
-    model.eval()
-    return model
+    return load_checkpoint(MODEL_PATH, "cpu")
 
 
 def model_status() -> dict[str, Any]:

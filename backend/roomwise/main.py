@@ -12,7 +12,8 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from .catalog import catalog, demo_scene, suggest_items
-from .commands import apply_command
+from .command_service import interpret_command
+from .intent_planner import language_status
 from .generator import generate_layouts, learning_status
 from .geometry import validate_scene
 from .schemas import CommandRequest, GenerateRequest, SceneRequest, SuggestRequest
@@ -58,7 +59,8 @@ def health():
         video = _video_module().video_status()
     except HTTPException:
         video = {"available": False, "name": None, "limitations": ["视频模块不可用"]}
-    return {"status": "ok", "version": __version__, "modelLoaded": bool(model.get("loaded", model.get("available", model.get("modelLoaded", False)))), "model": model, "videoDetector": video, "commandParser": "offline_restricted_chinese", "units": "metres"}
+    language = language_status()
+    return {"status": "ok", "version": __version__, "modelLoaded": bool(model.get("loaded", model.get("available", model.get("modelLoaded", False)))), "model": model, "videoDetector": video, "commandParser": "language_model_with_validated_executor" if language.get("enabled") else "offline_restricted_chinese", "language": language, "units": "metres"}
 
 
 @app.get("/catalog")
@@ -73,7 +75,12 @@ def get_demo():
 
 @app.post("/validate")
 def validate(request: SceneRequest):
-    return validate_scene(request.scene.model_dump())
+    from .window_constraints import evaluate_layout_requirements
+    from .bedside_constraints import evaluate_bedside_groups
+
+    scene = request.scene.model_dump()
+    return {**validate_scene(scene), "requirements": evaluate_layout_requirements(scene),
+            "functionalRelations": evaluate_bedside_groups(scene)}
 
 
 @app.post("/generate")
@@ -83,7 +90,7 @@ def generate(request: GenerateRequest):
 
 @app.post("/command")
 def command(request: CommandRequest):
-    return apply_command(request.scene.model_dump(), request.text, request.selectedId)
+    return interpret_command(request.scene.model_dump(), request.text, request.selectedId)
 
 
 @app.post("/suggest")

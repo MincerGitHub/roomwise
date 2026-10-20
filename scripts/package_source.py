@@ -9,10 +9,13 @@ files=[]
 for rel in targets:
  for p in (ROOT/rel).rglob('*'):
   if p.is_file() and not any(x in p.parts for x in ['__pycache__','.pytest_cache']): files.append(p)
-for rel in ['README.md','THIRD_PARTY.md','LICENSE','CONTRACT.md','requirements.txt','frontend/package.json','frontend/package-lock.json','frontend/index.html','frontend/tsconfig.json','frontend/vite.config.ts','frontend/playwright.config.ts']:
+for rel in ['README.md','THIRD_PARTY.md','LICENSE','CONTRACT.md','requirements.txt','start.ps1','start.bat','stop.ps1','setup.ps1','frontend/package.json','frontend/package-lock.json','frontend/index.html','frontend/tsconfig.json','frontend/vite.config.ts','frontend/vite.integration.config.ts','frontend/playwright.config.ts','.env.language.example','language.config.example.json']:
  p=ROOT/rel
  if p.is_file():files.append(p)
 for rel in ['artifacts/experiments/data_manifest.json','artifacts/experiments/heldout_metrics.json','artifacts/experiments/app_metrics.json','artifacts/experiments/app_scenarios.json','artifacts/experiments/RESULTS.md','artifacts/experiments/training_history.json','artifacts/experiments/training_environment.txt','artifacts/experiments/training_curves.png','artifacts/models/layout_denoiser.json','artifacts/detectors/manifest.json','artifacts/detectors/YOLOX_LICENSE.txt','artifacts/detectors/integration_evidence/generated_engineering_clip.avi','artifacts/detectors/integration_evidence/README.md']:
+ p=ROOT/rel
+ if p.is_file():files.append(p)
+for rel in ['data/interaction_benchmark_v1.jsonl','artifacts/interaction_checks/deepseek_live_commands.json','artifacts/interaction_checks/deepseek_local_replay.json','artifacts/interaction_checks/smart_production_check.json','artifacts/interaction_checks/functional_group_preview.png','artifacts/interaction_checks/bedside_after.json','artifacts/interaction_checks/bedside_production_check.json','artifacts/interaction_checks/bedside_right_preview.png','artifacts/interaction_checks/bedside_screenshot_scene_preview.png']:
  p=ROOT/rel
  if p.is_file():files.append(p)
 archive=OUT/'Roomwise_source.zip'

@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "provider": "chatcompletions",
+  "url": "https://api.deepseek.com",
+  "model": "deepseek-flash",
+  "apiKey": "",
+  "responseFormat": "json_object"
+}

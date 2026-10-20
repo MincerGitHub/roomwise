@@ -193,6 +193,173 @@ def validate_scene(scene: dict, check_access: bool = True):
     }
 
 
+def _axis_deviation_degrees(rotation: float) -> float:
+    """Distance from the nearest 0/90-degree orientation (0..45 degrees)."""
+    angle = float(rotation) % 90.0
+    return min(angle, 90.0 - angle)
+
+
+def _room_has_cardinal_axes(room: dict) -> bool:
+    """Do not assume 0/90-degree furniture angles in irregular floor plans."""
+    polygon = room.get("polygon")
+    if not polygon:
+        return True
+    points = [(float(point[0]), float(point[1])) for point in polygon]
+    if len(points) > 1 and math.dist(points[0], points[-1]) < 1e-5:
+        points.pop()
+    if len(points) != 4:
+        return False
+    for index, point in enumerate(points):
+        following = points[(index + 1) % len(points)]
+        dx, dz = abs(following[0] - point[0]), abs(following[1] - point[1])
+        if min(dx, dz) > 1e-4:
+            return False
+    return True
+
+
+def layout_quality(scene: dict) -> dict:
+    """Return a small, explainable soft score for a valid furniture layout.
+
+    This is deliberately a preference heuristic, not a claim that a layout is
+    beautiful or professionally designed.  Hard safety checks remain in
+    :func:`validate_scene`; this function only ranks candidates that already
+    passed those checks.  The terms favour common bedroom/living-room practice:
+    large pieces sit near a wall, furniture is aligned to the room axes, seats
+    stay close to their table/desk, and narrow gaps are avoided.  Locked items
+    are included because their positions are part of the room context, but
+    their constant contribution cannot make another candidate move them.
+    """
+    room = scene["room"]
+    shell = room_polygon(room)
+    diag = max(math.hypot(room["width"], room["depth"]), 1e-6)
+    cardinal_room = _room_has_cardinal_axes(room)
+    items = [i for i in scene.get("items", []) if i.get("category") != "rug"]
+    details = {
+        "wallAnchoring": 0.0,
+        "axisAlignment": 0.0,
+        "functionalGrouping": 0.0,
+        "clearance": 0.0,
+        "openCenter": 0.0,
+        "rugPlacement": 0.0,
+        "backAlignment": 0.0,
+        "seatFacing": 0.0,
+        "bedsidePlacement": 0.0,
+    }
+
+    # These pieces normally benefit from an adjacent wall.  Beds get a little
+    # more room because a headboard need not touch the wall exactly.
+    wall_categories = {
+        "double_bed", "single_bed", "kids_bed", "wardrobe", "desk", "sofa",
+        "bookshelf", "cabinet", "children_cabinet", "dressing_table", "tv_stand",
+    }
+    for item in items:
+        fp = footprint(item)
+        if item.get("category") in wall_categories:
+            target = .38 if "bed" in item["category"] else .24
+            distance = fp.distance(shell.boundary)
+            details["wallAnchoring"] += max(0.0, distance - target) / diag * 1.5
+            # A piece far from every wall is also more likely to have a
+            # visually awkward diagonal orientation in a rectangular room.
+            if cardinal_room and distance <= .8:
+                details["axisAlignment"] += _axis_deviation_degrees(item.get("rotation", 0)) / 45.0 * .22
+            # A side or front touching the wall is not equivalent to a
+            # headboard/cabinet back touching it. Score actual segment normals.
+            from .window_constraints import evaluate_wall_preference
+
+            back = evaluate_wall_preference(item, room, {"kind": "near_wall", "itemId": item["id"], "required": False})
+            metrics = back.get("metrics", {})
+            details["backAlignment"] += max(0., metrics.get("backDistanceMeters", diag)-.18) / diag * .8
+            details["backAlignment"] += metrics.get("backAlignmentErrorDegrees", 180) / 180 * .4
+
+    # A table/desk and its seat should read as one group.  A nightstand should
+    # sit beside a bed.  We only score relationships when both sides exist;
+    # the system must not punish a room for not owning a particular item.
+    tables = [i for i in items if i.get("category") in TABLE_CATEGORIES]
+    beds = [i for i in items if "bed" in i.get("category", "")]
+    nightstands = [i for i in items if i.get("category") == "nightstand"]
+    partners = {
+        "chair": {"desk", "table", "dressing_table"},
+        "dressing_chair": {"dressing_table"},
+        "stool": {"desk", "table", "dressing_table", "coffee_table"},
+    }
+    for seat in items:
+        partner_categories = partners.get(seat.get("category"), set())
+        seat_tables = [table for table in tables if table.get("category") in partner_categories]
+        if not seat_tables:
+            continue
+        table = min(seat_tables, key=lambda candidate: footprint(seat).distance(footprint(candidate)))
+        distance = footprint(seat).distance(footprint(table))
+        details["functionalGrouping"] += max(0.0, distance - .70) / diag * 2.0
+        if seat.get("category") in {"chair", "dressing_chair"}:
+            dx, dz = table["x"]-seat["x"], table["z"]-seat["z"]
+            length = math.hypot(dx, dz)
+            if length > 1e-6:
+                rotation = math.radians(float(seat.get("rotation", 0)))
+                dot = (math.sin(rotation)*dx + math.cos(rotation)*dz) / length
+                details["seatFacing"] += .8 * (1-max(-1.,min(1.,dot))) / 2
+    from .bedside_constraints import bedside_assignments
+    bedside_links = bedside_assignments(scene)
+    for stand in nightstands:
+        if not beds:
+            continue
+        linked_id = bedside_links.get(stand["id"], {}).get("targetId")
+        bed = next((candidate for candidate in beds if candidate["id"] == linked_id), None) or min(beds, key=lambda candidate: footprint(stand).distance(footprint(candidate)))
+        distance = footprint(stand).distance(footprint(bed))
+        details["functionalGrouping"] += max(0.0, distance - .45) / diag * 1.6
+        # Prefer a nightstand next to the long side of the bed instead of at
+        # its foot. Transform the centre offset into the bed's local axes.
+        angle = math.radians(float(bed.get("rotation", 0)))
+        dx, dz = stand["x"] - bed["x"], stand["z"] - bed["z"]
+        local_x = math.cos(angle) * dx - math.sin(angle) * dz
+        local_z = math.sin(angle) * dx + math.cos(angle) * dz
+        side_extent = bed["width"] / 2 + stand["width"] / 2 + .45
+        side_alignment = bed["depth"] * .32 + stand["depth"] * .35
+        details["functionalGrouping"] += max(0.0, abs(local_x) - side_extent) / diag * .8
+        details["functionalGrouping"] += max(0.0, abs(local_z) - side_alignment) / diag * 1.2
+        desired_z = -bed["depth"]/2 + stand["depth"]/2 + .08
+        details["bedsidePlacement"] += max(0., abs(local_z-desired_z)-.25) / diag * 1.8
+
+    # Hard collision checks already reject overlap.  This soft term discourages
+    # a barely passable .03m gap that looks like furniture has been stacked.
+    for index, first in enumerate(items):
+        first_fp = footprint(first)
+        for second in items[index + 1:]:
+            second_fp = footprint(second)
+            if first_fp.intersection(second_fp).area > EPSILON:
+                # A permitted partial chair tuck is intentional and should not
+                # be scored as an ugly gap.
+                if overlap_kind(first, second, first_fp.intersection(second_fp).area) == "seat_tuck":
+                    continue
+                continue
+            gap = first_fp.distance(second_fp)
+            details["clearance"] += max(0.0, .12 - gap) / .12 * .18
+
+    # Keep the centre visually available when a large item happens to cover it.
+    # A coffee table/rug is intentionally excluded because it commonly belongs
+    # in the middle of a room.
+    center = shell.centroid
+    centre_zone = center.buffer(min(room["width"], room["depth"]) * .12).intersection(shell)
+    centre_blockers = {"double_bed", "single_bed", "kids_bed", "wardrobe", "desk", "sofa", "cabinet", "bookshelf"}
+    occupied_centre = sum(footprint(item).intersection(centre_zone).area
+                          for item in items if item.get("category") in centre_blockers)
+    if centre_zone.area > EPSILON:
+        details["openCenter"] = .45 * min(1.0, occupied_centre / centre_zone.area)
+
+    # Rugs are floor layers.  If present, place them under/near furniture so
+    # they do not appear as an unrelated island at the edge of the room.
+    rugs = [i for i in scene.get("items", []) if i.get("category") == "rug"]
+    all_non_rugs = items
+    for rug in rugs:
+        if all_non_rugs:
+            closest = min(footprint(rug).distance(footprint(item)) for item in all_non_rugs)
+            details["rugPlacement"] += max(0.0, closest - .45) / diag * .5
+
+    # Round components for a stable API/debug display, while retaining enough
+    # precision for deterministic sorting of candidates.
+    penalty = sum(details.values())
+    return {"penalty": float(penalty), "components": {k: round(v, 4) for k, v in details.items()}}
+
+
 def assert_invariants(original: dict, proposed: dict):
     """Reject any omission, identity/size/metadata change or lock violation."""
     originals = {i["id"]: i for i in original["items"]}
@@ -228,4 +395,21 @@ def preference_penalty(scene: dict, original: dict):
             if windows:
                 distances = [math.dist((item["x"], item["z"]), opening_center(room, w)) for w in windows]
                 cost += min(distances) / diag
+        elif pref["kind"] == "bedside":
+            from .bedside_constraints import evaluate_bedside_preference
+            check = evaluate_bedside_preference(item, by_id.get(pref.get("targetId")), pref)
+            metrics = check.get("metrics", {})
+            cost += metrics.get("headOffsetErrorMeters", diag) / diag
+            if not check["satisfied"]:
+                cost += .4
+        elif pref["kind"] in ("near_wall", "face_window"):
+            from .window_constraints import evaluate_spatial_preference
+
+            check = evaluate_spatial_preference(item, room, pref)
+            metrics = check.get("metrics", {})
+            if pref["kind"] == "near_wall":
+                cost += 3 * metrics.get("distanceMeters", diag) / diag
+                cost += metrics.get("backAlignmentErrorDegrees", 180) / 90
+            else:
+                cost += metrics.get("angularErrorDegrees", 180) / 90
     return cost

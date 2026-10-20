@@ -108,6 +108,8 @@ def test_model_unavailable_never_claimed(monkeypatch):
 
 
 def test_hybrid_repairs_bad_model_output_without_claiming_raw_success(monkeypatch):
+    # Exercise the ML-repair fallback independently of the preferred templates.
+    monkeypatch.setattr("roomwise.generator.functional_template", lambda *args: None)
     def bad_proposal(scene, iterations=3):
         result = deepcopy(scene)
         by_id = {i["id"]: i for i in result["items"]}

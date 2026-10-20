@@ -1,0 +1,28 @@
+{
+  "checkedAt": "2026-10-20T12:03:47.242559+00:00",
+  "backend": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "4",
+    "tests": "277",
+    "time": "37.425",
+    "timestamp": "2026-10-20T20:00:43.617468+08:00",
+    "hostname": "\u8ffd\u661f\u8005"
+  },
+  "browser": {
+    "passed": 8,
+    "provider": "disabled",
+    "apiPort": 8766
+  },
+  "build": "passed",
+  "liveLanguageCalls": 3,
+  "additionalPaidCalls": 0,
+  "localReplay": "artifacts/interaction_checks/deepseek_local_replay.json",
+  "productionCheck": "artifacts/interaction_checks/smart_production_check.json",
+  "limitations": [
+    "Engineering validation only; not a majority-language accuracy study.",
+    "No human preference evaluation or professional furnishing quality guarantee.",
+    "Functional candidates may use similar room zoning."
+  ]
+}

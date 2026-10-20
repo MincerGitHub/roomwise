@@ -111,9 +111,28 @@ class Item(DataModel):
 
 
 class Preference(DataModel):
-    kind: Literal["near_window", "min_move"]
+    kind: Literal["near_window", "face_window", "near_wall", "bedside", "min_move"]
     itemId: str = Field(min_length=1, max_length=100)
     targetId: str | None = Field(default=None, max_length=100)
+    # Old saved scenes contain soft near-window preferences. Explicit commands
+    # can require the constraint without silently changing those old scenes.
+    required: bool = False
+    # These are room coordinates, independent of the user's current camera.
+    # None means any actual boundary segment, preferably the nearest one.
+    wall: Literal["north", "south", "west", "east"] | None = None
+    side: Literal["left", "right", "either"] | None = None
+
+    @model_validator(mode="after")
+    def target_matches_kind(self):
+        if self.kind in ("min_move", "near_wall") and self.targetId:
+            raise ValueError("少移动和靠墙偏好不能指定窗户目标")
+        if self.kind != "near_wall" and self.wall is not None:
+            raise ValueError("只有靠墙要求可以指定墙体方向")
+        if self.kind != "bedside" and self.side is not None:
+            raise ValueError("只有床头柜关系可以指定床的左右侧")
+        if self.kind == "bedside" and not self.targetId:
+            raise ValueError("床头柜关系必须指定床的家具 ID")
+        return self
 
 
 class Scene(DataModel):
@@ -132,7 +151,12 @@ class Scene(DataModel):
         for preference in self.preferences:
             if preference.itemId not in ids:
                 raise ValueError("偏好引用了不存在的家具")
-            if preference.targetId and preference.targetId not in {w.id for w in self.room.windows}:
+            if preference.kind == "bedside":
+                stand = next(item for item in self.items if item.id == preference.itemId)
+                bed = next((item for item in self.items if item.id == preference.targetId), None)
+                if stand.category != "nightstand" or not bed or bed.category not in {"double_bed", "single_bed", "kids_bed"}:
+                    raise ValueError("床头柜关系必须从床头柜指向存在的床")
+            elif preference.targetId and preference.targetId not in {w.id for w in self.room.windows}:
                 raise ValueError("偏好引用了不存在的窗户")
         return self
 

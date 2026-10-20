@@ -45,7 +45,12 @@ def test_api_prefix_and_static_upload_paths_do_not_conflict():
     scene = client.get("/api/demo").json()
     generated = client.post("/api/generate", json={"scene": scene, "mode": "rules", "count": 1, "seed": 42})
     assert generated.status_code == 200
-    assert generated.json()["candidates"]
+    candidates = generated.json()["candidates"]
+    assert candidates
+    assert all(candidate["validation"]["valid"] for candidate in candidates)
+    assert all("quality" in candidate and "components" in candidate["quality"] for candidate in candidates)
+    assert [candidate["score"] for candidate in candidates] == sorted(
+        [candidate["score"] for candidate in candidates], reverse=True)
     assert client.get("/uploads/missing-test.png").status_code == 404
     assert client.get("/api/catalog").json()["items"] == client.get("/catalog").json()["items"]
 

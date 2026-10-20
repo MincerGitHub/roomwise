@@ -68,20 +68,18 @@
 
 ## 复现命令
 
-先按根目录 `README.md` 创建并激活 Conda 环境。训练核心依赖的实际固定版本在 [requirements-training.txt](../backend/scripts/requirements-training.txt)，完整现场环境在 [training_environment.txt](../artifacts/experiments/training_environment.txt)。
+先使用应用安装脚本准备环境。训练核心依赖的实际固定版本在 [requirements-training.txt](../backend/scripts/requirements-training.txt)，完整现场环境在 [training_environment.txt](../artifacts/experiments/training_environment.txt)。
 
 数据归档应置于 `../data/LEGO-Net/3DFRONT_65347.zip`；路径相对于 `app`。如路径不同，可给准备脚本传 `--archive`。
 
 ```powershell
-Set-Location -LiteralPath 'D:\code\pythonProjects\roomwise\app'
-conda activate roomwise
-$env:PYTHONPATH = "$PWD\backend"
-python backend\scripts\prepare_data.py
-python backend\scripts\train_layout.py --threads 4 --epochs 90 --max-seconds 600
-python backend\scripts\train_layout.py --threads 4 --resume --epochs 250 --max-seconds 425
-python backend\scripts\evaluate_layout.py --threads 4
-python backend\scripts\evaluate_application.py --count 1 --seconds 5 --checks 8000
-python -m unittest discover -s backend\tests -p test_learning.py -v
+Set-Location -LiteralPath 'D:/code/roomwise'
+.\.venv\Scripts\python.exe backend\scripts\prepare_data.py
+.\.venv\Scripts\python.exe backend\scripts\train_layout.py --threads 4 --epochs 90 --max-seconds 600
+.\.venv\Scripts\python.exe backend\scripts\train_layout.py --threads 4 --resume --epochs 250 --max-seconds 425
+.\.venv\Scripts\python.exe backend\scripts\evaluate_layout.py --threads 4
+.\.venv\Scripts\python.exe backend\scripts\evaluate_application.py --count 1 --seconds 5 --checks 8000
+.\.venv\Scripts\python.exe -m unittest discover -s backend\tests -p test_learning.py -v
 ```
 
 可选图形由具有 matplotlib 3.10.1 的 Python 运行 `backend/scripts/render_experiments.py` 生成。它只读取已记录预测和曲线，不重训。不同硬件或库版本可能带来微小数值和时间差异，不能承诺跨机器文件哈希完全一致。

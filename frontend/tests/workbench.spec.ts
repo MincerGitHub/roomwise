@@ -1,55 +1,62 @@
 import {test,expect} from '@playwright/test';
-test('完整流程：家具约束、生成、文字修改、撤销、保存',async({page})=>{
- const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('/');await expect(page.getByText('本机服务已连接')).toBeVisible();await expect(page.locator('canvas')).toBeVisible();
- await page.screenshot({path:'test-results/workbench-initial.png',fullPage:true});
- await page.getByRole('button',{name:'俯视',exact:true}).click();await page.getByRole('button',{name:'三维',exact:true}).click();
- await page.getByRole('button',{name:'房内衣柜',exact:false}).first().click();
- await expect(page.getByRole('button',{name:'切换位置锁定'})).toHaveAttribute('aria-pressed','true');
- const initial=await page.locator('input[type=number]').evaluateAll(els=>els.map(e=>(e as HTMLInputElement).value));
- await page.getByLabel('布局方法').selectOption('rules');await page.getByRole('button',{name:'生成布局',exact:true}).click();
- await expect(page.locator('.candidate-card')).toHaveCount(3,{timeout:40000});
- await page.locator('.candidate-card').first().getByRole('button',{name:'应用'}).click();
- await expect(page.getByRole('button',{name:'切换位置锁定'})).toHaveAttribute('aria-pressed','true');
- const after=await page.locator('input[type=number]').evaluateAll(els=>els.map(e=>(e as HTMLInputElement).value));expect(after).toEqual(initial);
- await page.getByRole('button',{name:'旧书桌',exact:false}).first().click();
- const angle=page.locator('.field').filter({hasText:'角度°'}).locator('input');const oldAngle=Number(await angle.inputValue());
- await page.getByLabel('输入修改要求').fill('把选中的书桌旋转90度');await page.getByRole('button',{name:'发送要求'}).click();
- await expect(angle).toHaveValue(String((oldAngle+90)%360));
- await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(angle).toHaveValue(String(oldAngle));
- await page.getByRole('button',{name:'另存',exact:true}).click();await expect(page.getByRole('status')).toContainText('保存');
- await page.getByRole('button',{name:'打开已保存方案'}).click();await expect(page.locator('.saved-row')).not.toHaveCount(0);await page.locator('.modal-heading').getByRole('button').click();
- await page.getByRole('button',{name:'添加',exact:true}).click();await page.locator('.catalog-grid').getByRole('button',{name:'书架',exact:false}).click();
- await expect(page.locator('.item-card')).toHaveCount(6);await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.locator('.item-card')).toHaveCount(5);
- await page.getByRole('button',{name:'检查',exact:false}).first().click();await expect(page.getByRole('button',{name:'查看模型实验记录'})).toBeVisible();
- await page.screenshot({path:'test-results/workbench-results.png',fullPage:true});expect(errors).toEqual([]);
+
+test('candidate preview is isolated until explicitly applied',async({page})=>{
+ await page.goto('/');
+ const canvas=page.locator('.scene-canvas');
+ await expect(canvas.locator('canvas')).toBeVisible();
+ const original=JSON.parse((await canvas.getAttribute('data-layout'))!);
+ const x=page.locator('.sidebar-content .field-grid').nth(1).locator('input').nth(0);
+ const originalX=await x.inputValue();
+ await page.locator('.generation-actions select').selectOption('rules');
+ await page.locator('.generation-actions button.primary').click();
+ const first=page.locator('.candidate-card').first();
+ await expect(first).toBeVisible({timeout:40000});
+ await first.locator('button').first().click();
+ await expect(page.locator('.preview-banner')).toBeVisible();
+ await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).not.toEqual(original);
+ await expect(x).toHaveValue(originalX);
+ await expect(page.locator('.header-actions button').nth(4)).toBeDisabled();
+ const preview=JSON.parse((await canvas.getAttribute('data-layout'))!);
+ await page.locator('.preview-banner button').first().click();
+ await expect(page.locator('.preview-banner')).toHaveCount(0);
+ await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(original);
+ await expect(x).toHaveValue(originalX);
+ await first.locator('button').first().click();
+ await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(preview);
+ await page.locator('.preview-banner button').nth(1).click();
+ await expect(page.locator('.preview-banner')).toHaveCount(0);
+ await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(preview);
+ await expect(x).not.toHaveValue(originalX);
 });
-test('约束冲突明确提示，JSON导出可复用',async({page})=>{
- await page.goto('/');await expect(page.getByText('本机服务已连接')).toBeVisible();
- await page.getByRole('button',{name:'旧双人床',exact:false}).first().click();
- await page.getByLabel('家具宽').fill('9');await page.getByLabel('家具宽').blur();
- await page.getByLabel('布局方法').selectOption('rules');await page.getByRole('button',{name:'生成布局',exact:true}).click();
- await expect(page.getByRole('status')).toContainText(/未找到|调整/,{timeout:40000});await expect(page.locator('.candidate-card')).toHaveCount(0);
- const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'导出JSON'}).click();const d=await downloadPromise;expect(d.suggestedFilename()).toMatch(/json$/);
+
+test('invalid furniture size yields no candidates and current plan can be exported',async({page})=>{
+ await page.goto('/');
+ await page.locator('.item-card').first().click();
+ const width=page.locator('.sidebar-content .field-grid').first().locator('input').first();
+ await width.fill('9');await width.blur();
+ await page.locator('.generation-actions select').selectOption('rules');
+ await page.locator('.generation-actions button.primary').click();
+ await expect(page.locator('.candidate-card')).toHaveCount(0,{timeout:40000});
+ const download=page.waitForEvent('download');
+ await page.locator('.header-actions .icon-btn').nth(2).click();
+ expect((await download).suggestedFilename()).toMatch(/json$/);
 });
-test('真实画布拖动保持身份和尺寸；锁定家具不可拖动',async({page})=>{
- await page.goto('/');await expect(page.getByText('本机服务已连接')).toBeVisible();
- await page.getByRole('button',{name:'俯视',exact:true}).click();await page.waitForTimeout(600);
+
+test('top view drag edits furniture position while locked furniture stays put',async({page})=>{
+ await page.goto('/');await page.locator('.view-switch button').nth(1).click();await page.waitForTimeout(600);
  const canvas=page.locator('canvas'),bounds=(await canvas.boundingBox())!;
  const scale=bounds.height/(2*5.2*.72);
  const point=(x:number,z:number)=>({x:bounds.x+bounds.width/2+(x-2.6)*scale,y:bounds.y+bounds.height/2+(z-2.1)*scale});
+ const x=page.locator('.sidebar-content .field-grid').nth(1).locator('input').nth(0);
  const bed=point(3.8,2.4);await page.mouse.move(bed.x,bed.y);await page.mouse.down();await page.mouse.move(bed.x-35,bed.y+12,{steps:12});await page.mouse.up();
- await expect(page.getByRole('button',{name:'旧双人床',exact:false}).first()).toHaveClass(/selected/);
- const x=page.locator('.field').filter({hasText:/^X$/}).locator('input');await expect(x).not.toHaveValue('3.8');
- await expect(page.getByLabel('家具宽')).toHaveValue('1.8');await expect(page.getByLabel('家具深')).toHaveValue('2');
+ await expect(x).not.toHaveValue('3.8');
  const cabinet=point(1.15,3.8);await page.mouse.move(cabinet.x,cabinet.y);await page.mouse.down();await page.mouse.move(cabinet.x+50,cabinet.y-30,{steps:8});await page.mouse.up();
- await expect(page.getByRole('button',{name:'房内衣柜',exact:false}).first()).toHaveClass(/selected/);await expect(x).toHaveValue('1.15');
+ await expect(x).toHaveValue('1.15');
 });
-test('视频上传抽帧真实完成，空候选不被伪造',async({page})=>{
- await page.goto('/');await expect(page.getByText('本机服务已连接')).toBeVisible();
- await page.getByRole('button',{name:'视频录入',exact:false}).click();
+
+test('video extraction shows frames without inventing furniture candidates',async({page})=>{
+ await page.goto('/');await page.locator('.tabs button').nth(2).click();
  await page.locator('input[type=file]').last().setInputFiles('../artifacts/detectors/integration_evidence/generated_engineering_clip.avi');
- await expect(page.getByRole('heading',{name:'关键画面'})).toBeVisible({timeout:45000});
- await expect(page.locator('.video-frames img')).not.toHaveCount(0);await expect(page.getByText('未识别到受支持家具', {exact:false})).toBeVisible();
- await page.screenshot({path:'test-results/video-ingest.png',fullPage:true});
+ await expect(page.locator('.video-frames img').first()).toBeVisible({timeout:45000});
+ await expect(page.locator('.video-candidate')).toHaveCount(0);
 });

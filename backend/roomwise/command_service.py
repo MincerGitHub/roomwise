@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .commands import apply_command, is_bedside_only_command
+from .commands import apply_command, is_bedside_only_command, is_global_wall_command
 from .intent_planner import language_status, plan_command
 
 
@@ -13,6 +13,11 @@ def interpret_command(scene: dict, text: str, selected_id: str | None = None):
     if re.fullmatch(r"(?:请)?(?:撤销|撤销上一步|恢复上一步|回到上一版)[。！!\s]*", text.strip()):
         return apply_command(scene, text, selected_id)
     if is_bedside_only_command(text):
+        return apply_command(scene, text, selected_id)
+    # Keep quantified wall requests deterministic. The local executor knows
+    # how to expand the excluded group to concrete item IDs and preserve the
+    # exception; a model plan may otherwise omit part of the group.
+    if is_global_wall_command(text):
         return apply_command(scene, text, selected_id)
     status = language_status()
     if not status.get("enabled"):

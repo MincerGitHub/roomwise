@@ -177,6 +177,36 @@ def test_window_desk_chair_group_and_wall_request_are_checked_together():
     assert_invariants(scene, candidate["scene"])
 
 
+def test_global_except_chair_wall_request_targets_all_movable_non_chairs():
+    scene = demo_scene()
+    reply = apply_command(scene, "办公桌靠窗，除了椅子以外的家具尽量靠墙摆放")
+    assert reply["action"] == "generate", reply
+    preferences = reply["scene"]["preferences"]
+    wall_preferences = {preference["itemId"]: preference for preference in preferences
+                        if preference["kind"] == "near_wall"}
+    # The locked wardrobe is already fixed in place. The command should
+    # target every other movable item except the chair, rather than resolving
+    # only the literal word "椅子".
+    assert set(wall_preferences) == {"bed-1", "desk-1", "nightstand-1"}
+    assert all(not preference["required"] for preference in wall_preferences.values())
+    assert "chair-1" not in wall_preferences
+
+
+def test_global_soft_wall_request_moves_non_chairs_when_combined_with_window_request():
+    scene = demo_scene()
+    reply = apply_command(scene, "办公桌靠窗，除了椅子以外的家具尽量靠墙摆放")
+    result = generate_layouts(reply["scene"], mode="rules", count=1, seed=42)
+    assert result["candidates"], result["diagnostics"]
+    candidate = result["candidates"][0]
+    for item in candidate["scene"]["items"]:
+        if item["category"] == "chair":
+            continue
+        check = evaluate_wall_preference(item, candidate["scene"]["room"],
+                                         {"kind": "near_wall", "itemId": item["id"], "required": True})
+        assert check["satisfied"], (item["id"], check)
+    assert candidate["requirements"]["satisfied"]
+
+
 @pytest.mark.parametrize("reference", ["chair-1和chair-2", "办公椅和备用椅"])
 def test_only_adjust_accepts_explicit_multiple_ids_or_unique_full_names(reference):
     scene = demo_scene()
@@ -196,3 +226,4 @@ def test_only_adjust_generic_category_still_clarifies_multiple_chairs():
     reply = apply_command(scene, "只调整椅子")
     assert reply["action"] == "clarify"
     assert "scene" not in reply
+

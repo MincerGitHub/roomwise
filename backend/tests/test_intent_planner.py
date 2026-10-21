@@ -95,6 +95,23 @@ def test_real_provider_protocol_and_only_confirmed_scene_fields(monkeypatch, pro
     assert "secret-only-in-header" not in status_text and "language.invalid" not in status_text
 
 
+def test_exclusion_wall_quantifier_expands_to_unlocked_nonexcluded_items(monkeypatch):
+    # The model may attach the only explicit noun (chair) to near_wall.  The
+    # planner must resolve "all furniture except chair" against the scene,
+    # while skipping the locked wardrobe because a soft request cannot unlock it.
+    mock_plan(monkeypatch, {"action": "apply", "operations": [
+        {"name": "near_window", "itemIds": ["desk-1"], "targetId": "window-1", "required": True},
+        {"name": "near_wall", "itemIds": ["chair-1"], "required": False},
+    ]})
+    text = "\u529e\u516c\u684c\u9760\u7a97\uff0c\u9664\u4e86\u6905\u5b50\u4ee5\u5916\u7684\u5bb6\u5177\u5c3d\u91cf\u9760\u5899\u6446\u653e"
+    result = planner.plan_command(demo_scene(), text)
+    assert result["action"] == "apply"
+    wall_ops = [op for op in result["operations"] if op["name"] == "near_wall"]
+    wall_ids = {item_id for op in wall_ops for item_id in op["itemIds"]}
+    assert wall_ids == {"bed-1", "desk-1", "nightstand-1"}
+    assert "chair-1" not in wall_ids and "wardrobe-1" not in wall_ids
+
+
 def test_compilation_uses_allowlisted_relative_operations_only():
     scene = demo_scene()
     plan = {"action": "apply", "operations": [

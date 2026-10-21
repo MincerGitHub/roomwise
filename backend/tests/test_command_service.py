@@ -76,3 +76,16 @@ def test_only_adjust_with_exact_displacement_does_not_trigger_random_generation(
     for item in scene["items"]:
         if item["id"] != "desk-1":
             assert (after[item["id"]]["x"], after[item["id"]]["z"], after[item["id"]]["rotation"]) == (item["x"], item["z"], item["rotation"])
+
+
+
+def test_global_wall_quantifier_uses_local_executor_even_with_language_provider(monkeypatch):
+    scene = demo_scene()
+    monkeypatch.setattr(service, "language_status", lambda: {"enabled": True, "provider": "deepseek"})
+    monkeypatch.setattr(service, "plan_command", lambda *args: pytest.fail("quantified wall request must stay local"))
+    text = "\u529e\u516c\u684c\u9760\u7a97\uff0c\u9664\u4e86\u6905\u5b50\u4ee5\u5916\u7684\u5bb6\u5177\u5c3d\u91cf\u9760\u5899\u6446\u653e"
+    reply = service.interpret_command(scene, text)
+    assert reply["action"] == "generate"
+    wall_ids = {p["itemId"] for p in reply["scene"]["preferences"] if p["kind"] == "near_wall"}
+    assert {"bed-1", "desk-1", "nightstand-1"}.issubset(wall_ids)
+    assert "chair-1" not in wall_ids

@@ -81,6 +81,36 @@ def _add_preference(scene, item_id, kind, target_id=None, required=False, wall=N
         preferences.append(preference)
 
 
+def _global_wall_exclusion(clause, items):
+    """Parse ``除了 X 以外的家具靠墙`` as a scoped wall preference.
+
+    ``家具`` is intentionally not an alias for one concrete item: in this
+    construction it means every movable item except the explicitly excluded
+    furniture.  Returning the concrete IDs here also prevents the normal
+    parser from accidentally applying the preference to only ``椅子`` (the
+    only word it can otherwise resolve from the clause).
+    """
+    if "家具" not in clause or not re.search(r"(?:靠近?|贴|挨|沿)(?:着)?\s*(?:[北南东西前后左右])?墙", clause):
+        return None
+    match = re.search(r"(?:^|[，,、\s])除(?:了)?(?P<excluded>.+?)(?:以外|之外|外)(?:的)?", clause)
+    if not match:
+        return None
+    excluded = _references(match.group("excluded").strip(), items, plural=True)
+    if not excluded:
+        return {"error": "没有找到要排除的家具"}
+    required = not bool(re.search(r"尽量|最好|优先", clause))
+    wall_names = {"北": "north", "后": "north", "南": "south", "前": "south",
+                  "东": "east", "右": "east", "西": "west", "左": "west"}
+    walls = {wall_names[name] for name in re.findall(r"([北南东西前后左右])墙", clause)}
+    if len(walls) > 1:
+        return {"error": "同一句话指定了多面墙"}
+    excluded_ids = {item["id"] for item in excluded}
+    targets = [item for item in items if item["id"] not in excluded_ids
+               and not item.get("locked") and item.get("category") != "rug"]
+    return {"targets": targets, "excluded": excluded, "required": required,
+            "wall": next(iter(walls), None)}
+
+
 def _window_target(scene, clause):
     windows = scene["room"].get("windows", [])
     if not windows:
@@ -118,6 +148,27 @@ def is_bedside_only_command(text):
     """Safe local fast path: every clause must be a complete bedside relation."""
     clauses = [clause.strip() for clause in re.split(r"[,，;；。]|同时|然后", text) if clause.strip()]
     return bool(clauses) and all(_bedside_syntax(clause) is not None for clause in clauses)
+
+
+
+def is_global_wall_command(text):
+    """Return whether *text* contains a deterministic furniture-group wall request.
+
+    Quantified requests with an exclusion clause are
+    deliberately handled by the local parser. Sending this narrow form to a
+    language model first can lose the exclusion scope, which then lets the
+    layout search leave furniture in the middle of the room.
+    """
+    return bool(
+        re.search(r"\u5bb6\u5177", text)
+        and re.search(r"\u9664(?:\u4e86)?.+?(?:\u4ee5\u5916|\u4e4b\u5916|\u5916)", text)
+        and re.search(
+            r"(?:\u9760|\u8d34|\u6328|\u9760\u8fd1)(?:\u7740)?\s*"
+            r"(?:[\u5317\u5357\u4e1c\u897f\u524d\u540e\u5de6\u53f3])?"
+            r"\u5899",
+            text,
+        )
+    )
 
 
 def _bedside_objects(scene, syntax, selected_id):
@@ -212,6 +263,21 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
             handled = True
             continue
         if re.fullmatch(r"(?:请|帮我)?(?:重新)?(?:生成|布局|布置|摆放|调整布局|优化布局|重排)(?:一下|方案|布局|其他家具|一个方案)?", clause):
+            request_generate = True
+            handled = True
+            continue
+        global_wall = _global_wall_exclusion(clause, result["items"])
+        if global_wall:
+            if global_wall.get("error"):
+                return _reply(scene, "clarify", global_wall["error"] + "，本次没有修改。")
+            descriptions = {"north": "北墙（房间 +z 边）", "south": "南墙（房间 -z 边）",
+                            "east": "东墙（房间 +x 边）", "west": "西墙（房间 -x 边）"}
+            for item in global_wall["targets"]:
+                _add_preference(result, item["id"], "near_wall", required=global_wall["required"], wall=global_wall["wall"])
+                description = descriptions.get(global_wall["wall"], "最近的实际墙段")
+                changes.append({"itemId": item["id"], "field": "preference", "value": "near_wall",
+                                "wall": global_wall["wall"], "required": global_wall["required"],
+                                "label": f"{item['label']}{'尽量' if not global_wall['required'] else ''}靠{description}，背面朝墙"})
             request_generate = True
             handled = True
             continue

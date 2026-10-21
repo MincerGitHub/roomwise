@@ -295,6 +295,84 @@ def validate_plan_against_scene(plan: IntentPlan | dict, scene: dict):
     return plan.model_copy(update={"operations": normalized})
 
 
+def _expand_global_near_wall_request(plan: IntentPlan, text: str, scene: dict):
+    """Expand a Chinese exclusion request into concrete soft wall operations.
+
+    The language model is given item IDs and may interpret a phrase such as
+    ``除了椅子以外的家具尽量靠墙`` as a request about the mentioned chair, or
+    simply omit the other furniture.  This is a quantifier that must be
+    resolved against the current scene before validation.  Only the explicit
+    exclusion form is handled here; an ambiguous phrase is left for the model
+    and normal clarification path.
+    """
+    if plan.action != "apply":
+        return plan
+    match = re.search(
+        r"除(?:了)?(?P<excluded>[^，,。；;]+?)(?:以外|之外)"
+        r"(?:的)?(?:家具|物品)?[^，,。；;]{0,20}"
+        r"(?:尽量|最好|优先)?\s*(?:靠近?|贴|挨|沿着?)\s*"
+        r"(?:[北南东西前后左右])?墙",
+        text,
+    )
+    if not match:
+        return plan
+
+    # Resolve the exclusion with the same aliases and ambiguity rules used by
+    # the executor.  If it cannot be resolved, retain the model plan so that
+    # the existing validation/clarification message remains authoritative.
+    from .commands import _references
+
+    excluded = _references(match.group("excluded"), scene["items"], plural=True)
+    if not excluded:
+        return plan
+    excluded_ids = {item["id"] for item in excluded}
+    allowed_ids = [
+        item["id"] for item in scene["items"]
+        if item["id"] not in excluded_ids
+        # A soft global request may not move a locked item.  Keeping it out of
+        # the generated operation avoids turning an otherwise harmless request
+        # into a clarification solely because the model tried to move it.
+        and not item.get("locked")
+        # Rugs and other non-solid decor should not be forced against a wall.
+        and item.get("category") != "rug"
+    ]
+    if not allowed_ids:
+        return plan
+
+    operations = []
+    soft_wall_ids = set()
+    for operation in plan.operations:
+        if operation.name != "near_wall":
+            operations.append(operation)
+            continue
+        if operation.required is False or operation.required is None:
+            # A model may have attached the request to the exception itself;
+            # remove those IDs and replace the operation with the full set.
+            soft_wall_ids.update(item_id for item_id in operation.itemIds if item_id not in excluded_ids)
+            continue
+        # Preserve separately stated hard wall requirements verbatim.
+        operations.append(operation)
+
+    # Respect an explicit only_adjust scope if the model supplied one.
+    only_adjust = next((op for op in operations if op.name == "only_adjust"), None)
+    if only_adjust is not None:
+        allowed_ids = [item_id for item_id in allowed_ids if item_id in set(only_adjust.itemIds)]
+    soft_wall_ids.update(allowed_ids)
+    # Keep an explicit hard wall request authoritative and avoid duplicate
+    # (name, itemId) preferences being rejected during validation.
+    hard_wall_ids = {
+        item_id
+        for operation in operations
+        if operation.name == "near_wall" and operation.required is not False
+        for item_id in operation.itemIds
+    }
+    soft_wall_ids.difference_update(hard_wall_ids)
+    if soft_wall_ids:
+        operations.append(IntentOperation(name="near_wall", itemIds=sorted(soft_wall_ids),
+                                          wall="nearest", required=False))
+    return plan.model_copy(update={"operations": operations})
+
+
 def compile_plan(plan: IntentPlan | dict, scene: dict):
     """Canonical, allowlisted clauses for the existing atomic command executor."""
     validated = validate_plan_against_scene(plan, scene)
@@ -460,6 +538,11 @@ def plan_command(scene: dict, text: str, selected_id: str | None = None, history
         if not isinstance(content, str) or len(content.encode("utf-8")) > MAX_RESPONSE_BYTES:
             raise ValueError("invalid model content")
         plan = IntentPlan.model_validate(json.loads(content))
+        # Resolve the Chinese exclusion quantifier against the concrete scene
+        # before lock/scene validation.  The model schema only carries item IDs,
+        # so a phrase such as “除了椅子以外的家具尽量靠墙” can otherwise be
+        # attached to the mentioned chair or omitted altogether.
+        plan = _expand_global_near_wall_request(plan, text, scene)
         lock_error = _position_lock_guard(plan, text, scene, selected_id)
         if lock_error:
             return {**base, "action": "clarify", "message": lock_error}

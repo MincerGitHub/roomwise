@@ -319,7 +319,13 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
         if chair:
             used_chairs.add(chair["id"])
         groups.append((table, chair, preference))
-    affected_ids = {p["itemId"] for p in preferences if p.get("required") and p["kind"] in EXPLICIT_SPATIAL_KINDS} | used_chairs
+    # A soft wall request still names furniture that the user expects the
+    # layout search to reconsider.  It must not be treated as an unrelated
+    # item merely because a separate hard request (for example, a desk near a
+    # window) sends us through the constraint-preserving branch.
+    affected_ids = {p["itemId"] for p in preferences
+                    if (p.get("required") and p["kind"] in EXPLICIT_SPATIAL_KINDS)
+                    or p["kind"] == "near_wall"} | used_chairs
     assignments = bedside_assignments(original)
     initial_relations = evaluate_bedside_groups(original)
     affected_ids.update(check["itemId"] for check in initial_relations["unsatisfied"])

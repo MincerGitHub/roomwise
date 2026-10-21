@@ -17,7 +17,7 @@ WINDOW_PROJECTION_TOLERANCE = .15
 MAX_FACING_ANGLE = 20.0
 MAX_WALL_GAP = .15
 MAX_WALL_BACK_ANGLE = 20.0
-EXPLICIT_SPATIAL_KINDS = ("near_window", "face_window", "near_wall", "bedside")
+EXPLICIT_SPATIAL_KINDS = ("near_window", "face_window", "near_wall", "bedside", "vanity_seating")
 
 
 def matching_wall_segments(room, preference):
@@ -152,8 +152,12 @@ def evaluate_layout_requirements(scene):
     """Geometry and explicit requests are separate; only required checks gate acceptance."""
     items = {item["id"]: item for item in scene["items"]}
     from .bedside_constraints import evaluate_bedside_preference
+    from .geometry import evaluate_vanity_preference
     checks = [(evaluate_bedside_preference(items.get(pref["itemId"]), items.get(pref.get("targetId")), pref)
-               if pref["kind"] == "bedside" else evaluate_spatial_preference(items.get(pref["itemId"]), scene["room"], pref))
+               if pref["kind"] == "bedside" else
+               evaluate_vanity_preference(items.get(pref["itemId"]), items.get(pref.get("targetId")), pref)
+               if pref["kind"] == "vanity_seating" else
+               evaluate_spatial_preference(items.get(pref["itemId"]), scene["room"], pref))
               for pref in scene.get("preferences", []) if pref["kind"] in EXPLICIT_SPATIAL_KINDS]
     unsatisfied = [check for check in checks if check["required"] and not check["satisfied"]]
     return {"satisfied": not unsatisfied, "checks": checks, "unsatisfied": unsatisfied,

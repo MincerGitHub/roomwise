@@ -226,16 +226,33 @@ def evaluate_vanity_seating(scene: dict) -> dict:
     """
     tables = [item for item in scene.get("items", []) if item.get("category") == "dressing_table"]
     chairs = [item for item in scene.get("items", []) if item.get("category") == "dressing_chair"]
-    available = set(chair["id"] for chair in chairs)
-    checks = []
-    unsatisfied = []
-    warnings = []
+    chairs_by_id = {chair["id"]: chair for chair in chairs}
+    tables_by_id = {table["id"]: table for table in tables}
+    available = set(chairs_by_id)
+    pairs = []
+    paired_tables = set()
+    for preference in scene.get("preferences", []):
+        if preference.get("kind") != "vanity_seating":
+            continue
+        table = tables_by_id.get(preference.get("targetId"))
+        chair = chairs_by_id.get(preference.get("itemId"))
+        if table and chair and chair["id"] in available and table["id"] not in paired_tables:
+            pairs.append((table, chair))
+            available.remove(chair["id"])
+            paired_tables.add(table["id"])
     for table in tables:
+        if table["id"] in paired_tables:
+            continue
         candidates = [chair for chair in chairs if chair["id"] in available]
         if not candidates:
             continue
         chair = min(candidates, key=lambda item: math.dist((item["x"], item["z"]), (table["x"], table["z"])))
+        pairs.append((table, chair))
         available.remove(chair["id"])
+    checks = []
+    unsatisfied = []
+    warnings = []
+    for table, chair in pairs:
         dx, dz = chair["x"] - table["x"], chair["z"] - table["z"]
         angle = math.radians(float(table.get("rotation", 0)))
         local_x = math.cos(angle) * dx - math.sin(angle) * dz
@@ -263,6 +280,34 @@ def evaluate_vanity_seating(scene: dict) -> dict:
             unsatisfied.append(check)
     return {"satisfied": not unsatisfied, "checks": checks,
             "unsatisfied": unsatisfied, "warnings": warnings}
+
+
+def evaluate_vanity_preference(chair: dict | None, table: dict | None, preference: dict) -> dict:
+    """Check a requested chair-to-vanity relation against the named table."""
+    base = {"kind": "vanity_seating", "itemId": preference["itemId"],
+            "targetId": preference.get("targetId"), "required": bool(preference.get("required")),
+            "satisfied": False, "message": "", "metrics": {}}
+    if not chair or not table:
+        return {**base, "message": "梳妆椅或指定梳妆台不存在。"}
+    dx, dz = chair["x"] - table["x"], chair["z"] - table["z"]
+    table_angle = math.radians(float(table.get("rotation", 0)))
+    local_x = math.cos(table_angle) * dx - math.sin(table_angle) * dz
+    local_z = math.sin(table_angle) * dx + math.cos(table_angle) * dz
+    chair_angle = math.radians(float(chair.get("rotation", 0)))
+    length = math.hypot(dx, dz)
+    facing_dot = ((math.sin(chair_angle) * -dx + math.cos(chair_angle) * -dz) / length
+                  if length > EPSILON else -1.)
+    gap = float(footprint(table).distance(footprint(chair)))
+    front = local_z >= table["depth"] * .5 - chair["depth"] * .35
+    centred = abs(local_x) <= min(.22, table["width"] * .28)
+    facing = facing_dot >= math.cos(math.radians(30))
+    close = gap <= .55
+    satisfied = front and centred and facing and close
+    return {**base, "satisfied": satisfied,
+            "metrics": {"frontOffsetMeters": round(local_z, 3), "sideOffsetMeters": round(local_x, 3),
+                        "gapMeters": round(gap, 3), "facingDot": round(facing_dot, 3)},
+            "message": f"{chair['label']}需位于{table['label']}前方、接近桌面中心并面朝桌面；" +
+                       ("当前满足。" if satisfied else "当前未满足。")}
 
 
 def layout_quality(scene: dict) -> dict:

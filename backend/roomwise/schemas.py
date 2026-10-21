@@ -111,7 +111,7 @@ class Item(DataModel):
 
 
 class Preference(DataModel):
-    kind: Literal["near_window", "face_window", "near_wall", "bedside", "min_move"]
+    kind: Literal["near_window", "face_window", "near_wall", "bedside", "vanity_seating", "min_move"]
     itemId: str = Field(min_length=1, max_length=100)
     targetId: str | None = Field(default=None, max_length=100)
     # Old saved scenes contain soft near-window preferences. Explicit commands
@@ -130,8 +130,8 @@ class Preference(DataModel):
             raise ValueError("只有靠墙要求可以指定墙体方向")
         if self.kind != "bedside" and self.side is not None:
             raise ValueError("只有床头柜关系可以指定床的左右侧")
-        if self.kind == "bedside" and not self.targetId:
-            raise ValueError("床头柜关系必须指定床的家具 ID")
+        if self.kind in ("bedside", "vanity_seating") and not self.targetId:
+            raise ValueError("床头柜或梳妆椅关系必须指定目标家具 ID")
         return self
 
 
@@ -156,6 +156,11 @@ class Scene(DataModel):
                 bed = next((item for item in self.items if item.id == preference.targetId), None)
                 if stand.category != "nightstand" or not bed or bed.category not in {"double_bed", "single_bed", "kids_bed"}:
                     raise ValueError("床头柜关系必须从床头柜指向存在的床")
+            elif preference.kind == "vanity_seating":
+                chair = next(item for item in self.items if item.id == preference.itemId)
+                table = next((item for item in self.items if item.id == preference.targetId), None)
+                if chair.category not in {"dressing_chair", "chair", "stool"} or not table or table.category != "dressing_table":
+                    raise ValueError("梳妆椅关系必须从椅子指向存在的梳妆台")
             elif preference.targetId and preference.targetId not in {w.id for w in self.room.windows}:
                 raise ValueError("偏好引用了不存在的窗户")
         return self

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .commands import apply_command, is_bedside_only_command, is_global_wall_command
+from .commands import apply_command, is_bedside_only_command, is_global_wall_command, is_vanity_or_wall_exemption_command
 from .intent_planner import language_status, plan_command
 
 
@@ -13,6 +13,8 @@ def interpret_command(scene: dict, text: str, selected_id: str | None = None):
     if re.fullmatch(r"(?:请)?(?:撤销|撤销上一步|恢复上一步|回到上一版)[。！!\s]*", text.strip()):
         return apply_command(scene, text, selected_id)
     if is_bedside_only_command(text):
+        return apply_command(scene, text, selected_id)
+    if is_vanity_or_wall_exemption_command(text):
         return apply_command(scene, text, selected_id)
     # Keep quantified wall requests deterministic. The local executor knows
     # how to expand the excluded group to concrete item IDs and preserve the
@@ -43,7 +45,7 @@ def interpret_command(scene: dict, text: str, selected_id: str | None = None):
     operations = metadata["operations"]
     names = {operation.get("name") for operation in operations}
     if (executed.get("action") == "generate" and names & {"move", "rotate"}
-            and not names & {"generate", "near_wall", "near_window", "face_window", "bedside", "min_move"}):
+            and not names & {"generate", "near_wall", "near_window", "face_window", "bedside", "vanity_seating", "min_move"}):
         # "Only move the desk 20cm right" is an exact edit. The historical
         # only-adjust command creates a generation intent, which must not turn
         # an explicit displacement into a new random placement.

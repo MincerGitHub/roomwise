@@ -319,6 +319,14 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
             continue
         chair_categories = {"dressing_chair", "stool"} if table["category"] == "dressing_table" else {"chair", "stool"}
         chairs = [item for item in original["items"] if item["category"] in chair_categories and item["id"] not in used_chairs]
+        requested_vanity = next((p for p in preferences if p["kind"] == "vanity_seating"
+                                 and p.get("targetId") == table["id"]), None)
+        if requested_vanity:
+            explicit_chair = items.get(requested_vanity["itemId"])
+            if explicit_chair and explicit_chair["id"] not in used_chairs:
+                chairs = [explicit_chair]
+            else:
+                return None
         # An explicitly facing chair gets paired first; remaining ties use distance.
         facing_ids = {p["itemId"] for p in window_requests if p["kind"] == "face_window" and
                       (not p.get("targetId") or not preference.get("targetId") or p["targetId"] == preference["targetId"])}
@@ -333,8 +341,24 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
     # movable vanity and its matching chair together in this branch too.
     window_table_ids = {table["id"] for table, _, _ in groups}
     vanity_groups = []
+    explicitly_paired_tables = {table["id"] for table, _, _ in groups
+                                if table["category"] == "dressing_table"}
+    for preference in (p for p in preferences if p["kind"] == "vanity_seating"):
+        table, chair = items.get(preference.get("targetId")), items.get(preference["itemId"])
+        if not table or not chair:
+            return None
+        if table["id"] in explicitly_paired_tables:
+            # The window group above already paired the requested chair.
+            if chair["id"] not in used_chairs:
+                return None
+            continue
+        if table["id"] in window_table_ids or chair["id"] in used_chairs:
+            return None
+        used_chairs.add(chair["id"])
+        explicitly_paired_tables.add(table["id"])
+        vanity_groups.append((table, chair))
     for table in (item for item in original["items"] if item["category"] == "dressing_table"
-                  and item["id"] not in window_table_ids):
+                  and item["id"] not in window_table_ids and item["id"] not in explicitly_paired_tables):
         chairs = [item for item in original["items"]
                   if item["category"] in {"dressing_chair", "stool"}
                   and item["id"] not in used_chairs]
@@ -369,6 +393,7 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
     affected_ids = {p["itemId"] for p in preferences
                     if (p.get("required") and p["kind"] in EXPLICIT_SPATIAL_KINDS)
                     or p["kind"] == "near_wall"} | used_chairs
+    affected_ids.update(p["targetId"] for p in preferences if p["kind"] == "vanity_seating")
     for table, chair in vanity_groups:
         affected_ids.update((table["id"], chair["id"]))
     assignments = bedside_assignments(original)
@@ -481,10 +506,16 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
         if vanity_groups:
             from .layout_templates import _anchor_positions, _facing_table, _group_positions
             for table, chair in vanity_groups:
+                explicitly_paired = any(preference["kind"] == "vanity_seating"
+                                        and preference["itemId"] == chair["id"]
+                                        and preference.get("targetId") == table["id"]
+                                        for preference in preferences)
                 group_ids = {table["id"], chair["id"]}
                 obstacles = [item for item in placed if item["id"] not in group_ids]
                 options = []
-                for table_candidate in _anchor_positions(table, [chair], "table", result, rng):
+                for anchor_index, table_candidate in enumerate(_anchor_positions(table, [chair], "table", result, rng)):
+                    if explicitly_paired and anchor_index >= 120:
+                        break
                     if budget and not budget.take():
                         return None
                     if (not _required_item_passes(table_candidate, room, preferences)
@@ -503,9 +534,12 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
                                                   [*obstacles, *[other for other in group if other["id"] != member["id"]]],
                                                   max(anchor_strength, .7))
                                    for member in group)
-                        partial = {**result, "items": [*obstacles, *group]}
-                        cost += layout_quality(partial)["penalty"] * .6
                         options.append((cost + rng.uniform(0, .015), group))
+                    # When the user names a specific chair/table relation, the
+                    # current table location has priority. Move it only if no
+                    # valid chair position fits there.
+                    if explicitly_paired and options:
+                        break
                 if not options:
                     failed = True
                     break
@@ -605,11 +639,13 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
     diagnostics["requirements"] = original_requirements
     diagnostics["functionalRelations"] = evaluate_bedside_groups(scene, scene)
     locked_ids = {item["id"] for item in scene["items"] if item.get("locked")}
+    item_ids = {item["id"] for item in scene["items"]}
     blocked_requirements = [check for check in original_requirements["unsatisfied"]
-                            if ((check["itemId"] in locked_ids and (check["kind"] != "bedside" or check.get("targetId") in locked_ids)) or not (
-                                check.get("targetId") in {item["id"] for item in scene["items"]} if check["kind"] == "bedside" else
-                                matching_wall_segments(scene["room"], {"wall": check.get("requestedWall")}) if check["kind"] == "near_wall"
-                                else matching_windows(scene["room"], check)))]
+                            if ((check["itemId"] in locked_ids and
+                                 (check["kind"] not in ("bedside", "vanity_seating") or check.get("targetId") in locked_ids))
+                                or (check.get("targetId") not in item_ids if check["kind"] in ("bedside", "vanity_seating")
+                                    else not matching_wall_segments(scene["room"], {"wall": check.get("requestedWall")})
+                                    if check["kind"] == "near_wall" else not matching_windows(scene["room"], check)))]
     if blocked_requirements:
         diagnostics["message"] = "未找到同时满足明确要求的布局：" + "；".join(check["message"] for check in blocked_requirements)
         if any(check["itemId"] in locked_ids for check in blocked_requirements):

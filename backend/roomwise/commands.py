@@ -150,6 +150,36 @@ def is_bedside_only_command(text):
     return bool(clauses) and all(_bedside_syntax(clause) is not None for clause in clauses)
 
 
+def _vanity_syntax(clause):
+    """Recognize a chair placed in front of a dressing table or its mirror."""
+    move = re.fullmatch(
+        r"(?:请帮我|帮我|请)?(?:把|将)?(?P<subject>.+?)(?P<soft>尽量|最好|优先)?"
+        r"(?:摆放在|摆在|放置在|放在|摆到|放到|挪到|坐在)(?P<target>.+?)", clause.strip(),
+    )
+    if not move:
+        return None
+    target = re.fullmatch(r"(?P<table>.+?)(?:的)?(?:正前方|前方|前面|前)", move["target"].strip())
+    if not target:
+        return None
+    return {"subject": move["subject"].strip(), "target": target["table"].strip(),
+            "required": not bool(move["soft"])}
+
+
+def _wall_exemption(clause):
+    """A rug that need not touch a wall has no wall-placement constraint."""
+    match = re.fullmatch(
+        r"(?P<item>.+?)(?:不用|无需|不需要|不必|没必要|不要求)(?:再)?(?:靠近?|贴|挨|沿)(?:着)?(?:墙|墙边)",
+        clause.strip(),
+    )
+    return match["item"].strip() if match else None
+
+
+def is_vanity_or_wall_exemption_command(text):
+    """Use deterministic execution for complete vanity and rug-exemption clauses."""
+    clauses = [clause.strip() for clause in re.split(r"[,，;；。]|同时|然后", text) if clause.strip()]
+    return bool(clauses) and all(_vanity_syntax(clause) or _wall_exemption(clause) for clause in clauses)
+
+
 
 def is_global_wall_command(text):
     """Return whether *text* contains a deterministic furniture-group wall request.
@@ -258,6 +288,55 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
     for clause in clauses:
         clause = clause.strip()
         if not clause or (restriction and re.search(r"(?:只|仅)(?:调整|移动|重排|重新布置)", clause)):
+            continue
+        wall_exemption = _wall_exemption(clause)
+        if wall_exemption:
+            rugs = [item for item in result["items"] if item["category"] == "rug"
+                    and (wall_exemption in {item["id"], item["label"], "地毯", "地垫", "rug"})]
+            for rug in rugs:
+                result["preferences"] = [preference for preference in result.get("preferences", [])
+                                         if not (preference["itemId"] == rug["id"] and preference["kind"] == "near_wall")]
+                changes.append({"itemId": rug["id"], "field": "preference", "value": "near_wall",
+                                "removed": True, "label": f"{rug['label']}不设置靠墙要求"})
+            if not rugs:
+                changes.append({"field": "preference", "value": "near_wall", "removed": True,
+                                "label": "地毯不设置靠墙要求"})
+            request_generate = True
+            handled = True
+            continue
+        vanity = _vanity_syntax(clause)
+        if vanity:
+            subject = vanity["subject"]
+            target = vanity["target"]
+            chair_categories = {"dressing_chair", "chair", "stool"}
+            chair_aliases = {"梳妆椅", "椅子", "椅", "凳子", "坐凳"}
+            chairs = [item for item in result["items"] if item["category"] in chair_categories
+                      and (subject in {item["id"], item["label"]}
+                           or subject in ALIASES.get(item["category"], [])
+                           or subject in chair_aliases
+                           or item["id"] in subject or item["label"] in subject)]
+            if "梳妆椅" in subject:
+                chairs = [item for item in chairs if item["category"] == "dressing_chair"
+                          or "梳妆椅" in item["label"]]
+            tables = [item for item in result["items"] if item["category"] == "dressing_table"
+                      and (target in {item["id"], item["label"], "梳妆镜", "镜子", "梳妆台"}
+                           or item["id"] in target or item["label"] in target)]
+            if len(chairs) != 1 or len(tables) != 1:
+                options = chairs if len(chairs) != 1 else tables
+                return _clarify(scene, options, "梳妆椅与梳妆台的搭配")
+            chair, table = chairs[0], tables[0]
+            if chair.get("locked") and table.get("locked"):
+                from .geometry import evaluate_vanity_preference
+                requested = {"kind": "vanity_seating", "itemId": chair["id"], "targetId": table["id"],
+                             "required": vanity["required"]}
+                if not evaluate_vanity_preference(chair, table, requested)["satisfied"]:
+                    return _reply(scene, "clarify", "梳妆椅和梳妆台都已锁定且当前不在合适位置；请先解锁其中一件再重排。")
+            _add_preference(result, chair["id"], "vanity_seating", table["id"], vanity["required"])
+            changes.append({"itemId": chair["id"], "field": "preference", "value": "vanity_seating",
+                            "targetId": table["id"], "required": vanity["required"],
+                            "label": f"{chair['label']}放在{table['label']}前方并面朝桌面"})
+            request_generate = True
+            handled = True
             continue
         if re.fullmatch(r"(?:其他|其余)(?:家具)?(?:都)?(?:不动|不要动|保持不动)", clause) and restriction:
             handled = True
@@ -389,7 +468,7 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
     action = "generate" if request_generate else "edit"
     validation = validate_scene(result)
     message = "已更新布局条件，请生成候选后选择；现有家具身份与尺寸保持。" if request_generate else "已执行明确编辑；请检查提示，可随时撤销。"
-    window_changes = [c["label"] for c in changes if c.get("value") in ("near_window", "face_window", "near_wall", "bedside")]
+    window_changes = [c["label"] for c in changes if c.get("value") in ("near_window", "face_window", "near_wall", "bedside", "vanity_seating")]
     if window_changes:
         message = "已识别：" + "；".join(window_changes) + "。" + message
     if any(change.get("value") == "bedside" for change in changes):

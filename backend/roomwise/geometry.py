@@ -217,6 +217,54 @@ def _room_has_cardinal_axes(room: dict) -> bool:
     return True
 
 
+def evaluate_vanity_seating(scene: dict) -> dict:
+    """Check whether each movable vanity chair is usable at a matching vanity.
+
+    A usable chair sits in front of the tabletop, near its centreline, and
+    faces the table. These are layout heuristics rather than ergonomic rules.
+    A pair that is both locked is reported as a warning and left untouched.
+    """
+    tables = [item for item in scene.get("items", []) if item.get("category") == "dressing_table"]
+    chairs = [item for item in scene.get("items", []) if item.get("category") == "dressing_chair"]
+    available = set(chair["id"] for chair in chairs)
+    checks = []
+    unsatisfied = []
+    warnings = []
+    for table in tables:
+        candidates = [chair for chair in chairs if chair["id"] in available]
+        if not candidates:
+            continue
+        chair = min(candidates, key=lambda item: math.dist((item["x"], item["z"]), (table["x"], table["z"])))
+        available.remove(chair["id"])
+        dx, dz = chair["x"] - table["x"], chair["z"] - table["z"]
+        angle = math.radians(float(table.get("rotation", 0)))
+        local_x = math.cos(angle) * dx - math.sin(angle) * dz
+        local_z = math.sin(angle) * dx + math.cos(angle) * dz
+        facing_angle = math.radians(float(chair.get("rotation", 0)))
+        length = math.hypot(dx, dz)
+        facing_dot = ((math.sin(facing_angle) * -dx + math.cos(facing_angle) * -dz) / length
+                      if length > EPSILON else -1.)
+        gap = float(footprint(table).distance(footprint(chair)))
+        front_of_table = local_z >= table["depth"] * .5 - chair["depth"] * .35
+        centred = abs(local_x) <= min(.22, table["width"] * .28)
+        facing = facing_dot >= math.cos(math.radians(30))
+        close = gap <= .55
+        satisfied = front_of_table and centred and facing and close
+        check = {"tableId": table["id"], "chairId": chair["id"], "satisfied": satisfied,
+                 "metrics": {"frontOffsetMeters": round(local_z, 3), "sideOffsetMeters": round(local_x, 3),
+                             "gapMeters": round(gap, 3), "facingDot": round(facing_dot, 3)},
+                 "message": "???????????" if satisfied else "?????????????????"}
+        checks.append(check)
+        if satisfied:
+            continue
+        if table.get("locked") and chair.get("locked"):
+            warnings.append({**check, "message": "?????????????????"})
+        else:
+            unsatisfied.append(check)
+    return {"satisfied": not unsatisfied, "checks": checks,
+            "unsatisfied": unsatisfied, "warnings": warnings}
+
+
 def layout_quality(scene: dict) -> dict:
     """Return a small, explainable soft score for a valid furniture layout.
 

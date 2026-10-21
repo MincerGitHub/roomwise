@@ -90,3 +90,48 @@ def test_quality_penalizes_vanity_chair_away_from_front_of_vanity():
     detached = layout_quality(scene)
     assert detached["components"]["functionalGrouping"] > paired["components"]["functionalGrouping"]
     assert detached["components"]["seatFacing"] > paired["components"]["seatFacing"]
+
+
+
+def test_vanity_seating_postcondition_rejects_sideways_or_rear_chair():
+    from roomwise.geometry import evaluate_vanity_seating
+
+    scene = demo_scene()
+    scene["items"] = [
+        {"id": "vanity", "label": "???", "category": "dressing_table",
+         "width": 1.0, "depth": .45, "height": .75, "x": 2.5, "z": 3.7,
+         "rotation": 180., "locked": False, "keep": True, "source": "brought"},
+        {"id": "vanity-chair", "label": "???", "category": "dressing_chair",
+         "width": .4, "depth": .4, "height": .75, "x": 3.2, "z": 3.3,
+         "rotation": 90., "locked": False, "keep": True, "source": "brought"},
+    ]
+    sideways = evaluate_vanity_seating(scene)
+    assert not sideways["satisfied"]
+    assert sideways["unsatisfied"][0]["chairId"] == "vanity-chair"
+
+    scene["items"][1].update(x=2.5, z=3.1, rotation=0.)
+    front = evaluate_vanity_seating(scene)
+    assert front["satisfied"], front
+
+
+
+def test_model_candidate_with_sideways_vanity_chair_is_not_accepted(monkeypatch):
+    from types import SimpleNamespace
+    import roomwise.generator as generator
+
+    scene = demo_scene()
+    scene["items"] = [
+        {"id": "vanity", "label": "???", "category": "dressing_table",
+         "width": 1.0, "depth": .45, "height": .75, "x": 3.5, "z": 3.45,
+         "rotation": 0., "locked": False, "keep": True, "source": "brought"},
+        {"id": "vanity-chair", "label": "???", "category": "dressing_chair",
+         "width": .4, "depth": .4, "height": .75, "x": 4.2, "z": 3.45,
+         "rotation": 90., "locked": False, "keep": True, "source": "brought"},
+    ]
+    fake_learning = SimpleNamespace(refine_scene=lambda candidate, iterations=3: candidate)
+    monkeypatch.setattr(generator, "learning_status", lambda: {"available": True})
+    monkeypatch.setattr(generator.importlib, "import_module", lambda name: fake_learning)
+    result = generator.generate_layouts(scene, mode="model", count=1, seed=42)
+    assert result["candidates"] == []
+    assert result["diagnostics"]["rejected"]["functionalRelations"] > 0
+    assert result["diagnostics"]["lastUnsatisfiedVanitySeating"]

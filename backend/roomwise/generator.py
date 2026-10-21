@@ -14,6 +14,7 @@ from .bedside_constraints import bedside_assignments, bedside_placements, bed_pl
 
 from .geometry import (
     assert_invariants,
+    evaluate_vanity_seating,
     footprint,
     layout_quality,
     opening_center,
@@ -636,6 +637,11 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
             rejected["functionalRelations"] += 1
             diagnostics["lastUnsatisfiedFunctionalRelations"] = relations["unsatisfied"]
             return False
+        vanity_seating = evaluate_vanity_seating(proposed)
+        if not vanity_seating["satisfied"]:
+            rejected["functionalRelations"] += 1
+            diagnostics["lastUnsatisfiedVanitySeating"] = vanity_seating["unsatisfied"]
+            return False
         fingerprint = _fingerprint(proposed)
         if fingerprint in fingerprints:
             return False
@@ -654,6 +660,7 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
         }
         candidates[-1]["requirements"] = requirements
         candidates[-1]["functionalRelations"] = relations
+        candidates[-1]["vanitySeating"] = vanity_seating
         if relations["warnings"]:
             candidates[-1]["summary"] += "锁定的床头柜仍有床头位置问题，未自动移动；请查看功能关系提示。"
         requested_ids = {preference["itemId"] for preference in scene.get("preferences", []) if preference.get("required")}

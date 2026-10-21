@@ -219,6 +219,8 @@ def test_constraint_search_keeps_vanity_chair_paired_with_its_table():
     proposed = rule_candidate(scene, random.Random(42))
     assert proposed is not None
     assert validate_scene(proposed)["valid"]
+    from roomwise.geometry import evaluate_vanity_seating
+    assert evaluate_vanity_seating(proposed)["satisfied"]
     items = {item["id"]: item for item in proposed["items"]}
     vanity, chair = items["vanity-1"], items["vanity-chair-1"]
     assert _forward_dot(items["chair-1"], items["desk-1"]) > .95

@@ -20,6 +20,14 @@ function furniture(it:Item):THREE.Group{
  }else if(['desk','table','coffee_table','dressing_table'].includes(it.category)){
   legs(g,w,d,Math.max(.1,h-.055));box(g,w,.055,d,0,h-.027,0,colors.lightWood);
   if(it.category==='desk'){box(g,.30,h*.60,d*.82,w/2-.17,h*.45,0,0xd5dbd0);for(let n=0;n<3;n++)box(g,.26,.006,.012,w/2-.17,h*.3+n*.12,d*.41+.01,colors.wood)}
+  if(it.category==='dressing_table'){
+   // Local +z is the usable front: the paired chair sits here and faces -z.
+   // A framed mirror at the back makes that orientation visible in the 3D view.
+   box(g,w*.50,.43,.035,0,h+.22,-d*.30,colors.wood);
+   box(g,w*.43,.35,.012,0,h+.22,-d*.30+.024,0xa9c2be);
+   box(g,w*.38,.13,d*.28,0,h-.12,d*.20,colors.wood);
+   box(g,.025,.025,.018,0,h-.12,d*.35,colors.cream);
+  }
  }else if(['chair','dressing_chair','stool','armchair'].includes(it.category)){
   const seatH=it.category==='armchair'?h*.40:h*.52;legs(g,w,d,seatH);box(g,w,.07,d,0,seatH,0,colors.sage);
   if(it.category!=='stool')box(g,w,h-seatH-.04,.08,0,seatH+(h-seatH-.04)/2,-d/2+.04,colors.sage);

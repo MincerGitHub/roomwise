@@ -200,3 +200,34 @@ def test_generator_preserves_false_keep_and_true_keep_metadata(monkeypatch):
     assert_invariants(scene, proposed)
     assert len(proposed["items"]) == len(scene["items"])
     assert proposed["items"][0]["keep"] is False
+
+
+def test_constraint_search_keeps_vanity_chair_paired_with_its_table():
+    from roomwise.generator import rule_candidate
+
+    scene = demo_scene()
+    scene["room"]["door"] = None
+    scene["preferences"] = [{"kind": "near_window", "itemId": "desk-1", "targetId": "window-1", "required": True}]
+    scene["items"].extend([
+        {"id": "vanity-1", "label": "vanity", "category": "dressing_table",
+         "width": 1.0, "depth": .45, "height": .75, "x": .7, "z": .7,
+         "rotation": 0., "locked": False, "keep": True, "source": "brought"},
+        {"id": "vanity-chair-1", "label": "vanity chair", "category": "dressing_chair",
+         "width": .4, "depth": .4, "height": .75, "x": 4.0, "z": 3.4,
+         "rotation": 90., "locked": False, "keep": True, "source": "brought"},
+    ])
+    proposed = rule_candidate(scene, random.Random(42))
+    assert proposed is not None
+    assert validate_scene(proposed)["valid"]
+    items = {item["id"]: item for item in proposed["items"]}
+    vanity, chair = items["vanity-1"], items["vanity-chair-1"]
+    assert _forward_dot(items["chair-1"], items["desk-1"]) > .95
+    assert _forward_dot(chair, vanity) > .95
+    assert (vanity["rotation"] - chair["rotation"]) % 360 == 180
+    assert .07 <= footprint(vanity).distance(footprint(chair)) <= .30
+    angle = math.radians(vanity["rotation"])
+    dx, dz = chair["x"] - vanity["x"], chair["z"] - vanity["z"]
+    local_x = math.cos(angle) * dx - math.sin(angle) * dz
+    local_z = math.sin(angle) * dx + math.cos(angle) * dz
+    assert abs(local_x) <= .11
+    assert local_z > 0

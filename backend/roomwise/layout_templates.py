@@ -61,7 +61,9 @@ def _groups(items, assignments=None):
     for table in [item for item in items if item["category"] in TABLES]:
         chair_categories = {"dressing_chair", "stool"} if table["category"] == "dressing_table" else {"chair", "stool"}
         chairs = [item for item in items if item["category"] in chair_categories and item["id"] not in used]
-        chairs.sort(key=lambda item: math.dist((item["x"], item["z"]), (table["x"], table["z"])))
+        preferred_category = "dressing_chair" if table["category"] == "dressing_table" else "chair"
+        chairs.sort(key=lambda item: (item["category"] != preferred_category,
+                                      math.dist((item["x"], item["z"]), (table["x"], table["z"]))))
         attached = chairs[:1]
         used.update(item["id"] for item in [table, *attached])
         groups.append((table, attached, "table"))

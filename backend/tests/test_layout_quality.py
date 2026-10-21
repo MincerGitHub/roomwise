@@ -73,3 +73,20 @@ def test_nightstand_near_head_scores_better_than_midpoint_or_foot():
     stand["z"] = 2.9
     foot = layout_quality(scene)["components"]["bedsidePlacement"]
     assert head < middle < foot
+
+
+def test_quality_penalizes_vanity_chair_away_from_front_of_vanity():
+    scene = demo_scene()
+    scene["items"] = [
+        {"id": "vanity", "label": "vanity", "category": "dressing_table",
+         "width": 1.0, "depth": .45, "height": .75, "x": 2.5, "z": 3.7,
+         "rotation": 180., "locked": False, "keep": True, "source": "brought"},
+        {"id": "vanity-chair", "label": "vanity chair", "category": "dressing_chair",
+         "width": .4, "depth": .4, "height": .75, "x": 2.5, "z": 3.15,
+         "rotation": 0., "locked": False, "keep": True, "source": "brought"},
+    ]
+    paired = layout_quality(scene)
+    scene["items"][1].update(x=4.2, z=1.1, rotation=90.)
+    detached = layout_quality(scene)
+    assert detached["components"]["functionalGrouping"] > paired["components"]["functionalGrouping"]
+    assert detached["components"]["seatFacing"] > paired["components"]["seatFacing"]

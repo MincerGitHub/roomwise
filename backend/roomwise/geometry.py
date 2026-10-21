@@ -278,7 +278,7 @@ def layout_quality(scene: dict) -> dict:
     beds = [i for i in items if "bed" in i.get("category", "")]
     nightstands = [i for i in items if i.get("category") == "nightstand"]
     partners = {
-        "chair": {"desk", "table", "dressing_table"},
+        "chair": {"desk", "table"},
         "dressing_chair": {"dressing_table"},
         "stool": {"desk", "table", "dressing_table", "coffee_table"},
     }
@@ -289,14 +289,24 @@ def layout_quality(scene: dict) -> dict:
             continue
         table = min(seat_tables, key=lambda candidate: footprint(seat).distance(footprint(candidate)))
         distance = footprint(seat).distance(footprint(table))
-        details["functionalGrouping"] += max(0.0, distance - .70) / diag * 2.0
+        # A seat belongs in front of its matching work surface, close enough
+        # to use but with a small pull-out gap. Keep its centre near the
+        # tabletop centreline instead of accepting any nearby position.
+        details["functionalGrouping"] += max(0.0, distance - .18) / diag * 4.0
         if seat.get("category") in {"chair", "dressing_chair"}:
-            dx, dz = table["x"]-seat["x"], table["z"]-seat["z"]
-            length = math.hypot(dx, dz)
+            dx, dz = seat["x"] - table["x"], seat["z"] - table["z"]
+            angle = math.radians(float(table.get("rotation", 0)))
+            local_x = math.cos(angle) * dx - math.sin(angle) * dz
+            local_z = math.sin(angle) * dx + math.cos(angle) * dz
+            details["functionalGrouping"] += max(0.0, abs(local_x) - .10) / diag * 3.0
+            if local_z < 0:
+                details["functionalGrouping"] += min(.4, abs(local_z) / diag)
+            tx, tz = table["x"] - seat["x"], table["z"] - seat["z"]
+            length = math.hypot(tx, tz)
             if length > 1e-6:
                 rotation = math.radians(float(seat.get("rotation", 0)))
-                dot = (math.sin(rotation)*dx + math.cos(rotation)*dz) / length
-                details["seatFacing"] += .8 * (1-max(-1.,min(1.,dot))) / 2
+                dot = (math.sin(rotation)*tx + math.cos(rotation)*tz) / length
+                details["seatFacing"] += 1.0 * (1-max(-1.,min(1.,dot))) / 2
     from .bedside_constraints import bedside_assignments
     bedside_links = bedside_assignments(scene)
     for stand in nightstands:

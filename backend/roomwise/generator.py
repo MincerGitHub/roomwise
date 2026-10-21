@@ -114,12 +114,17 @@ def _location_cost(item, scene, original, placed, anchor_strength=0):
     if item["category"] in {"wardrobe", "double_bed", "single_bed", "kids_bed", "bookshelf", "cabinet", "desk", "sofa", "tv_stand"}:
         # A soft near-wall heuristic; no assumption that it is always desirable.
         cost += poly.distance(room_polygon(room).boundary) * .6
-    if item["category"] in {"chair", "dressing_chair", "nightstand"}:
-        partner_categories = {"desk", "table", "dressing_table"} if item["category"] != "nightstand" else {"double_bed", "single_bed", "kids_bed"}
+    if item["category"] in {"chair", "dressing_chair", "stool", "nightstand"}:
+        partner_categories = {
+            "chair": {"desk", "table"},
+            "dressing_chair": {"dressing_table"},
+            "stool": {"desk", "table", "dressing_table", "coffee_table"},
+            "nightstand": {"double_bed", "single_bed", "kids_bed"},
+        }[item["category"]]
         partners = [p for p in placed if p["category"] in partner_categories]
         if partners:
-            target_gap = .08 if item["category"] == "nightstand" else .12
-            grouping_strength = 1.5 if item["category"] == "nightstand" else .8
+            target_gap = .08 if item["category"] == "nightstand" else .14
+            grouping_strength = 1.5 if item["category"] == "nightstand" else 1.4
             distance = min(poly.distance(footprint(p)) for p in partners)
             cost += max(0.0, distance - target_gap) * grouping_strength
     return cost
@@ -311,14 +316,51 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
         table = items[preference["itemId"]]
         if preference["kind"] != "near_window" or table["category"] not in {"desk", "table", "dressing_table"}:
             continue
-        chairs = [item for item in original["items"] if item["category"] in {"chair", "dressing_chair", "stool"} and item["id"] not in used_chairs]
+        chair_categories = {"dressing_chair", "stool"} if table["category"] == "dressing_table" else {"chair", "stool"}
+        chairs = [item for item in original["items"] if item["category"] in chair_categories and item["id"] not in used_chairs]
         # An explicitly facing chair gets paired first; remaining ties use distance.
         facing_ids = {p["itemId"] for p in window_requests if p["kind"] == "face_window" and
                       (not p.get("targetId") or not preference.get("targetId") or p["targetId"] == preference["targetId"])}
-        chair = min(chairs, key=lambda c: (c["id"] not in facing_ids, math.dist((c["x"], c["z"]), (table["x"], table["z"])))) if chairs else None
+        preferred_category = "dressing_chair" if table["category"] == "dressing_table" else "chair"
+        chair = min(chairs, key=lambda c: (c["category"] != preferred_category, c["id"] not in facing_ids,
+                                           math.dist((c["x"], c["z"]), (table["x"], table["z"])))) if chairs else None
         if chair:
             used_chairs.add(chair["id"])
         groups.append((table, chair, preference))
+
+    # Explicit-constraint search bypasses functional_template. Keep each
+    # movable vanity and its matching chair together in this branch too.
+    window_table_ids = {table["id"] for table, _, _ in groups}
+    vanity_groups = []
+    for table in (item for item in original["items"] if item["category"] == "dressing_table"
+                  and item["id"] not in window_table_ids):
+        chairs = [item for item in original["items"]
+                  if item["category"] in {"dressing_chair", "stool"}
+                  and item["id"] not in used_chairs]
+        if not chairs:
+            continue
+        chair = min(chairs, key=lambda item: (item["category"] != "dressing_chair",
+                                              math.dist((item["x"], item["z"]), (table["x"], table["z"]))))
+        used_chairs.add(chair["id"])
+        # A pair that is entirely locked cannot be repaired. Leave it intact.
+        if table.get("locked") and chair.get("locked"):
+            continue
+        dx, dz = chair["x"] - table["x"], chair["z"] - table["z"]
+        angle = math.radians(float(table.get("rotation", 0)))
+        local_x = math.cos(angle) * dx - math.sin(angle) * dz
+        local_z = math.sin(angle) * dx + math.cos(angle) * dz
+        seat_angle = math.radians(float(chair.get("rotation", 0)))
+        length = math.hypot(dx, dz)
+        facing_dot = ((math.sin(seat_angle) * -dx + math.cos(seat_angle) * -dz) / length
+                      if length > 1e-8 else -1.)
+        gap = footprint(table).distance(footprint(chair))
+        relation_ok = (.04 <= gap <= .30 and local_z > 0 and abs(local_x) <= .18
+                       and facing_dot >= math.cos(math.radians(25)))
+        wall_ok = evaluate_wall_preference(table, room, {"kind": "near_wall", "itemId": table["id"]})["satisfied"]
+        explicit_table_request = any(pref["itemId"] == table["id"] for pref in preferences)
+        if not relation_ok or not wall_ok or explicit_table_request:
+            vanity_groups.append((table, chair))
+
     # A soft wall request still names furniture that the user expects the
     # layout search to reconsider.  It must not be treated as an unrelated
     # item merely because a separate hard request (for example, a desk near a
@@ -326,6 +368,8 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
     affected_ids = {p["itemId"] for p in preferences
                     if (p.get("required") and p["kind"] in EXPLICIT_SPATIAL_KINDS)
                     or p["kind"] == "near_wall"} | used_chairs
+    for table, chair in vanity_groups:
+        affected_ids.update((table["id"], chair["id"]))
     assignments = bedside_assignments(original)
     initial_relations = evaluate_bedside_groups(original)
     affected_ids.update(check["itemId"] for check in initial_relations["unsatisfied"])
@@ -432,6 +476,42 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
             placed = [*obstacles, *selected]
         if failed:
             continue
+
+        if vanity_groups:
+            from .layout_templates import _anchor_positions, _facing_table, _group_positions
+            for table, chair in vanity_groups:
+                group_ids = {table["id"], chair["id"]}
+                obstacles = [item for item in placed if item["id"] not in group_ids]
+                options = []
+                for table_candidate in _anchor_positions(table, [chair], "table", result, rng):
+                    if budget and not budget.take():
+                        return None
+                    if (not _required_item_passes(table_candidate, room, preferences)
+                            or placement_errors(table_candidate, room, obstacles, gap=.025)):
+                        continue
+                    for group in _group_positions(table_candidate, [chair], "table"):
+                        if budget and not budget.take():
+                            return None
+                        chair_candidate = group[1]
+                        if not _facing_table(chair_candidate, table_candidate):
+                            continue
+                        if (not _required_item_passes(chair_candidate, room, preferences)
+                                or placement_errors(chair_candidate, room, [*obstacles, table_candidate], gap=.025)):
+                            continue
+                        cost = sum(_location_cost(member, result, original,
+                                                  [*obstacles, *[other for other in group if other["id"] != member["id"]]],
+                                                  max(anchor_strength, .7))
+                                   for member in group)
+                        partial = {**result, "items": [*obstacles, *group]}
+                        cost += layout_quality(partial)["penalty"] * .6
+                        options.append((cost + rng.uniform(0, .015), group))
+                if not options:
+                    failed = True
+                    break
+                options.sort(key=lambda row: row[0])
+                placed = [*obstacles, *options[0][1]]
+            if failed:
+                continue
         if preserve_others == "keep_clear":
             # Preserve every unrelated piece that does not block the new group.
             # Only blockers are searched again; a later broad pass remains a fallback.

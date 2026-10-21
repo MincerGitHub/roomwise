@@ -58,7 +58,11 @@ def _groups(items, assignments=None):
         attached = stands[:2]
         used.update(item["id"] for item in [bed, *attached])
         groups.append((bed, attached, "bed"))
-    for table in [item for item in items if item["category"] in TABLES]:
+    tables = [item for item in items if item["category"] in TABLES]
+    # Reserve a dedicated dressing chair or generic stool for each vanity
+    # before desk groups claim the more general-purpose stools.
+    tables.sort(key=lambda item: item["category"] != "dressing_table")
+    for table in tables:
         chair_categories = {"dressing_chair", "stool"} if table["category"] == "dressing_table" else {"chair", "stool"}
         chairs = [item for item in items if item["category"] in chair_categories and item["id"] not in used]
         preferred_category = "dressing_chair" if table["category"] == "dressing_table" else "chair"

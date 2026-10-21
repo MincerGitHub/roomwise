@@ -233,3 +233,40 @@ def test_constraint_search_keeps_vanity_chair_paired_with_its_table():
     local_z = math.sin(angle) * dx + math.cos(angle) * dz
     assert abs(local_x) <= .11
     assert local_z > 0
+
+
+def test_rule_fallback_keeps_new_vanity_at_wall_and_pairs_catalog_stool(monkeypatch):
+    from roomwise.generator import generate_layouts
+    from roomwise.window_constraints import evaluate_wall_preference
+    from roomwise.geometry import evaluate_vanity_seating
+
+    # Recreate the app flow: generate once, then add the two catalog items at
+    # the room centre. Force the documented fallback after the group template
+    # so this covers the path that used to accept a vanity in the middle.
+    first = generate_layouts(demo_scene(), mode="rules", count=1, seed=42)
+    assert first["candidates"]
+    scene = deepcopy(first["candidates"][0]["scene"])
+    scene["items"].extend([
+        {"id": "vanity-new", "label": "梳妆台", "category": "dressing_table",
+         "width": 1.0, "depth": .45, "height": .75,
+         "x": scene["room"]["width"] / 2, "z": scene["room"]["depth"] / 2,
+         "rotation": 0., "locked": False, "keep": True, "source": "brought"},
+        {"id": "vanity-stool-new", "label": "梳妆凳", "category": "stool",
+         "width": .4, "depth": .4, "height": .45,
+         "x": scene["room"]["width"] / 2, "z": scene["room"]["depth"] / 2,
+         "rotation": 0., "locked": False, "keep": True, "source": "brought"},
+    ])
+    monkeypatch.setattr("roomwise.generator.learning_status", lambda: {"available": False})
+    monkeypatch.setattr("roomwise.generator.functional_template", lambda *args: None)
+
+    result = generate_layouts(scene, mode="rules", count=1, seed=42)
+
+    assert result["candidates"]
+    candidate = result["candidates"][0]["scene"]
+    items = {item["id"]: item for item in candidate["items"]}
+    wall = evaluate_wall_preference(items["vanity-new"], candidate["room"],
+                                    {"kind": "near_wall", "itemId": "vanity-new"})
+    assert wall["satisfied"], wall
+    seating = evaluate_vanity_seating(candidate)
+    assert seating["satisfied"], seating
+    assert any(check["chairId"] == "vanity-stool-new" for check in seating["checks"])

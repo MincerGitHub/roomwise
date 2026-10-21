@@ -115,6 +115,15 @@ def _location_cost(item, scene, original, placed, anchor_strength=0):
     if item["category"] in {"wardrobe", "double_bed", "single_bed", "kids_bed", "bookshelf", "cabinet", "desk", "sofa", "tv_stand"}:
         # A soft near-wall heuristic; no assumption that it is always desirable.
         cost += poly.distance(room_polygon(room).boundary) * .6
+    if item["category"] == "dressing_table":
+        # Vanities normally need a wall behind the mirror. Score the actual
+        # back edge as well as the footprint gap so a centre placement does
+        # not win when this search falls back to placing items individually.
+        check = evaluate_wall_preference(item, room, {"kind": "near_wall", "itemId": item["id"]})
+        metrics = check.get("metrics", {})
+        cost += max(0., metrics.get("distanceMeters", diag) - .24) * 1.5
+        cost += max(0., metrics.get("backDistanceMeters", diag) - .18) * .8
+        cost += metrics.get("backAlignmentErrorDegrees", 180.) / 180. * .6
     if item["category"] in {"chair", "dressing_chair", "stool", "nightstand"}:
         partner_categories = {
             "chair": {"desk", "table"},
@@ -123,11 +132,30 @@ def _location_cost(item, scene, original, placed, anchor_strength=0):
             "nightstand": {"double_bed", "single_bed", "kids_bed"},
         }[item["category"]]
         partners = [p for p in placed if p["category"] in partner_categories]
+        # The generic catalog stool is also used as a vanity seat. Give an
+        # existing vanity first claim so an older desk does not pull it away.
+        if item["category"] == "stool":
+            vanity_partners = [p for p in partners if p["category"] == "dressing_table"]
+            if vanity_partners:
+                partners = vanity_partners
         if partners:
             target_gap = .08 if item["category"] == "nightstand" else .14
             grouping_strength = 1.5 if item["category"] == "nightstand" else 1.4
-            distance = min(poly.distance(footprint(p)) for p in partners)
+            partner = min(partners, key=lambda p: poly.distance(footprint(p)))
+            distance = poly.distance(footprint(partner))
             cost += max(0.0, distance - target_gap) * grouping_strength
+            if item["category"] == "stool" and partner["category"] == "dressing_table":
+                dx, dz = item["x"] - partner["x"], item["z"] - partner["z"]
+                angle = math.radians(float(partner.get("rotation", 0)))
+                local_x = math.cos(angle) * dx - math.sin(angle) * dz
+                local_z = math.sin(angle) * dx + math.cos(angle) * dz
+                cost += max(0., abs(local_x) - .10) * 2.
+                cost += max(0., partner["depth"] / 2 - local_z) * 2.
+                length = math.hypot(dx, dz)
+                if length > 1e-8:
+                    facing = math.radians(float(item.get("rotation", 0)))
+                    dot = (math.sin(facing) * -dx + math.cos(facing) * -dz) / length
+                    cost += (1. - max(-1., min(1., dot))) * .7
     return cost
 
 
@@ -576,14 +604,70 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
 def rule_candidate(original: dict, rng: random.Random, anchor_strength=0, budget=None):
     if any(p.get("required") and p["kind"] in EXPLICIT_SPATIAL_KINDS for p in original.get("preferences", [])):
         return _constraint_rule_candidate(original, rng, anchor_strength, budget)
+    from .layout_templates import _anchor_positions, _group_positions
+
     result = deepcopy(original)
     room = result["room"]
     placed = [deepcopy(i) for i in result["items"] if i.get("locked")]
     movable = [deepcopy(i) for i in result["items"] if not i.get("locked")]
+    vanity_seats = {}
+    available_seats = {item["id"] for item in result["items"]
+                       if item.get("category") in {"dressing_chair", "stool"}}
+    for table in (item for item in result["items"]
+                  if item.get("category") == "dressing_table" and not item.get("locked")):
+        candidates = [item for item in result["items"] if item["id"] in available_seats
+                      and item.get("category") == "dressing_chair"]
+        if not candidates:
+            candidates = [item for item in result["items"] if item["id"] in available_seats
+                          and item.get("category") == "stool"]
+        if candidates:
+            seat = min(candidates, key=lambda candidate: math.dist((candidate["x"], candidate["z"]),
+                                                                   (table["x"], table["z"])))
+            vanity_seats[table["id"]] = seat
+            available_seats.remove(seat["id"])
+    consumed_vanity_seats = {seat["id"] for seat in vanity_seats.values()}
     # Large solid furniture first; small pieces are inserted around it, rugs last.
     jitter = {i["id"]: rng.uniform(.85, 1.15) for i in movable}
     movable.sort(key=lambda i: (i["category"] in ("nightstand", "rug"), i["category"] == "rug", -i["width"] * i["depth"] * jitter[i["id"]]))
     for item in movable:
+        if item["id"] in consumed_vanity_seats:
+            continue
+        vanity_seat = vanity_seats.get(item["id"])
+        if vanity_seat:
+            # Keep a newly added vanity and its stool together through the
+            # ordinary fallback too. Try wall-aligned poses first, then keep
+            # the best valid pair if other furniture blocks every wall pose.
+            obstacles = [other for other in placed if other["id"] != vanity_seat["id"]]
+            options = []
+            for wall_only in (True, False):
+                poses = (_anchor_positions(item, [vanity_seat], "table", result, rng)
+                         if wall_only else _placements(item, room, rng, result.get("preferences", [])))
+                for table_candidate in poses:
+                    if budget and not budget.take():
+                        return None
+                    if placement_errors(table_candidate, room, obstacles, gap=.025):
+                        continue
+                    for group in _group_positions(table_candidate, [vanity_seat], "table"):
+                        accepted = []
+                        for member in group:
+                            if placement_errors(member, room, [*obstacles, *accepted], gap=.025):
+                                break
+                            accepted.append(member)
+                        if len(accepted) != len(group):
+                            continue
+                        local = sum(_location_cost(member, result, original,
+                                                   [*obstacles, *[other for other in group if other["id"] != member["id"]]],
+                                                   anchor_strength) for member in group)
+                        quality = _candidate_quality_cost(group[-1], result,
+                                                          [*obstacles, *group[:-1]], local)
+                        options.append((quality + rng.uniform(0, .025), group))
+                if options:
+                    break
+            if not options:
+                return None
+            options.sort(key=lambda row: row[0])
+            placed = [*obstacles, *options[0][1]]
+            continue
         options = []
         for candidate in _dependent_placements(item, result, original, placed, rng):
             if budget and not budget.take():

@@ -225,7 +225,7 @@ def evaluate_vanity_seating(scene: dict) -> dict:
     A pair that is both locked is reported as a warning and left untouched.
     """
     tables = [item for item in scene.get("items", []) if item.get("category") == "dressing_table"]
-    chairs = [item for item in scene.get("items", []) if item.get("category") == "dressing_chair"]
+    chairs = [item for item in scene.get("items", []) if item.get("category") in {"dressing_chair", "stool"}]
     chairs_by_id = {chair["id"]: chair for chair in chairs}
     tables_by_id = {table["id"]: table for table in tables}
     available = set(chairs_by_id)
@@ -243,7 +243,11 @@ def evaluate_vanity_seating(scene: dict) -> dict:
     for table in tables:
         if table["id"] in paired_tables:
             continue
-        candidates = [chair for chair in chairs if chair["id"] in available]
+        candidates = [chair for chair in chairs
+                      if chair["id"] in available and chair.get("category") == "dressing_chair"]
+        if not candidates:
+            candidates = [chair for chair in chairs
+                          if chair["id"] in available and chair.get("category") == "stool"]
         if not candidates:
             continue
         chair = min(candidates, key=lambda item: math.dist((item["x"], item["z"]), (table["x"], table["z"])))
@@ -378,6 +382,10 @@ def layout_quality(scene: dict) -> dict:
     for seat in items:
         partner_categories = partners.get(seat.get("category"), set())
         seat_tables = [table for table in tables if table.get("category") in partner_categories]
+        if seat.get("category") == "stool":
+            vanity_tables = [table for table in seat_tables if table.get("category") == "dressing_table"]
+            if vanity_tables:
+                seat_tables = vanity_tables
         if not seat_tables:
             continue
         table = min(seat_tables, key=lambda candidate: footprint(seat).distance(footprint(candidate)))
@@ -386,14 +394,16 @@ def layout_quality(scene: dict) -> dict:
         # to use but with a small pull-out gap. Keep its centre near the
         # tabletop centreline instead of accepting any nearby position.
         details["functionalGrouping"] += max(0.0, distance - .18) / diag * 4.0
-        if seat.get("category") in {"chair", "dressing_chair"}:
+        if seat.get("category") in {"chair", "dressing_chair"} or (
+                seat.get("category") == "stool" and table.get("category") == "dressing_table"):
             dx, dz = seat["x"] - table["x"], seat["z"] - table["z"]
             angle = math.radians(float(table.get("rotation", 0)))
             local_x = math.cos(angle) * dx - math.sin(angle) * dz
             local_z = math.sin(angle) * dx + math.cos(angle) * dz
             details["functionalGrouping"] += max(0.0, abs(local_x) - .10) / diag * 3.0
-            if local_z < 0:
-                details["functionalGrouping"] += min(.4, abs(local_z) / diag)
+            if local_z < table["depth"] / 2 - seat["depth"] * .35:
+                shortfall = table["depth"] / 2 - seat["depth"] * .35 - local_z
+                details["functionalGrouping"] += min(.6, shortfall / diag * 3.)
             tx, tz = table["x"] - seat["x"], table["z"] - seat["z"]
             length = math.hypot(tx, tz)
             if length > 1e-6:

@@ -236,7 +236,7 @@ def test_constraint_search_keeps_vanity_chair_paired_with_its_table():
 
 
 def test_rule_fallback_keeps_new_vanity_at_wall_and_pairs_catalog_stool(monkeypatch):
-    from roomwise.generator import generate_layouts
+    from roomwise.generator import generate_layouts, rule_candidate
     from roomwise.window_constraints import evaluate_wall_preference
     from roomwise.geometry import evaluate_vanity_seating
 
@@ -259,10 +259,10 @@ def test_rule_fallback_keeps_new_vanity_at_wall_and_pairs_catalog_stool(monkeypa
     monkeypatch.setattr("roomwise.generator.learning_status", lambda: {"available": False})
     monkeypatch.setattr("roomwise.generator.functional_template", lambda *args: None)
 
-    result = generate_layouts(scene, mode="rules", count=1, seed=42)
-
-    assert result["candidates"]
-    candidate = result["candidates"][0]["scene"]
+    # Exercise the rule fallback directly: it must be safe even when the
+    # group template cannot supply the proposal.
+    candidate = rule_candidate(scene, random.Random(0))
+    assert candidate is not None
     items = {item["id"]: item for item in candidate["items"]}
     wall = evaluate_wall_preference(items["vanity-new"], candidate["room"],
                                     {"kind": "near_wall", "itemId": "vanity-new"})
@@ -270,3 +270,35 @@ def test_rule_fallback_keeps_new_vanity_at_wall_and_pairs_catalog_stool(monkeypa
     seating = evaluate_vanity_seating(candidate)
     assert seating["satisfied"], seating
     assert any(check["chairId"] == "vanity-stool-new" for check in seating["checks"])
+
+
+def test_functional_template_pairs_catalog_stool_with_vanity_before_desk():
+    from roomwise.geometry import evaluate_vanity_seating
+    from roomwise.layout_templates import _groups
+
+    scene = demo_scene()
+    scene["room"]["door"] = None
+    scene["preferences"] = []
+    scene["items"] = [item for item in scene["items"] if item["id"] in {"desk-1", "chair-1"}]
+    scene["items"].extend([
+        {"id": "vanity", "label": "梳妆台", "category": "dressing_table",
+         "width": 1.0, "depth": .45, "height": .75, "x": 2.6, "z": 2.1,
+         "rotation": 0., "locked": False, "keep": True, "source": "brought"},
+        {"id": "stool", "label": "梳妆凳", "category": "stool",
+         "width": .4, "depth": .4, "height": .45, "x": 2.6, "z": 2.1,
+         "rotation": 0., "locked": False, "keep": True, "source": "brought"},
+    ])
+
+    groups = _groups(scene["items"])
+    vanity_group = next(group for group in groups if group[0]["id"] == "vanity")
+    assert [seat["id"] for seat in vanity_group[1]] == ["stool"]
+
+    proposed = functional_template(scene, random.Random(42))
+
+    assert proposed is not None
+    assert validate_scene(proposed)["valid"]
+    items = {item["id"]: item for item in proposed["items"]}
+    wall = evaluate_wall_preference(items["vanity"], proposed["room"],
+                                    {"kind": "near_wall", "itemId": "vanity"})
+    assert wall["satisfied"], wall
+    assert evaluate_vanity_seating(proposed)["satisfied"]

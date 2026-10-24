@@ -279,3 +279,200 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* Frosted-glass surfaces: layered highlights keep the treatment light and legible. */
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 82% 5%, rgba(224, 234, 193, .42), transparent 33rem),
+    radial-gradient(ellipse at 7% 62%, rgba(229, 236, 218, .52), transparent 35rem),
+    #f4f5f0;
+}
+.app-header {
+  background: rgba(255, 255, 255, .68);
+  border-bottom-color: rgba(255, 255, 255, .82);
+  box-shadow: 0 1px 0 rgba(86, 103, 67, .035), 0 8px 28px rgba(54, 68, 46, .035);
+  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  backdrop-filter: blur(24px) saturate(1.35);
+}
+.workspace { background: transparent; }
+.sidebar {
+  background: rgba(255, 255, 255, .57);
+  border-right-color: rgba(255, 255, 255, .8);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(22px) saturate(1.25);
+}
+.sidebar-footer { border-top-color: rgba(221, 229, 211, .62); }
+
+.note-card,
+.language-status,
+.identified-requirements,
+.generation-bar,
+.candidate-card,
+.conversation,
+.preview-requirements,
+.functional-relations,
+.suggestion,
+.saved-row,
+.video-candidate,
+.metric-grid > div {
+  background: rgba(255, 255, 255, .66);
+  border-color: rgba(255, 255, 255, .88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 8px 26px rgba(51, 67, 43, .045);
+  -webkit-backdrop-filter: blur(18px) saturate(1.28);
+  backdrop-filter: blur(18px) saturate(1.28);
+}
+.item-card,
+.catalog-grid > button {
+  background: rgba(255, 255, 255, .72);
+  border-color: rgba(255, 255, 255, .92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .92), 0 3px 12px rgba(48, 65, 41, .035);
+  -webkit-backdrop-filter: blur(16px) saturate(1.22);
+  backdrop-filter: blur(16px) saturate(1.22);
+}
+.item-card.selected,
+.candidate-card.active {
+  background: rgba(240, 246, 226, .78);
+  border-color: rgba(185, 204, 145, .86);
+}
+.language-status { background: rgba(247, 249, 242, .64); }
+.generation-bar { background: rgba(250, 252, 244, .66); }
+.conversation { background: rgba(255, 255, 255, .64); }
+.identified-requirements { background: rgba(255, 255, 255, .62); }
+.modal {
+  background: rgba(255, 255, 255, .78);
+  border-color: rgba(255, 255, 255, .94);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), 0 24px 80px rgba(24, 40, 28, .2);
+  -webkit-backdrop-filter: blur(28px) saturate(1.35);
+  backdrop-filter: blur(28px) saturate(1.35);
+}
+.viewport {
+  background: rgba(238, 241, 228, .58);
+  border-color: rgba(255, 255, 255, .86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .82), 0 14px 38px rgba(52, 67, 43, .075);
+}
+.canvas-validation,
+.selected-label,
+.canvas-tools button {
+  background: rgba(255, 255, 255, .72);
+  border-color: rgba(255, 255, 255, .94);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+}
+.btn,
+.icon-btn,
+.tabs button,
+.toggle,
+.prompt-examples button,
+.canvas-tools button,
+.view-switch button,
+.add-outline,
+.saved-row,
+.catalog-grid > button,
+.item-card,
+.candidate-card,
+.preview-banner .btn,
+.command-box button {
+  transform-origin: center;
+  transition:
+    transform 420ms cubic-bezier(.18, 1.35, .32, 1),
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    box-shadow 300ms ease;
+}
+.app-header .btn,
+.generation-actions .btn,
+.command-box button { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 4px 12px rgba(54, 74, 40, .12); }
+.app-header .btn:not(.primary) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), 0 3px 10px rgba(54, 68, 46, .05); }
+@media (hover: hover) and (pointer: fine) {
+  .item-card:hover,
+  .candidate-card:hover,
+  .saved-row:hover,
+  .video-candidate:hover,
+  .suggestion:hover,
+  .metric-grid > div:hover {
+    transform: translateY(-2px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .96), 0 12px 30px rgba(48, 65, 41, .095);
+  }
+  .catalog-grid > button:hover {
+    transform: translateY(-3px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .96), 0 14px 30px rgba(48, 65, 41, .11);
+  }
+  .btn:hover:not(:disabled),
+  .icon-btn:hover:not(:disabled),
+  .prompt-examples button:hover:not(:disabled),
+  .canvas-tools button:hover:not(:disabled),
+  .view-switch button:hover:not(:disabled),
+  .add-outline:hover:not(:disabled) { transform: translateY(-1px); }
+}
+
+/* Put the press state after hover so it always wins while the pointer is down. */
+.btn:active:not(:disabled),
+.icon-btn:active:not(:disabled),
+.tabs button:active:not(:disabled),
+.toggle:active:not(:disabled),
+.prompt-examples button:active:not(:disabled),
+.canvas-tools button:active:not(:disabled),
+.view-switch button:active:not(:disabled),
+.add-outline:active:not(:disabled),
+.saved-row:active:not(:disabled),
+.catalog-grid > button:active:not(:disabled),
+.item-card:active:not(:disabled),
+.candidate-card .btn:active:not(:disabled),
+.preview-banner .btn:active:not(:disabled),
+.command-box button:active:not(:disabled) {
+  transform: translateY(1px) scale(.965);
+  transition-duration: 90ms;
+  transition-timing-function: cubic-bezier(.35, 0, .65, 1);
+  box-shadow: inset 0 1px 2px rgba(38, 52, 33, .12), 0 1px 3px rgba(38, 52, 33, .08);
+}
+.item-card:active:not(:disabled),
+.candidate-card:active:not(:disabled),
+.saved-row:active:not(:disabled),
+.video-candidate:active:not(:disabled),
+.suggestion:active:not(:disabled) { transform: translateY(1px) scale(.99); }
+
+@media (max-width: 780px) {
+  .sidebar { background: rgba(255, 255, 255, .76); }
+  .tabs { background: rgba(255, 255, 255, .72); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .icon-btn,
+  .tabs button,
+  .toggle,
+  .prompt-examples button,
+  .canvas-tools button,
+  .view-switch button,
+  .add-outline,
+  .saved-row,
+  .catalog-grid > button,
+  .item-card,
+  .candidate-card,
+  .preview-banner .btn,
+  .command-box button { transition: none !important; }
+  .btn:active:not(:disabled),
+  .icon-btn:active:not(:disabled),
+  .item-card:hover,
+  .candidate-card:hover,
+  .saved-row:hover,
+  .video-candidate:hover,
+  .suggestion:hover,
+  .metric-grid > div:hover,
+  .catalog-grid > button:hover { transform: none !important; }
+  .btn:active:not(:disabled),
+  .icon-btn:active:not(:disabled),
+  .tabs button:active:not(:disabled),
+  .toggle:active:not(:disabled),
+  .prompt-examples button:active:not(:disabled),
+  .canvas-tools button:active:not(:disabled),
+  .view-switch button:active:not(:disabled),
+  .add-outline:active:not(:disabled),
+  .saved-row:active:not(:disabled),
+  .catalog-grid > button:active:not(:disabled),
+  .item-card:active:not(:disabled),
+  .candidate-card .btn:active:not(:disabled),
+  .preview-banner .btn:active:not(:disabled),
+  .command-box button:active:not(:disabled) { transform: none !important; }
+}

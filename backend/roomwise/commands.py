@@ -60,7 +60,7 @@ def _clarify(scene, matches, action="操作"):
     return _reply(scene, "clarify", "没有找到指令中的家具，请先选中家具或使用清单中的完整名称。")
 
 
-def _add_preference(scene, item_id, kind, target_id=None, required=False, wall=None, side=None):
+def _add_preference(scene, item_id, kind, target_id=None, required=False, wall=None, side=None, direction=None):
     # A repeated request updates the existing preference, including its window
     # and strength. It must not leave contradictory duplicate conditions behind.
     preferences = scene.setdefault("preferences", [])
@@ -72,6 +72,8 @@ def _add_preference(scene, item_id, kind, target_id=None, required=False, wall=N
         preference["wall"] = wall
     if kind == "bedside":
         preference["side"] = side or "either"
+    if kind == "relative_position":
+        preference["direction"] = direction
     if matches:
         first = matches[0]
         first.clear()
@@ -172,8 +174,21 @@ def _vanity_syntax(clause):
 
 
 def _relative_furniture_syntax(clause):
-    """Recognize generic object-to-object positions outside supported pairs."""
-    return re.fullmatch('(?:请帮我|帮我|请|把|将)?(?P<subject>.+?)(?:放置在|放在|放到|摆放在|摆在|摆到|挪到|移到)(?P<target>.+?)(?P<relation>前面|前方|前|后面|后方|后|左侧|左边|右侧|右边|旁边)', clause.strip())
+    """Recognize a complete object-to-object relation, preserving each reference."""
+    return re.fullmatch('(?:请帮我|帮我|请|把|将)?(?P<subject>.+?)(?:放置在|放在|放到|摆放在|摆在|摆到|挪到|移到|位于|在)(?P<target>.+?)(?P<relation>前面|前方|前|后面|后方|后|左侧|左边|左面|右侧|右边|右面|旁边)', clause.strip())
+
+
+def _relative_reference_matches(reference, item, selected_id=None, subject=False):
+    """Do not silently discard extra edits, negation or other requirements."""
+    reference = reference.strip()
+    if subject:
+        reference = re.sub(r"^(?:(?:请帮我|帮我|请|把|将|尽量|最好|优先))+", "", reference).strip()
+        reference = re.sub(r"(?:尽量|最好|优先)$", "", reference).strip()
+        if selected_id == item["id"] and reference in ("它", "这个", "这件", "该家具", "选中的家具"):
+            return True
+    else:
+        reference = re.sub(r"的$", "", reference).strip()
+    return reference in (item["id"], item["label"], *ALIASES.get(item["category"], []))
 
 
 def _wall_exemption(clause):
@@ -193,7 +208,7 @@ def is_vanity_or_wall_exemption_command(text):
 
 
 def is_relative_furniture_command(text):
-    clauses = [part.strip() for part in re.split('[,，;；。！？]|同时|然后', text) if part.strip()]
+    clauses = [part.strip() for part in re.split('[,，;；。！？!?]|同时|然后', text) if part.strip()]
     return bool(clauses) and any(_relative_furniture_syntax(part) and not _vanity_syntax(part)
                                  and not _bedside_syntax(part) for part in clauses)
 
@@ -256,6 +271,9 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
         return _reply(scene, "clarify", "检测到否定的靠墙要求，本次未修改。当前支持明确靠墙，或说出要移动到的位置。")
     if re.search(r"(?:不要|不能|不想|不许|禁止|别|不)(?:再)?(?:放|摆|挪|移|靠).*(?:床头|床边|床旁)", text):
         return _reply(scene, "clarify", "当前支持明确的床头柜摆放要求，尚不支持否定的床头关系。本次未修改。")
+    if any(re.search(r"(?:不要|不能|不想|不许|禁止|别|不)(?:再)?\s*(?:放|摆|挪|移|位于|在).*(?:前面|前方|前|后面|后方|后|左侧|左边|左面|右侧|右边|右面)", clause)
+           for clause in re.split(r"[，,。;；！？!?]|同时|然后", text)):
+        return _reply(scene, "clarify", "当前支持明确放在家具前后左右的要求；否定关系请改为希望摆放的方向。本次未修改。")
     if re.search(r"(?:增加|添加|补充|需要).*(?:办公|工作位|阅读|收纳)", text):
         need = "work" if re.search(r"办公|工作位", text) else "reading" if "阅读" in text else "storage"
         suggestions = suggest_items(scene, need)
@@ -300,8 +318,9 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
         request_generate = True
         handled = True
 
-    clauses = re.split(r"[，,](?!\s*[zZ]\s*[=:：])|[。;；]|同时|然后", text)
+    clauses = re.split(r"[，,](?!\s*[zZ]\s*[=:：])|[。;；！？!?]|同时|然后", text)
     last_item_id = None
+    relative_commands = {}
     for clause in clauses:
         clause = clause.strip()
         if not clause or (restriction and re.search(r"(?:只|仅)(?:调整|移动|重排|重新布置)", clause)):
@@ -357,6 +376,12 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
             continue
         relative = _relative_furniture_syntax(clause)
         if relative and not _vanity_syntax(clause) and not _bedside_syntax(clause):
+            direction = {"前面": "front", "前方": "front", "前": "front",
+                         "后面": "back", "后方": "back", "后": "back",
+                         "左侧": "left", "左边": "left", "左面": "left",
+                         "右侧": "right", "右边": "right", "右面": "right"}.get(relative["relation"])
+            if direction is None:
+                return _reply(scene, "clarify", "请说清楚放在目标家具的前、后、左或右侧；本次未修改。")
             subjects = _references(relative["subject"], result["items"], selected_id)
             targets = _references(relative["target"], result["items"])
             if len(subjects) != 1:
@@ -365,7 +390,32 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
                 return _clarify(scene, targets, '相对位置目标')
             if subjects[0]["id"] == targets[0]["id"]:
                 return _reply(scene, "clarify", '相对位置要求需要指向两件不同家具。本次未修改。')
-            return _reply(scene, "unsupported", '已识别这两件家具但目前还不支持一般家具之间的前后、左右摆放关系。当前仅支持床头柜与床、梳妆椅与梳妆台等专用搭配。本次未修改。')
+            subject, target = subjects[0], targets[0]
+            if not (_relative_reference_matches(relative["subject"], subject, selected_id, subject=True)
+                    and _relative_reference_matches(relative["target"], target)):
+                return _reply(scene, "unsupported", "相对位置指令中还有未识别的内容，本次未修改。请分步说明，例如“床放在衣柜前面”。")
+            if subject.get("category") == "rug" or target.get("category") == "rug":
+                return _reply(scene, "clarify", "地毯不参与家具前后左右关系，请指定两件实体家具；本次未修改。")
+            if subject.get("locked"):
+                from .relative_constraints import evaluate_relative_position
+                current = evaluate_relative_position(subject, target, {"kind": "relative_position",
+                    "itemId": subject["id"], "targetId": target["id"], "direction": direction, "required": True})
+                if not current["satisfied"]:
+                    return _reply(scene, "clarify", f"{subject['label']}的位置已锁定且当前不符合相对位置；请先解锁，再调整。本次未修改。")
+            required = not bool(re.search(r"尽量|最好|优先", clause))
+            requested = (target["id"], direction)
+            if subject["id"] in relative_commands and relative_commands[subject["id"]] != requested:
+                return _reply(scene, "clarify", f"{subject['label']}在同一条指令中收到了相互冲突的相对位置要求；本次未修改。")
+            relative_commands[subject["id"]] = requested
+            _add_preference(result, subject["id"], "relative_position", target["id"], required=required,
+                            direction=direction)
+            side_name = {"front": "前方", "back": "后方", "left": "左侧", "right": "右侧"}[direction]
+            changes.append({"itemId": subject["id"], "field": "preference", "value": "relative_position",
+                            "targetId": target["id"], "direction": direction, "required": required,
+                            "label": f"{subject['label']}{'尽量' if not required else ''}放在{target['label']}{side_name}"})
+            request_generate = True
+            handled = True
+            continue
         if re.fullmatch(r"(?:其他|其余)(?:家具)?(?:都)?(?:不动|不要动|保持不动)", clause) and restriction:
             handled = True
             continue
@@ -421,7 +471,7 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
             if "不动" in clause and restriction:
                 handled = True
                 continue
-            return _reply(scene, "unsupported", "当前离线指令支持：保留、锁定/解锁、旋转N度、向右移动N米、靠墙或靠指定方向墙、靠窗、面朝窗户、床头柜放床头左侧或右侧、尽量少移动、只调整指定家具、生成方案、补充办公/收纳/阅读、撤销。颜色风格等未实现。")
+            return _reply(scene, "unsupported", "当前离线指令支持：保留、锁定/解锁、旋转N度、向右移动N米、靠墙或靠指定方向墙、靠窗、面朝窗户、家具放在另一件家具前后左右、床头柜放床头左侧或右侧、尽量少移动、只调整指定家具、生成方案、补充办公/收纳/阅读、撤销。颜色风格等未实现。")
         matches = _references(clause, result["items"], selected_id)
         if not matches and last_item_id and re.fullmatch(r"(?:但|不过|并且)?(?:它|位置|朝向|位置和朝向)?(?:可以变|可以移动|不要动|保持原位|锁定|解锁)", clause):
             matches = [i for i in result["items"] if i["id"] == last_item_id]
@@ -496,11 +546,13 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
     action = "generate" if request_generate else "edit"
     validation = validate_scene(result)
     message = "已更新布局条件，请生成候选后选择；现有家具身份与尺寸保持。" if request_generate else "已执行明确编辑；请检查提示，可随时撤销。"
-    window_changes = [c["label"] for c in changes if c.get("value") in ("near_window", "face_window", "near_wall", "bedside", "vanity_seating")]
+    window_changes = [c["label"] for c in changes if c.get("value") in ("near_window", "face_window", "near_wall", "bedside", "vanity_seating", "relative_position")]
     if window_changes:
         message = "已识别：" + "；".join(window_changes) + "。" + message
     if any(change.get("value") == "bedside" for change in changes):
         message += "床头左右按站在床尾看向床头判断，与相机视角无关。"
+    if any(change.get("value") == "relative_position" for change in changes):
+        message += "前后左右按参照家具自身朝向判断；床的前后对应床头端和床尾端。参照家具保持原位。"
     if any(c["field"] in ("x", "z") for c in changes):
         message += "移动方向按房间坐标：右为+x，后为+z。"
     if not validation["valid"]:

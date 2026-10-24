@@ -10,6 +10,7 @@ import math
 from shapely.geometry import LineString
 
 from .geometry import footprint, opening_center, room_polygon
+from .relative_constraints import MAX_RELATIVE_GAP, MIN_LATERAL_OVERLAP, MIN_RELATIVE_GAP, evaluate_relative_position
 
 
 MAX_WINDOW_GAP = .60
@@ -17,7 +18,7 @@ WINDOW_PROJECTION_TOLERANCE = .15
 MAX_FACING_ANGLE = 20.0
 MAX_WALL_GAP = .15
 MAX_WALL_BACK_ANGLE = 20.0
-EXPLICIT_SPATIAL_KINDS = ("near_window", "face_window", "near_wall", "bedside", "vanity_seating")
+EXPLICIT_SPATIAL_KINDS = ("near_window", "face_window", "near_wall", "bedside", "vanity_seating", "relative_position")
 
 
 def matching_wall_segments(room, preference):
@@ -157,6 +158,8 @@ def evaluate_layout_requirements(scene):
                if pref["kind"] == "bedside" else
                evaluate_vanity_preference(items.get(pref["itemId"]), items.get(pref.get("targetId")), pref)
                if pref["kind"] == "vanity_seating" else
+               evaluate_relative_position(items.get(pref["itemId"]), items.get(pref.get("targetId")), pref)
+               if pref["kind"] == "relative_position" else
                evaluate_spatial_preference(items.get(pref["itemId"]), scene["room"], pref))
               for pref in scene.get("preferences", []) if pref["kind"] in EXPLICIT_SPATIAL_KINDS]
     unsatisfied = [check for check in checks if check["required"] and not check["satisfied"]]
@@ -164,5 +167,8 @@ def evaluate_layout_requirements(scene):
             "thresholds": {"maxWindowGapMeters": MAX_WINDOW_GAP,
                            "windowProjectionToleranceMeters": WINDOW_PROJECTION_TOLERANCE,
                            "maxFacingAngleDegrees": MAX_FACING_ANGLE,
-                           "maxWallGapMeters": MAX_WALL_GAP, "maxWallBackAngleDegrees": MAX_WALL_BACK_ANGLE},
+                           "maxWallGapMeters": MAX_WALL_GAP, "maxWallBackAngleDegrees": MAX_WALL_BACK_ANGLE,
+                           "relativePositionMinGapMeters": MIN_RELATIVE_GAP,
+                           "relativePositionMaxGapMeters": MAX_RELATIVE_GAP,
+                           "relativePositionMinLateralOverlapMeters": MIN_LATERAL_OVERLAP},
             "note": "靠墙、靠窗和朝向阈值是本产品的可调整默认值，不是建筑或人体工学标准；靠墙默认家具背面朝墙、正面朝室内。"}

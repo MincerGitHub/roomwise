@@ -36,3 +36,241 @@
 @media(max-width:780px){.furniture-editor-grid{grid-template-columns:1fr}.furniture-parameters{grid-template-columns:repeat(2,minmax(0,1fr))}.owned-furniture-grid{grid-template-columns:1fr 1fr}.furniture-library fieldset{padding:12px}.furniture-library .field-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.furniture-crop{width:100%}.app-header{flex-wrap:wrap;height:auto;gap:10px;padding:12px}.header-actions{flex-wrap:wrap}}
 @media(max-width:480px){.owned-furniture-grid{grid-template-columns:1fr}.furniture-photos img{width:80px;height:70px}}
 .furniture-import-entry{padding:14px;margin:0 0 18px;border:1px solid #d8e1ca;border-radius:10px;background:#f4f7ee}.furniture-import-entry strong{font-size:13px}.furniture-import-entry p{font-size:11px;color:#68745d;line-height:1.7;margin:8px 0 12px}
+
+/* A quieter, more deliberate furniture library surface. */
+.modal-backdrop.furniture-backdrop {
+  z-index: 80;
+  padding: clamp(12px, 3vh, 30px);
+  background: rgba(30, 39, 31, .38);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+.modal.furniture-library {
+  width: min(1040px, 96vw);
+  max-width: 1040px;
+  max-height: min(90dvh, 980px);
+  padding: 0 30px 30px;
+  overflow: auto;
+  border: 1px solid rgba(255,255,255,.92);
+  border-radius: 24px;
+  background: rgba(250, 251, 247, .96);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 28px 90px rgba(20,31,21,.24);
+  color: #2b362d;
+  -webkit-backdrop-filter: blur(30px) saturate(1.35);
+  backdrop-filter: blur(30px) saturate(1.35);
+  scrollbar-width: thin;
+  scrollbar-color: #cbd4c3 transparent;
+}
+.furniture-library .modal-heading {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  margin: 0 -30px 20px;
+  padding: 24px 28px 17px 30px;
+  border-bottom: 1px solid rgba(222,228,216,.76);
+  background: rgba(250,251,247,.94);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  backdrop-filter: blur(24px) saturate(1.3);
+}
+.furniture-library .eyebrow {
+  color: #84946f;
+  font-size: 10px;
+  letter-spacing: 1.7px;
+}
+.furniture-library .modal-heading h2 {
+  margin-top: 5px;
+  color: #26342b;
+  font-size: 23px;
+  font-weight: 620;
+  letter-spacing: -.35px;
+}
+.furniture-library .modal-heading .icon-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #e7ebe3;
+  border-radius: 12px;
+  background: rgba(255,255,255,.74);
+}
+.furniture-intro {
+  margin: 0 0 17px;
+  color: #707c70;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.furniture-service {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 0 0 18px;
+  padding: 13px 15px;
+  border: 1px solid #e7eadf;
+  border-radius: 14px;
+  background: rgba(255,255,255,.67);
+  color: #657263;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.furniture-service-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: #a0a98e;
+  box-shadow: 0 0 0 4px rgba(160,169,142,.13);
+}
+.furniture-service.ready .furniture-service-dot {
+  background: #7e9b58;
+  box-shadow: 0 0 0 4px rgba(126,155,88,.14);
+}
+.furniture-service > div { display: grid; gap: 2px; }
+.furniture-service strong { color: #43543e; font-size: 12px; font-weight: 600; }
+.furniture-service span:not(.furniture-service-dot) { color: #788275; }
+.furniture-library fieldset {
+  min-width: 0;
+  margin: 0 0 22px;
+  padding: 18px;
+  border: 1px solid #e3e8dc;
+  border-radius: 18px;
+  background: rgba(255,255,255,.56);
+}
+.furniture-library fieldset:disabled { opacity: .76; }
+.furniture-library legend {
+  padding: 0 8px;
+  color: #354638;
+  font-size: 14px;
+  font-weight: 620;
+}
+.furniture-library .furniture-upload > input[type="file"] {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  padding: 17px;
+  border: 1px dashed #c7d3ba;
+  border-radius: 14px;
+  background: rgba(248,250,245,.86);
+  color: #687568;
+  font-size: 12px;
+  cursor: pointer;
+}
+.furniture-library input[type="file"]::file-selector-button {
+  min-height: 40px;
+  margin-right: 13px;
+  padding: 0 15px;
+  border: 1px solid #d8e1ce;
+  border-radius: 11px;
+  background: #fff;
+  color: #4f633e;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, transform .25s cubic-bezier(.18,1.35,.32,1);
+}
+.furniture-library input[type="file"]::file-selector-button:hover { background: #f1f5e9; border-color: #c5d4b4; }
+.furniture-library input[type="file"]::file-selector-button:active { transform: scale(.97); }
+.furniture-upload-note { margin: 9px 2px 2px; color: #899184; font-size: 11px; }
+.furniture-crops { gap: 12px; margin: 14px 0 5px; }
+.furniture-crop { width: calc(33.33% - 8px); min-width: 180px; }
+.crop-surface img { border-radius: 11px; }
+.furniture-library .furniture-check {
+  align-items: flex-start;
+  gap: 11px;
+  margin: 15px 0 14px;
+  padding: 13px 14px;
+  border: 1px solid #e9ebdf;
+  border-radius: 13px;
+  background: rgba(247,248,241,.72);
+  color: #626e60;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.furniture-consent input { width: 17px; height: 17px; margin-top: 2px; }
+.furniture-consent strong { color: #394b3b; font-weight: 650; }
+.furniture-library .furniture-upload > .btn.primary {
+  min-height: 42px;
+  padding: 10px 17px;
+  border-radius: 12px;
+}
+.furniture-message {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: 13px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.furniture-library .furniture-saved,
+.furniture-library .furniture-draft-section { margin-top: 25px; }
+.furniture-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 15px; margin-bottom: 13px; }
+.furniture-section-heading h3 { display: flex; align-items: center; gap: 9px; margin: 3px 0 0; color: #303d32; font-size: 16px; font-weight: 620; }
+.furniture-section-heading > p { margin: 0 0 2px; color: #858e80; font-size: 11px; }
+.furniture-section-kicker { color: #89977a; font-size: 9px; letter-spacing: 1.5px; }
+.furniture-count { display: inline-grid; min-width: 22px; height: 22px; place-items: center; padding: 0 6px; border-radius: 999px; background: #edf2e4; color: #60774a; font-size: 11px; font-weight: 600; }
+.owned-furniture-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 13px; }
+.owned-furniture-card {
+  min-width: 0;
+  gap: 7px;
+  padding: 11px;
+  overflow: hidden;
+  border: 1px solid rgba(223,230,215,.94);
+  border-radius: 16px;
+  background: rgba(255,255,255,.75);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 4px 15px rgba(46,61,39,.045);
+  transition: transform .32s cubic-bezier(.18,1.35,.32,1), box-shadow .24s ease, border-color .24s ease;
+}
+.owned-furniture-card:hover { transform: translateY(-2px); border-color: #cbd8bc; box-shadow: inset 0 1px 0 rgba(255,255,255,.98), 0 12px 28px rgba(46,61,39,.09); }
+.owned-furniture-card > img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1.45;
+  object-fit: cover;
+  border-radius: 11px;
+  background: linear-gradient(145deg,#f0f2eb,#fafbf8);
+}
+.owned-furniture-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; margin-top: 3px; }
+.owned-furniture-meta > strong { overflow: hidden; color: #334035; font-size: 13px; font-weight: 610; text-overflow: ellipsis; white-space: nowrap; }
+.owned-furniture-meta > span { flex: 0 0 auto; padding: 3px 7px; border-radius: 999px; background: #f2f4ed; color: #798371; font-size: 10px; }
+.owned-furniture-card > small { color: #818b7e; font-size: 11px; }
+.owned-furniture-card .furniture-actions { gap: 7px; margin-top: 5px; }
+.owned-furniture-card .furniture-actions .btn { min-height: 36px; flex: 1; padding: 7px 9px; border-radius: 10px; font-size: 11px; }
+.furniture-empty { padding: 18px; border: 1px dashed #dce4d3; border-radius: 14px; color: #8a9286; font-size: 12px; text-align: center; }
+.furniture-drafts { gap: 8px; }
+.furniture-drafts .btn { min-height: 35px; border-radius: 10px; background: rgba(255,255,255,.7); font-size: 11px; }
+.furniture-library .furniture-editor { margin-top: 20px; }
+.furniture-library .field { color: #687467; font-size: 12px; }
+.furniture-library .field input,
+.furniture-library .field select { min-height: 40px; border-radius: 11px; background: rgba(255,255,255,.9); }
+.furniture-photos img { width: 110px; height: 90px; border-radius: 11px; background: linear-gradient(145deg,#f0f2eb,#fafbf8); }
+.furniture-preview { border: 1px solid #e5e9e0; border-radius: 15px; background: linear-gradient(145deg,#f1f3ec,#fbfcf8); }
+.furniture-evidence { border: 1px solid #e8ebdf; border-radius: 13px; background: rgba(245,247,240,.82); }
+.furniture-confirmations { border-color: #e5e9df; }
+.furniture-library .furniture-actions .btn { min-height: 38px; border-radius: 10px; }
+
+@media (max-width: 780px) {
+  .modal-backdrop.furniture-backdrop { padding: 8px; }
+  .modal.furniture-library { width: 100%; max-width: 100%; max-height: 94dvh; padding: 0 17px 20px; border-radius: 19px; }
+  .furniture-library .modal-heading { margin: 0 -17px 16px; padding: 18px 15px 14px 18px; }
+  .furniture-library .modal-heading h2 { font-size: 19px; }
+  .furniture-library fieldset { margin-bottom: 18px; padding: 14px; border-radius: 15px; }
+  .owned-furniture-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  .owned-furniture-card { padding: 9px; border-radius: 14px; }
+  .owned-furniture-card > img { aspect-ratio: 1.2; }
+}
+@media (max-width: 480px) {
+  .furniture-intro { font-size: 12px; }
+  .furniture-section-heading { align-items: flex-start; }
+  .furniture-section-heading > p { max-width: 135px; text-align: right; }
+  .owned-furniture-grid { grid-template-columns: 1fr; }
+  .owned-furniture-card { display: grid; grid-template-columns: 100px minmax(0,1fr); grid-template-rows: auto auto 1fr; column-gap: 11px; align-items: center; }
+  .owned-furniture-card > img { grid-column: 1; grid-row: 1 / span 3; width: 100px; aspect-ratio: 1; }
+  .owned-furniture-meta { grid-column: 2; }
+  .owned-furniture-card > small,.owned-furniture-card .furniture-actions { grid-column: 2; }
+  .owned-furniture-card .furniture-actions { align-self: end; }
+  .furniture-library .furniture-upload > input[type="file"] { min-height: 75px; padding: 11px; }
+  .furniture-library .furniture-check { padding: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .owned-furniture-card,
+  .furniture-library input[type="file"]::file-selector-button { transition: none !important; }
+  .owned-furniture-card:hover,
+  .furniture-library input[type="file"]::file-selector-button:active { transform: none !important; }
+}

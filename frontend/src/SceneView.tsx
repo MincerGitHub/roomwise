@@ -2,49 +2,10 @@ import {useEffect,useRef} from 'react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createFurniture as furniture,box} from './furnitureMesh';
 import type {Item,Scene,Validation} from './types';
 
 type Props={scene:Scene;selectedId:string|null;validation:Validation|null;top:boolean;editable?:boolean;onSelect:(id:string|null)=>void;onMove:(id:string,x:number,z:number)=>void};
-const colors={wood:0xb28c65,lightWood:0xd8cbb7,cream:0xf1ece2,dark:0x596159,sage:0x82a28a,rust:0xba826b};
-function box(g:THREE.Group,w:number,h:number,d:number,x:number,y:number,z:number,color:number,radius=0){
- const m=new THREE.Mesh(new THREE.BoxGeometry(Math.max(.005,w),Math.max(.005,h),Math.max(.005,d)),new THREE.MeshStandardMaterial({color,roughness:.78}));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;
-}
-function legs(g:THREE.Group,w:number,d:number,h:number){for(const x of [-1,1])for(const z of [-1,1])box(g,.045,h,.045,x*(w/2-.07),h/2,z*(d/2-.07),colors.dark)}
-function furniture(it:Item):THREE.Group{
- const g=new THREE.Group();const {width:w,depth:d,height:h}=it;g.userData.itemId=it.id;
- if(it.category.includes('bed')){
-  box(g,w,.13,d,0,.13,0,colors.wood);box(g,w*.97,.16,d*.95,0,.29,0,colors.cream);
-  box(g,w*.96,Math.max(.02,h-.39),d*.76,0,.39+(Math.max(.02,h-.39)/2),d*.10,colors.sage);
-  box(g,w,Math.min(h*.8,.45),.075,0,Math.min(h*.8,.45)/2,-d/2+.04,colors.lightWood);
-  for(const x of w>1.3?[-w*.24,w*.24]:[0])box(g,w>1.3?w*.40:w*.75,.10,d*.19,x,.41,-d*.33,0xfcfaf4);
- }else if(['desk','table','coffee_table','dressing_table'].includes(it.category)){
-  legs(g,w,d,Math.max(.1,h-.055));box(g,w,.055,d,0,h-.027,0,colors.lightWood);
-  if(it.category==='desk'){box(g,.30,h*.60,d*.82,w/2-.17,h*.45,0,0xd5dbd0);for(let n=0;n<3;n++)box(g,.26,.006,.012,w/2-.17,h*.3+n*.12,d*.41+.01,colors.wood)}
-  if(it.category==='dressing_table'){
-   // Local +z is the usable front: the paired chair sits here and faces -z.
-   // A framed mirror at the back makes that orientation visible in the 3D view.
-   box(g,w*.50,.43,.035,0,h+.22,-d*.30,colors.wood);
-   box(g,w*.43,.35,.012,0,h+.22,-d*.30+.024,0xa9c2be);
-   box(g,w*.38,.13,d*.28,0,h-.12,d*.20,colors.wood);
-   box(g,.025,.025,.018,0,h-.12,d*.35,colors.cream);
-  }
- }else if(['chair','dressing_chair','stool','armchair'].includes(it.category)){
-  const seatH=it.category==='armchair'?h*.40:h*.52;legs(g,w,d,seatH);box(g,w,.07,d,0,seatH,0,colors.sage);
-  if(it.category!=='stool')box(g,w,h-seatH-.04,.08,0,seatH+(h-seatH-.04)/2,-d/2+.04,colors.sage);
-  if(it.category==='armchair')for(const x of [-1,1])box(g,.10,h*.36,d,x*(w/2-.05),h*.47,0,colors.cream);
- }else if(it.category==='sofa'){
-  box(g,w,.13,d,0,.09,0,colors.wood);box(g,w*.84,h*.38,d*.79,0,h*.32,d*.07,colors.sage);box(g,w,h*.66,.16,0,h*.62,-d/2+.08,colors.sage);for(const x of [-1,1])box(g,.14,h*.62,d,x*(w/2-.07),h*.47,0,colors.sage);
- }else if(it.category==='rug'){
-  box(g,w,.012,d,0,.012,0,0xdacabd);for(let n=0;n<4;n++)box(g,w*.9,.003,.018,0,.022,(n-1.5)*d*.18,0xc7b5a3);
- }else if(['bookshelf','shelf'].includes(it.category)){
-  box(g,w,h,.035,0,h/2,-d/2+.02,colors.lightWood);for(const x of [-1,1])box(g,.04,h,d,x*(w/2-.02),h/2,0,colors.wood);
-  for(let n=0;n<4;n++){const y=.07+n*(h-.13)/3;box(g,w,.035,d,0,y,0,colors.wood);if(n<3){for(let k=0;k<3;k++)box(g,.08,.22,d*.5,-w*.3+k*.12,y+.13,0,k%2?colors.sage:colors.rust)}}
- }else{
-  box(g,w,h,d,0,h/2,0,it.category==='nightstand'?colors.lightWood:0xd4d8c9);
-  const parts=w>1?2:1;for(let n=0;n<parts;n++){const x=parts===1?0:(n-.5)*w/2;box(g,w/parts-.026,h-.02,.014,x,h/2,d/2+.008,0xe5e5da);box(g,.012,.14,.018,x+(parts===1?w*.25:(n?-.04:.04)),h*.53,d/2+.03,colors.wood)}
- }
- return g;
-}
 function dispose(g:THREE.Object3D){g.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.LineSegments||o instanceof THREE.Line){o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose())}})}
 
 export default function SceneView(props:Props){
@@ -65,7 +26,7 @@ export default function SceneView(props:Props){
   let drag:{id:string;offset:THREE.Vector3;origin:THREE.Vector3;moved:boolean}|null=null;
   const ray=new THREE.Raycaster(),pointer=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
   function cast(e:PointerEvent){const b=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-b.left)/b.width*2-1,-(e.clientY-b.top)/b.height*2+1);ray.setFromCamera(pointer,latest.current.top?ortho:camera)}
-  function down(e:PointerEvent){if(e.button!==0)return;cast(e);const hits=ray.intersectObjects(itemsGroup.children,true);if(!hits.length){latest.current.onSelect(null);return}let o:THREE.Object3D|null=hits[0].object;while(o&&!o.userData.itemId)o=o.parent;if(!o)return;const id=o.userData.itemId as string;latest.current.onSelect(id);const it=latest.current.scene.items.find(x=>x.id===id);if(latest.current.editable===false||!it||it.locked)return;const pt=new THREE.Vector3();if(ray.ray.intersectPlane(plane,pt)){drag={id,offset:pt.clone().sub(o.position),origin:o.position.clone(),moved:false};orbit.enabled=false;renderer.domElement.setPointerCapture(e.pointerId);renderer.domElement.style.cursor='grabbing'}}
+  function down(e:PointerEvent){if(e.button!==0)return;cast(e);const hits=ray.intersectObjects(itemsGroup.children,true);if(!hits.length){latest.current.onSelect(null);return}let o:THREE.Object3D|null=hits[0].object;while(o&&o.parent!==itemsGroup)o=o.parent;if(!o?.userData.itemId)return;const id=o.userData.itemId as string;latest.current.onSelect(id);const it=latest.current.scene.items.find(x=>x.id===id);if(latest.current.editable===false||!it||it.locked)return;const pt=new THREE.Vector3();if(ray.ray.intersectPlane(plane,pt)){drag={id,offset:pt.clone().sub(o.position),origin:o.position.clone(),moved:false};orbit.enabled=false;renderer.domElement.setPointerCapture(e.pointerId);renderer.domElement.style.cursor='grabbing'}}
   function move(e:PointerEvent){if(!drag)return;cast(e);const pt=new THREE.Vector3();if(!ray.ray.intersectPlane(plane,pt))return;const g=groups.get(drag.id);if(!g)return;pt.sub(drag.offset);const r=latest.current.scene.room;g.position.x=THREE.MathUtils.clamp(pt.x,-1,r.width+1);g.position.z=THREE.MathUtils.clamp(pt.z,-1,r.depth+1);drag.moved=drag.origin.distanceTo(g.position)>.015}
   function up(){if(!drag)return;const current=drag;drag=null;const g=groups.get(current.id);orbit.enabled=!latest.current.top;renderer.domElement.style.cursor='';if(g&&current.moved)latest.current.onMove(current.id,Math.round(g.position.x*100)/100,Math.round(g.position.z*100)/100)}
   renderer.domElement.addEventListener('pointerdown',down);renderer.domElement.addEventListener('pointermove',move);renderer.domElement.addEventListener('pointerup',up);renderer.domElement.addEventListener('pointercancel',up);

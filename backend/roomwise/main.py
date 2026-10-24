@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from contextlib import asynccontextmanager
 import json
 from pathlib import Path
 import struct
@@ -9,6 +10,7 @@ import uuid
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from . import __version__
 from .catalog import catalog, demo_scene, suggest_items
@@ -17,18 +19,28 @@ from .intent_planner import language_status
 from .generator import generate_layouts, learning_status
 from .geometry import validate_scene
 from .schemas import CommandRequest, GenerateRequest, SceneRequest, SuggestRequest
-from .storage import SceneStore, VersionConflict
+from .storage import SceneStore, VersionConflict, runtime_directory
+from .furniture_api import router as furniture_router, close_service as close_furniture_service
 
 
 APP_ROOT = Path(__file__).resolve().parents[2]
-RUNTIME = APP_ROOT / "runtime"
+RUNTIME = runtime_directory()
 UPLOADS = RUNTIME / "uploads"
 UPLOADS.mkdir(parents=True, exist_ok=True)
 store = SceneStore(RUNTIME / "roomwise.sqlite3")
 
-app = FastAPI(title="Roomwise 搬家家具布局助手", version=__version__)
+@asynccontextmanager
+async def lifespan(application):
+    try:
+        yield
+    finally:
+        await run_in_threadpool(close_furniture_service)
+
+
+app = FastAPI(title="Roomwise 搬家家具布局助手", version=__version__, lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:8765", "http://localhost:8765"], allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS)), name="uploads")
+app.include_router(furniture_router)
 
 
 @app.middleware("http")
@@ -60,7 +72,7 @@ def health():
     except HTTPException:
         video = {"available": False, "name": None, "limitations": ["视频模块不可用"]}
     language = language_status()
-    return {"status": "ok", "version": __version__, "modelLoaded": bool(model.get("loaded", model.get("available", model.get("modelLoaded", False)))), "model": model, "videoDetector": video, "commandParser": "language_model_with_validated_executor" if language.get("enabled") else "offline_restricted_chinese", "language": language, "units": "metres"}
+    return {"status": "ok", "application": "roomwise", "version": __version__, "modelLoaded": bool(model.get("loaded", model.get("available", model.get("modelLoaded", False)))), "model": model, "videoDetector": video, "commandParser": "language_model_with_validated_executor" if language.get("enabled") else "offline_restricted_chinese", "language": language, "units": "metres"}
 
 
 @app.get("/catalog")

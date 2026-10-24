@@ -15,6 +15,9 @@ Roomwise 是一个本地运行的单房间家具布局原型。用户输入房�
 - 离线解析有限中文指令，可选接入 DeepSeek 理解更多表达；最终仍限于已实现的动作和几何检查。
 - 支持“书架靠墙”“桌子靠窗，椅子面朝窗户方向”“床头柜放床头的右侧”等要求，分别显示识别结果与位置验收。
 - 上传视频、抽取画面并为椅子、沙发、床、餐桌生成待确认候选。
+- 从 1—3 张图片或拼接三视图识别自有家具，人工核对后生成参数化近似三维，保存到独立家具库并跨房间复用。视觉识别仅向用户指定的第三方网关 `api.tokenlab.pro` 请求 `gpt-6-sol` / `high`（Responses 协议），默认关闭；该域名不是 OpenAI 官方域名。不与 DeepSeek 文字配置混用，不自动切换模型或服务；失败保留草稿，未确认尺寸不能发布。
+
+自有家具的配置、拍摄、尺寸核对、真实识别验证与回归操作见 [自有家具图片导入指南](docs/自有家具图片导入指南.md)。照片估计尺寸不是实测尺寸，近似模型不等同于实物精细重建。
 
 模型、视频检测和几何检查都有明确限制：它们不等同于精确的室内扫描、建筑规范检查、无障碍评估或真实用户满意度研究。
 
@@ -317,7 +320,7 @@ Set-Location D:\code\roomwise
 conda create -n roomwise python=3.13 pip -y
 conda activate roomwise
 python -m pip install -r requirements.txt
-nvm use 20.18.0
+nvm use 20
 Set-Location frontend
 npm ci
 npm run build

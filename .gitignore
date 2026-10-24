@@ -117,6 +117,8 @@ Desktop.ini
 # Public language configuration templates; real local configuration stays private.
 !.env.language.example
 /language.local.json
+/.env.vision.local
+!/.env.vision.example
 
 # Only the self-made language benchmark is public; never include dataset arrays.
 !/data/

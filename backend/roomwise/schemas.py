@@ -81,6 +81,54 @@ class Room(DataModel):
         return self
 
 
+class FurnitureParameters(DataModel):
+    primaryColor: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    secondaryColor: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    material: Literal["wood", "fabric", "leather", "metal", "plastic", "glass", "mixed", "unknown"] = "unknown"
+    hasBack: bool | None = None
+    hasArms: bool | None = None
+    hasLegs: bool | None = None
+    drawerCount: int | None = Field(default=None, ge=0, le=12, strict=True)
+    doorCount: int | None = Field(default=None, ge=0, le=8, strict=True)
+    shelfCount: int | None = Field(default=None, ge=1, le=12, strict=True)
+    seatCount: int | None = Field(default=None, ge=1, le=8, strict=True)
+    seatHeightRatio: float | None = Field(default=None, ge=0.15, le=0.8)
+
+
+class DimensionSources(DataModel):
+    width: Literal["annotation", "estimated", "user", "unknown"] = "unknown"
+    depth: Literal["annotation", "estimated", "user", "unknown"] = "unknown"
+    height: Literal["annotation", "estimated", "user", "unknown"] = "unknown"
+
+
+class FurnitureSnapshot(DataModel):
+    version: int = Field(ge=1)
+    label: str = Field(min_length=1, max_length=100)
+    category: str = Field(min_length=1, max_length=50)
+    width: float = Field(gt=0.03, le=20)
+    depth: float = Field(gt=0.03, le=20)
+    height: float = Field(gt=0.01, le=10)
+    dimensionsConfirmed: Literal[True]
+    parameters: FurnitureParameters = Field(default_factory=FurnitureParameters)
+    dimensionSources: DimensionSources = Field(default_factory=DimensionSources)
+    photoUrls: list[str] = Field(min_length=1, max_length=3)
+    frontDirection: Literal["positive_z", "negative_z"]
+    subtype: str | None = Field(default=None, max_length=100)
+    styleTags: list[str] = Field(default_factory=list, max_length=10)
+
+    @field_validator("photoUrls")
+    @classmethod
+    def photo_urls(cls, values):
+        return [validate_asset_url(value) for value in values]
+
+    @field_validator("category")
+    @classmethod
+    def known_snapshot_category(cls, value):
+        if value not in CATEGORIES:
+            raise ValueError("未知家具类别")
+        return value
+
+
 class Item(DataModel):
     id: str = Field(min_length=1, max_length=100)
     label: str = Field(min_length=1, max_length=100)
@@ -96,6 +144,14 @@ class Item(DataModel):
     source: Literal["brought", "existing", "new"] = "brought"
     assetUrl: str | None = Field(default=None, max_length=500)
     photoUrl: str | None = Field(default=None, max_length=500)
+    furnitureAssetId: str | None = Field(default=None, min_length=1, max_length=100, exclude_if=lambda value: value is None)
+    furnitureSnapshot: FurnitureSnapshot | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode="after")
+    def confirmed_furniture(self):
+        if self.furnitureAssetId and self.furnitureSnapshot is None:
+            raise ValueError("自有家具实例必须包含已确认的资产快照")
+        return self
 
     @field_validator("category")
     @classmethod

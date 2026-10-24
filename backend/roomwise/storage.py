@@ -4,6 +4,11 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
+import os
+
+
+def runtime_directory():
+    return Path(os.getenv("ROOMWISE_RUNTIME_DIR", str(Path(__file__).resolve().parents[2] / "runtime"))).resolve()
 
 
 class VersionConflict(Exception):

@@ -17,9 +17,10 @@ import time
 from typing import Any
 import uuid
 
+from .storage import runtime_directory
 
 APP_ROOT = Path(__file__).resolve().parents[2]
-UPLOADS_ROOT = APP_ROOT / "runtime" / "uploads"
+UPLOADS_ROOT = runtime_directory() / "uploads"
 DETECTOR_ROOT = APP_ROOT / "artifacts" / "detectors"
 MODEL_PATH = DETECTOR_ROOT / "yolox_tiny.onnx"
 MAX_BYTES = 100 * 1024 * 1024

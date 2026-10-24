@@ -36,6 +36,23 @@ Language boundary (2026-10-20): current local application is configured for opti
 Three real DeepSeek responses are preserved in `artifacts/interaction_checks/deepseek_live_commands.json`: a correct bookshelf/wall plan, an omitted wardrobe lock (`keep` instead), and correct relative movement with the old erroneous `generate` dispatch. Guards and dispatch were corrected after observing them; no fourth paid call validated the fixes. Do not report 3/3 intent accuracy or majority-command coverage. Automated checks must use provider `disabled` on backend8766 and `frontend/vite.integration.config.ts` proxying to8766; production8765 may have a live paid configuration. Mock transport checks do not measure the external model or visual design quality.
 
 Ownership: backend agent schemas/geometry/generator/commands/storage/API/tests. Model agent learning.py + scripts + artifacts + training/evaluation tests. Video agent video.py + setup model downloader + video tests. Root frontend/integration/docs/launcher. No public publish, no redistributing restricted training arrays. Use self-made procedural furniture meshes in demo.
+# 自有家具图片输入（2026-10-23）
+
+- `GET /api/furniture/status` -> `{enabled,provider,model,reasoningEffort,message}`，不返回密钥或完整服务地址，message 明示第三方接收域名。视觉服务独立于语言服务，默认 `ROOMWISE_VISION_PROVIDER=disabled`。启用仅允许 `openai`（大小写不敏感）、用户指定的根地址 `https://api.tokenlab.pro`、型号 `gpt-6-sol` 和推理强度 `high`；配置其他值不外发。provider 仅表示协议类型，不能证明网关为 OpenAI 官方或验证上游模型身份。enabled 仅表示本地配置合规，不证明账户权限或网关兼容性。
+- `POST /api/furniture/analyze`：multipart `files`（1—3 张 JPEG/PNG/WebP，每张最多 10 MB、4000 万像素）及 `consent=true` -> `{draftId,jobId}`。不要求客户端先选类别。后端校正方向、移除元数据，原尺寸重编码副本留本地，缩放副本联合发送用户指定的第三方 `https://api.tokenlab.pro/responses`，使用 Bearer 鉴权、`model=gpt-6-sol`、`reasoning.effort=high`、严格 JSON Schema 及本地 Pydantic 校验，`store=false`。模型目录 `/v1/models` 不作为推理地址；不自动尝试 `/v1/responses` 或其他端点。连接超时 15 秒、读写超时 180 秒。拒绝、截断、限流、模型不可用均保留草稿，不自动重试或降级。用量字段为 `input_tokens`、`output_tokens`、`total_tokens`。
+- `GET /api/furniture/jobs/{jobId}` -> `{id,draftId,status:'queued'|'processing'|'complete'|'failed',error,errorCode,result?,metrics?,updatedAt}`。SQLite 持久化，单工作线程，无自动付费重试。重启后的未完成任务标为 `failed/interrupted`；只支持单后端工作进程。
+- `GET /api/furniture` -> `{assets,drafts}`，仅列出未发布草稿及各资产最新版本；`GET /api/furniture/{assetId}` 读取当前资产，`GET /api/furniture/drafts/{draftId}` 读取草稿。
+- `POST /api/furniture/drafts/{draftId}/save`：`{expectedVersion,properties}` -> 更新后的草稿。运行中、已发布或旧版本拒绝修改。`properties` 包含名称、受支持类别或 null、细分类别、宽深高或 null、尺寸来源/依据、受约束结构参数、风格与规范方向；尺寸变化由后端标记为 `user`。
+- `POST /api/furniture/drafts/{draftId}/retry`：`{consent:true}` -> `{draftId,jobId}`。明确重试才可重复调用，运行中重复请求返回 409；已发布家具修订不重发旧照片。
+- `POST /api/furniture/drafts/{draftId}/publish`：`{requestId,expectedVersion,assetUrl,confirmations:{category:true,label:true,dimensions:true,direction:true,structure:true}}` -> 已确认资产。`assetUrl` 必须指向已上传到本机的 GLB；缺字段、未确认、目标混淆或视图冲突不能发布。`requestId` 持久去重，同一草稿重放返回同一资产及版本，不重复发布。
+- `POST /api/furniture/{assetId}/edit`：`{}` -> 修订草稿。发布时资产版本递增并检查基础版本，旧场景不联动更新。
+- 场景 `Item` 增加可选 `furnitureAssetId`、`furnitureSnapshot`；未使用的新字段不输出，旧场景不要求迁移。引用家具资产的实例必须携带 `dimensionsConfirmed:true` 的完整快照：资产版本、确认时名称/类别/尺寸、颜色/结构参数、尺寸来源、照片及方向等。实例独立复制，保存、布局与命令处理保留快照；旧快照不依赖家具库在线可查。照片主图和 GLB 继续使用 `photoUrl`、`assetUrl`。
+- 参数化预览、场景程序化回退和 GLB 导出共用构造器，近似模型规范化为确认的宽深高、中心与地面；床头为局部 `-z`，其他家具使用面为 `+z`。布局仍按矩形占地而非网格碰撞。未识别结构用模板补全，材质/风格不是物理认证。
+- `ROOMWISE_RUNTIME_DIR` 可隔离场景、家具与视频运行文件；默认仍为原本的项目 `runtime`。测试必须关闭视觉及文字服务并使用隔离目录。JSON 导出不包含资源本体，不承诺跨设备可直接显示资产。
+- 外发边界：第三方网关请求只包含固定提取提示、字段协议及预处理图片，不含房间、指令历史、图片 URL、本地路径或网格。不读取 Codex 配置或登录凭据，独立后端密钥仅来自 `ROOMWISE_VISION_API_KEY`。现有语言接口白名单不变，不发送新增家具快照。真实模型实测须单独明确启用，不以模拟测试冒充真实准确率。
+- 三维拾取的身份只来自场景实例根节点，忽略导入模型内部的 `userData.itemId`；兼容早期含预览标识的 GLB。新导出的家具资产不包含实例标识，避免资产元数据污染场景选择与拖动。
+- 视觉配置自动读取应用根目录 `.env.vision`（可用 `ROOMWISE_VISION_ENV_FILE` 指定），仅解析视觉配置白名单；进程环境变量优先，不修改全局环境。非法编码、格式或超大配置文件安全禁用外发，不回显文件内容。`GET /api/health` 增加 `application=roomwise`，供本机启动器辨别端口冲突。
+
 # 床头关系补充（2026-10-20）
 
 `bedside` 偏好的 `itemId` 必须引用床头柜，`targetId` 必须引用真实床，`side` 为 `left`、`right` 或 `either`。床头在床局部 `-z`；站在床尾看床头时，床局部 `+x` 为右侧。生成结果的空间合法性、明确要求和默认家具关系分别验收。可移动床头柜必须满足床头侧关系，不能以软评分替代；锁定柜体保持原位，有问题时明确显示，硬要求冲突不能冒充通过。完整的明确床头柜短句由本地执行器处理，无需模型 API；未支持的复合要求不能只执行一部分。

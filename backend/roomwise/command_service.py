@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .commands import apply_command, is_bedside_only_command, is_global_wall_command, is_vanity_or_wall_exemption_command
+from .commands import apply_command, is_bedside_only_command, is_global_wall_command, is_vanity_or_wall_exemption_command, is_relative_furniture_command
 from .intent_planner import language_status, plan_command
 
 
@@ -15,6 +15,8 @@ def interpret_command(scene: dict, text: str, selected_id: str | None = None):
     if is_bedside_only_command(text):
         return apply_command(scene, text, selected_id)
     if is_vanity_or_wall_exemption_command(text):
+        return apply_command(scene, text, selected_id)
+    if is_relative_furniture_command(text):
         return apply_command(scene, text, selected_id)
     # Keep quantified wall requests deterministic. The local executor knows
     # how to expand the excluded group to concrete item IDs and preserve the

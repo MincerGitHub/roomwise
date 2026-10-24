@@ -161,8 +161,19 @@ def _vanity_syntax(clause):
     target = re.fullmatch(r"(?P<table>.+?)(?:的)?(?:正前方|前方|前面|前)", move["target"].strip())
     if not target:
         return None
+    seat_terms = ('梳妆椅', '梳妆凳', '椅子', '凳子')
+    target_terms = ('梳妆台', '梳妆镜', '镜子')
+    if not any(term in move["subject"] for term in seat_terms):
+        return None
+    if not any(term in target["table"] for term in target_terms):
+        return None
     return {"subject": move["subject"].strip(), "target": target["table"].strip(),
             "required": not bool(move["soft"])}
+
+
+def _relative_furniture_syntax(clause):
+    """Recognize generic object-to-object positions outside supported pairs."""
+    return re.fullmatch('(?:请帮我|帮我|请|把|将)?(?P<subject>.+?)(?:放置在|放在|放到|摆放在|摆在|摆到|挪到|移到)(?P<target>.+?)(?P<relation>前面|前方|前|后面|后方|后|左侧|左边|右侧|右边|旁边)', clause.strip())
 
 
 def _wall_exemption(clause):
@@ -179,6 +190,12 @@ def is_vanity_or_wall_exemption_command(text):
     clauses = [clause.strip() for clause in re.split(r"[,，;；。]|同时|然后", text) if clause.strip()]
     return bool(clauses) and all(_vanity_syntax(clause) or _wall_exemption(clause) for clause in clauses)
 
+
+
+def is_relative_furniture_command(text):
+    clauses = [part.strip() for part in re.split('[,，;；。！？]|同时|然后', text) if part.strip()]
+    return bool(clauses) and any(_relative_furniture_syntax(part) and not _vanity_syntax(part)
+                                 and not _bedside_syntax(part) for part in clauses)
 
 
 def is_global_wall_command(text):
@@ -338,6 +355,17 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
             request_generate = True
             handled = True
             continue
+        relative = _relative_furniture_syntax(clause)
+        if relative and not _vanity_syntax(clause) and not _bedside_syntax(clause):
+            subjects = _references(relative["subject"], result["items"], selected_id)
+            targets = _references(relative["target"], result["items"])
+            if len(subjects) != 1:
+                return _clarify(scene, subjects, '相对位置要求中的家具')
+            if len(targets) != 1:
+                return _clarify(scene, targets, '相对位置目标')
+            if subjects[0]["id"] == targets[0]["id"]:
+                return _reply(scene, "clarify", '相对位置要求需要指向两件不同家具。本次未修改。')
+            return _reply(scene, "unsupported", '已识别这两件家具但目前还不支持一般家具之间的前后、左右摆放关系。当前仅支持床头柜与床、梳妆椅与梳妆台等专用搭配。本次未修改。')
         if re.fullmatch(r"(?:其他|其余)(?:家具)?(?:都)?(?:不动|不要动|保持不动)", clause) and restriction:
             handled = True
             continue

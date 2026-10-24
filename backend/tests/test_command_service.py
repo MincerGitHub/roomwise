@@ -18,6 +18,36 @@ def test_disabled_or_missing_key_remains_offline_without_network(monkeypatch):
     assert reply["language"]["enabled"] is False
 
 
+def test_bed_in_front_of_wardrobe_is_not_misclassified_as_vanity(monkeypatch):
+    scene = demo_scene()
+    before = deepcopy(scene)
+    monkeypatch.setattr(service, "language_status", lambda: pytest.fail("generic relative positions are classified locally"))
+    monkeypatch.setattr(service, "plan_command", lambda *args: pytest.fail("unsupported relation must not invoke the model"))
+
+    reply = service.interpret_command(scene, "\u628a\u5e8a\u653e\u5728\u8863\u67dc\u524d\u9762")
+
+    assert reply["action"] == "unsupported"
+    assert "\u4e00\u822c\u5bb6\u5177\u4e4b\u95f4\u7684\u524d\u540e" in reply["message"]
+    assert "\u672c\u6b21\u672a\u4fee\u6539" in reply["message"]
+    assert "scene" not in reply
+    assert scene == before
+
+
+def test_general_furniture_front_relation_is_not_misread_as_vanity(monkeypatch):
+    scene = demo_scene()
+    before = deepcopy(scene)
+    monkeypatch.setattr(service, "language_status", lambda: pytest.fail("relative relation must be classified locally"))
+    monkeypatch.setattr(service, "plan_command", lambda *args: pytest.fail("unsupported relation must not call the model"))
+
+    reply = service.interpret_command(scene, "把床放在衣柜前面")
+
+    assert reply["action"] == "unsupported"
+    assert "一般家具之间的前后、左右摆放关系" in reply["message"]
+    assert "本次未修改" in reply["message"]
+    assert "scene" not in reply
+    assert scene == before
+
+
 def test_configured_language_uses_executor_and_preserves_ids_sizes(monkeypatch):
     scene = demo_scene()
     shelf = next(item for item in CATALOG if item["category"] == "bookshelf")

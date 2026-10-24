@@ -20,6 +20,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 MAX_RESPONSE_BYTES = 65_536
 TIMEOUT_SECONDS = 30
+APP_ROOT = Path(__file__).resolve().parents[2]
+LANGUAGE_ENV_KEYS = {"PROVIDER", "MODEL", "URL", "API_KEY", "RESPONSE_FORMAT"}
 OPERATION_NAMES = Literal[
     "near_wall", "near_window", "face_window", "min_move", "lock", "unlock",
     "keep", "rotate", "move", "generate", "only_adjust", "undo", "bedside", "vanity_seating",
@@ -81,10 +83,38 @@ move的+x是房间右方，+z是房间后方，方向与相机无关；只说左
 """
 
 
+def _environment_file():
+    path = Path(os.environ.get("ROOMWISE_LANGUAGE_ENV_FILE", str(APP_ROOT / ".env.language")))
+    if not path.exists():
+        return {}
+    if path.stat().st_size > MAX_RESPONSE_BYTES:
+        raise ValueError("large environment file")
+    values = {}
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        assignment = re.fullmatch(r"(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)", line)
+        if not assignment:
+            raise ValueError("invalid environment assignment")
+        name, value = assignment.groups()
+        if name not in {"ROOMWISE_LANGUAGE_" + key for key in LANGUAGE_ENV_KEYS}:
+            continue
+        if value.startswith(("'", '"')):
+            quoted = re.fullmatch(r"(['\"])(.*?)\1\s*(?:#.*)?", value)
+            if not quoted:
+                raise ValueError("invalid quoted environment value")
+            value = quoted.group(2)
+        else:
+            value = re.split(r"\s+#", value, maxsplit=1)[0].rstrip()
+        values[name] = value
+    return values
+
+
 def _configuration():
     # A private local config supports UI setup without putting secrets in source.
     # Environment variables override file values. No global environment mutation.
-    config_path = Path(os.environ.get("ROOMWISE_LANGUAGE_CONFIG", str(Path(__file__).resolve().parents[2] / "runtime" / "language.local.json")))
+    config_path = Path(os.environ.get("ROOMWISE_LANGUAGE_CONFIG", str(APP_ROOT / "runtime" / "language.local.json")))
     settings = {}
     configuration_error = False
     try:
@@ -98,12 +128,20 @@ def _configuration():
         settings = {}
         configuration_error = True
 
+    environment_error = False
+    try:
+        environment = _environment_file()
+    except (OSError, ValueError):
+        environment = {}
+        environment_error = True
+
     def setting(env_key, file_key, default=""):
-        value = os.environ.get("ROOMWISE_LANGUAGE_" + env_key, settings.get(file_key, default))
+        name = "ROOMWISE_LANGUAGE_" + env_key
+        value = os.environ.get(name, environment.get(name, settings.get(file_key, default)))
         return value.strip() if isinstance(value, str) else ""
 
     provider = setting("PROVIDER", "provider", "disabled").lower()
-    if settings.get("enabled") is False and "ROOMWISE_LANGUAGE_PROVIDER" not in os.environ:
+    if settings.get("enabled") is False and "ROOMWISE_LANGUAGE_PROVIDER" not in os.environ and "ROOMWISE_LANGUAGE_PROVIDER" not in environment:
         provider = "disabled"
     model = setting("MODEL", "model")
     default_url = "http://127.0.0.1:11434/api/chat" if provider == "ollama" else ""
@@ -118,7 +156,9 @@ def _configuration():
     if deepseek and provider == "chatcompletions" and not model:
         model = "deepseek-flash"
     reason = ""
-    if configuration_error:
+    if environment_error:
+        reason = "语言模型 .env.language 配置无法读取，请检查文件权限、UTF-8 编码及 KEY=VALUE 格式。"
+    elif configuration_error:
         reason = "语言模型配置文件无法读取，请检查格式。"
     elif provider == "disabled":
         reason = "语言模型未启用；使用离线指令识别。"

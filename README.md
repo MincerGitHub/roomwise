@@ -208,7 +208,9 @@ if (-not (Test-Path -LiteralPath runtime\language.local.json)) {
 notepad runtime\language.local.json
 ```
 
-在自己电脑的文件中填写 API 密钥，并按示例设置 `enabled`、提供方和模型。仓库示例不含密钥，不会替新用户预先配置账户。私有配置每次处理指令时读取；环境变量优先，若当前启动终端设置了 `ROOMWISE_LANGUAGE_PROVIDER='disabled'`，该进程仍使用离线识别。
+在自己电脑的文件中填写 API 密钥，并按示例设置 `enabled`、提供方和模型。也可以将 `.env.language.example` 复制为项目根目录的 `.env.language`，填写并取消注释相应提供方、接口、模型和密钥；已有文件不要覆盖。仓库示例不含密钥，不会替新用户预先配置账户。
+
+配置优先级为：**后端进程环境变量 > 项目根目录 `.env.language` > `runtime/language.local.json` > 默认关闭**。后端在健康检查和每次文字指令时重新读取这两个文件，不依赖启动工作目录；保存后刷新网页即可。若启动终端设置了 `ROOMWISE_LANGUAGE_PROVIDER='disabled'`，文件不能覆盖它；需在终端移除该环境变量并重启后端。JSON 中的 `enabled:false` 可由更高优先级的 provider 配置覆盖。`.env.language` 只支持单行 `KEY=VALUE`、可选 `export`、单/双引号及注释，不执行命令或展开变量，同名键最后一条生效。检查 `/api/health` 的 `language.enabled` 和 `language.message`；启用仅代表本地配置有效，不代表已验证远端连通性。
 
 启用后，文字指令可能产生服务商费用；关闭接口不影响预览、拖动、保存和本地布局。传给服务商的是文字及结构化房间、家具、门窗信息，不包括照片、家具网格、资源地址和本机文件路径。支持动作有明确范围，不支持颜色材质、完整风格换装或任意家具关系；输出合法 JSON 不表示需求全部理解正确。“保持原位”必须是位置锁定，不能仅识别为保留家具。
 

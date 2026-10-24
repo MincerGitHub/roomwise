@@ -14,6 +14,7 @@ def isolated_language_environment(monkeypatch, tmp_path):
     for key in ("PROVIDER", "MODEL", "URL", "API_KEY", "RESPONSE_FORMAT"):
         monkeypatch.delenv("ROOMWISE_LANGUAGE_" + key, raising=False)
     monkeypatch.setenv("ROOMWISE_LANGUAGE_CONFIG", str(tmp_path / "absent.json"))
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_ENV_FILE", str(tmp_path / "absent.env"))
     monkeypatch.setattr(planner, "_post_json", lambda *args: pytest.fail("Unexpected network request"))
 
 
@@ -23,6 +24,134 @@ def configure(monkeypatch, provider="ollama"):
     if provider == "chatcompletions":
         monkeypatch.setenv("ROOMWISE_LANGUAGE_URL", "https://language.invalid/v1/chat/completions")
         monkeypatch.setenv("ROOMWISE_LANGUAGE_API_KEY", "secret-only-in-header")
+
+
+def write_language_env(monkeypatch, tmp_path, text=None):
+    path = tmp_path / ".env.language"
+    path.write_text(text if text is not None else (
+        "ROOMWISE_LANGUAGE_PROVIDER=disabled\n"
+        "export ROOMWISE_LANGUAGE_PROVIDER=chatcompletions # enable\n"
+        "ROOMWISE_LANGUAGE_URL='https://api.deepseek.com'\n"
+        'ROOMWISE_LANGUAGE_MODEL="test-model"\n'
+        'ROOMWISE_LANGUAGE_API_KEY="private#env-key" # secret\n'
+        "ROOMWISE_LANGUAGE_RESPONSE_FORMAT=json_object\n"
+    ), encoding="utf-8-sig")
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_ENV_FILE", str(path))
+    return path
+
+
+def test_language_env_loaded_without_mutating_process_environment(monkeypatch, tmp_path):
+    write_language_env(monkeypatch, tmp_path)
+    status = planner.language_status()
+    assert status["enabled"] and status["provider"] == "chatcompletions"
+    assert status["model"] == "test-model" and status["responseFormat"] == "json_object"
+    assert planner._configuration()[2:4] == ("https://api.deepseek.com/chat/completions", "private#env-key")
+    assert "private#env-key" not in json.dumps(status)
+    assert "ROOMWISE_LANGUAGE_API_KEY" not in planner.os.environ
+    assert "ROOMWISE_LANGUAGE_PROVIDER" not in planner.os.environ
+
+
+def test_language_env_default_path_is_independent_of_working_directory(monkeypatch, tmp_path):
+    write_language_env(monkeypatch, tmp_path)
+    monkeypatch.delenv("ROOMWISE_LANGUAGE_ENV_FILE")
+    monkeypatch.setattr(planner, "APP_ROOT", tmp_path)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    assert planner.language_status()["enabled"]
+
+
+def test_language_env_precedence_and_explicit_disabled_override(monkeypatch, tmp_path):
+    write_language_env(monkeypatch, tmp_path)
+    config_path = tmp_path / "language.local.json"
+    config_path.write_text(json.dumps({"enabled": False, "provider": "ollama", "model": "json-model"}), encoding="utf-8")
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_CONFIG", str(config_path))
+    assert planner.language_status()["enabled"]
+    assert planner.language_status()["model"] == "test-model"
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_MODEL", "process-model")
+    assert planner.language_status()["model"] == "process-model"
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_PROVIDER", "disabled")
+    assert not planner.language_status()["enabled"]
+    assert planner.plan_command(demo_scene(), "书桌靠窗") is None
+
+
+def test_language_env_reloaded_and_deleted_without_restart(monkeypatch, tmp_path):
+    path = write_language_env(monkeypatch, tmp_path)
+    assert planner.language_status()["enabled"]
+    path.write_text("ROOMWISE_LANGUAGE_PROVIDER=disabled\n", encoding="utf-8")
+    assert not planner.language_status()["enabled"]
+    path.unlink()
+    assert not planner.language_status()["enabled"]
+
+
+@pytest.mark.parametrize("contents", [
+    'ROOMWISE_LANGUAGE_API_KEY="private-unterminated',
+    "ROOMWISE_LANGUAGE_PROVIDER chatcompletions",
+    "ROOMWISE_LANGUAGE_MODEL=" + "x" * planner.MAX_RESPONSE_BYTES,
+], ids=["unterminated-quote", "missing-equals", "oversized-file"])
+def test_invalid_language_env_is_safe_and_never_calls_provider(monkeypatch, tmp_path, contents):
+    configure(monkeypatch, "chatcompletions")
+    write_language_env(monkeypatch, tmp_path, contents)
+    status = planner.language_status()
+    assert not status["enabled"] and ".env.language" in status["message"]
+    assert "private-unterminated" not in json.dumps(status)
+    assert planner.plan_command(demo_scene(), "书桌靠窗")["action"] == "clarify"
+
+
+def test_language_env_bad_encoding_and_unreadable_path(monkeypatch, tmp_path):
+    path = write_language_env(monkeypatch, tmp_path)
+    path.write_bytes(b"\xff\xfeinvalid")
+    assert not planner.language_status()["enabled"]
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_ENV_FILE", str(tmp_path))
+    assert not planner.language_status()["enabled"]
+
+
+def test_language_env_empty_key_does_not_fall_back_to_json_secret(monkeypatch, tmp_path):
+    path = write_language_env(monkeypatch, tmp_path)
+    with path.open("a", encoding="utf-8") as output:
+        output.write("ROOMWISE_LANGUAGE_API_KEY=\n")
+    config_path = tmp_path / "language.local.json"
+    config_path.write_text(json.dumps({"apiKey": "private-json-key"}), encoding="utf-8")
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_CONFIG", str(config_path))
+    status = planner.language_status()
+    assert not status["enabled"] and "密钥" in status["message"]
+
+
+def test_language_env_does_not_expand_variables_or_set_other_environment(monkeypatch, tmp_path):
+    path = write_language_env(monkeypatch, tmp_path)
+    with path.open("a", encoding="utf-8") as output:
+        output.write("OTHER_SETTING=ignored\nROOMWISE_LANGUAGE_API_KEY='${OTHER_SETTING}'\n")
+    assert planner._configuration()[3] == "${OTHER_SETTING}"
+    assert "OTHER_SETTING" not in planner.os.environ
+
+
+def test_language_env_health_and_command_share_configuration(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+    from roomwise.main import app
+
+    write_language_env(monkeypatch, tmp_path)
+    seen = []
+
+    def post(endpoint, payload, key):
+        seen.append((endpoint, key))
+        return {"choices": [{"message": {"content": json.dumps({
+            "action": "apply", "operations": [{"name": "lock", "itemIds": ["desk-1"]}], "message": "锁定书桌",
+        })}}]}
+
+    monkeypatch.setattr(planner, "_post_json", post)
+    with TestClient(app) as client:
+        health = client.get("/api/health").json()
+        assert health["language"]["enabled"]
+        assert health["commandParser"] == "language_model_with_validated_executor"
+        assert not seen
+        response = client.post("/api/command", json={"scene": demo_scene(), "text": "请保持书桌位置不变"})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["parser"] == "language_model_with_validated_executor"
+    assert result["language"]["enabled"]
+    assert next(item for item in result["scene"]["items"] if item["id"] == "desk-1")["locked"]
+    assert seen == [("https://api.deepseek.com/chat/completions", "private#env-key")]
+    assert "private#env-key" not in json.dumps(health) + response.text
 
 
 def mock_plan(monkeypatch, value, provider="ollama", seen=None):

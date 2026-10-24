@@ -476,3 +476,60 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .preview-banner .btn:active:not(:disabled),
   .command-box button:active:not(:disabled) { transform: none !important; }
 }
+
+/* Candidate choices: keep only the name, status and one clear action. */
+.candidate-card {
+  min-height: 82px;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 18px;
+}
+.candidate-number {
+  flex: 0 0 auto;
+  font-size: 21px;
+  color: #a6b68d;
+}
+.candidate-overview {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.candidate-overview h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #334034;
+  white-space: nowrap;
+}
+.candidate-status {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid rgba(206, 220, 188, .75);
+  border-radius: 999px;
+  background: rgba(244, 247, 238, .82);
+  color: #63794d;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.candidate-status.needs-adjustment {
+  border-color: rgba(231, 214, 189, .8);
+  background: rgba(250, 246, 238, .84);
+  color: #8b7353;
+}
+.candidate-card .preview-action {
+  min-height: 38px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-radius: 11px;
+  font-size: 12px;
+}
+@media (max-width: 520px) {
+  .candidate-card { min-height: 72px; gap: 10px; padding: 12px; }
+  .candidate-overview { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .candidate-overview h4 { font-size: 14px; }
+  .candidate-status { padding: 4px 8px; font-size: 10px; }
+  .candidate-card .preview-action { min-height: 34px; padding: 7px 9px; font-size: 11px; }
+}

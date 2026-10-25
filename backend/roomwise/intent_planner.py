@@ -60,17 +60,17 @@ only_adjust只调整itemIds中的家具并锁定其余家具(不自行解锁)，
 bedside床头柜放床头边：itemIds必须是nightstand类别，targetId必须是真实的床家具ID
 (double_bed/single_bed/kids_bed)，side='left'左侧/'right'右侧/'either'任意侧。
 vanity_seating梳妆椅摆在梳妆镜/梳妆台前：itemIds必须是现有椅子类别，targetId必须是真实的dressing_table家具ID；椅子应面朝桌面。
-face_item让一件家具的正面朝向另一件现有家具：itemIds恰好一个，targetId必须是另一件实体家具ID；按家具声明的正面方向计算，与相机无关。
+face_item让一件家具的正面朝向另一件现有家具：itemIds恰好一个，targetId必须是另一件实体家具ID；若目标未锁定，可先为它搜索可用摆位，再保持该候选中的目标位置并调整主体朝向。按家具声明的正面方向计算，与相机无关。
 relative_position把一件现有实体家具放在另一件实体家具前后左右：itemIds恰好一个，targetId必须是另一件现有实体家具ID，不支持地毯。
-direction必须是front前/back后/left左/right右，随目标家具的旋转变化，不随相机变化。普通家具前方是自身+z；床的前方是床头端(-z)，后方是床尾端(+z)。参照家具在生成时保持当前位置和朝向，不移动参照来满足关系。
+direction必须是front前/back后/left左/right右，随目标家具的旋转变化，不随相机变化。普通家具前方是自身+z；床的前方是床头端(-z)，后方是床尾端(+z)。relative_position 的参照家具固定在指令输入的位置和朝向，不移动参照来满足关系。face_item 的目标若未锁定，可先为它搜索符合碰撞和柜门净空的可用位置，再固定该候选中的目标位置并调整主体朝向；目标若已锁定则保持原位。
 床头柜对床头或梳妆椅对梳妆台的专用关系继续使用bedside和vanity_seating。
 床头左右按站在床尾看向床头判断，不随相机变化。没有床或多床未指明目标时clarify。
 不要返回家具新坐标，不增删家具，不改变尺寸、颜色或材质。软装风格、朝向其他家具、成套换新、
 未支持的关系不能冒充执行；有任何无法表达的要求时整次clarify或unsupported且operations=[]。
 itemIds必须是scene中真实ID。单数类别有多件且未明确选择时clarify。用户说这个/它时可以参考selectedId。
-targetId用于near_window/face_window时必须是真实窗户ID，用于bedside时必须是真实床ID，用于vanity_seating时必须是真实梳妆台ID，用于relative_position时必须是另一件真实实体家具ID；
+targetId用于near_window/face_window时必须是真实窗户ID，用于bedside时必须是真实床ID，用于vanity_seating时必须是真实梳妆台ID，用于relative_position/face_item时必须是另一件真实实体家具ID；
 多窗或多床未指定时clarify。wall只用于near_wall；side只用于bedside；direction只用于relative_position。
-required只用于near_wall/near_window/face_window/bedside/vanity_seating/relative_position：明确要求为true，尽量/最好/优先为false。
+required只用于near_wall/near_window/face_window/bedside/vanity_seating/relative_position/face_item：明确要求为true，尽量/最好/优先为false。
 无关字段用null。generate/undo的itemIds为空，其他操作itemIds至少一个。undo不能与其他操作混用。
 不能把否定要求翻译为肯定要求。only_adjust应在位置偏好操作之前，且不能包含已锁定家具。
 锁定家具只有用户明确同意解锁时才能加入unlock，且unlock必须在移动/旋转/靠墙/靠窗之前。
@@ -515,7 +515,7 @@ def _position_lock_guard(plan: IntentPlan, text: str, scene: dict, selected_id):
     for op in plan.operations:
         if op.name == "only_adjust":
             implicitly_locked.update(item["id"] for item in scene["items"] if item["id"] not in op.itemIds)
-        elif op.name in ("relative_position", "face_item") and op.targetId:
+        elif op.name == "relative_position" and op.targetId:
             implicitly_locked.add(op.targetId)
     forbidden = {item_id for op in plan.operations if op.name in (
         "unlock", "move", "rotate", "near_wall", "near_window", "face_window", "face_item", "bedside", "vanity_seating", "relative_position",

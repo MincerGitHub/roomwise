@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import math
 
+from .geometry import footprint
+
 
 MAX_FACING_ITEM_ANGLE = 20.0
+MAX_FACING_ITEM_GAP = 1.2
 EPSILON = 1e-9
 BED_CATEGORIES = {"double_bed", "single_bed", "kids_bed"}
 
@@ -27,6 +30,39 @@ def facing_rotation(item: dict, target: dict) -> float:
     if front_sign(item) < 0:
         target_heading -= 180.0
     return target_heading % 360
+
+
+def facing_item_placements(item: dict, target: dict, preference: dict):
+    """Yield facing poses around a target, including when current centres clash."""
+    if item.get("locked"):
+        yield dict(item)
+        return
+
+    initial_bearing = math.atan2(float(item["x"]) - target["x"], float(item["z"]) - target["z"])
+    bearings = [initial_bearing]
+    bearings.extend(math.radians(degrees) for degrees in range(0, 360, 22))
+    bearings = list(dict.fromkeys(round(value, 8) for value in bearings))
+
+    for bearing in bearings:
+        outward = (math.sin(bearing), math.cos(bearing))
+        oriented = {**item, "x": target["x"], "z": target["z"]}
+        oriented["rotation"] = facing_rotation({**oriented,
+            "x": target["x"] + outward[0], "z": target["z"] + outward[1]}, target)
+        subject_projection = [x * outward[0] + z * outward[1]
+                              for x, z in footprint(oriented).exterior.coords]
+        target_projection = [x * outward[0] + z * outward[1]
+                             for x, z in footprint(target).exterior.coords]
+        target_center = target["x"] * outward[0] + target["z"] * outward[1]
+        target_support = max(target_projection) - target_center
+        subject_rear_support = -min(subject_projection)
+        for gap in (.08, .18, .30, .45, .65, .90, 1.15):
+            distance = target_support + subject_rear_support + gap
+            candidate = {**oriented,
+                         "x": target["x"] + outward[0] * distance,
+                         "z": target["z"] + outward[1] * distance}
+            candidate["rotation"] = facing_rotation(candidate, target)
+            if evaluate_facing_preference(candidate, target, preference)["satisfied"]:
+                yield candidate
 
 
 def evaluate_facing_preference(item: dict | None, target: dict | None, preference: dict):

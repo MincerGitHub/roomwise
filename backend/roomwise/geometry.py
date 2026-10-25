@@ -6,6 +6,7 @@ This is a stated engineering check, not a building-code compliance certificate.
 from __future__ import annotations
 
 from collections import deque
+from functools import lru_cache
 import math
 
 import numpy as np
@@ -27,10 +28,17 @@ def room_polygon(room: dict) -> Polygon:
     return Polygon(room["polygon"]) if room.get("polygon") else box(0, 0, room["width"], room["depth"])
 
 
+@lru_cache(maxsize=32768)
+def _footprint(width: float, depth: float, x: float, z: float, rotation: float) -> Polygon:
+    shape = box(-width / 2, -depth / 2, width / 2, depth / 2)
+    shape = rotate(shape, -rotation, origin=(0, 0))
+    return translate(shape, xoff=x, yoff=z)
+
+
 def footprint(item: dict) -> Polygon:
-    shape = box(-item["width"] / 2, -item["depth"] / 2, item["width"] / 2, item["depth"] / 2)
-    shape = rotate(shape, -float(item.get("rotation", 0)), origin=(0, 0))
-    return translate(shape, xoff=item.get("x", 0), yoff=item.get("z", 0))
+    """Return a cached immutable Shapely footprint for this item transform."""
+    return _footprint(float(item["width"]), float(item["depth"]), float(item.get("x", 0)),
+                      float(item.get("z", 0)), float(item.get("rotation", 0)))
 
 
 def _furniture_parameters(item: dict) -> dict:
@@ -58,22 +66,30 @@ def has_opening_doors(item: dict) -> bool:
     return item.get("category") in DOOR_CLEARANCE_CATEGORIES
 
 
+@lru_cache(maxsize=4096)
+def _cabinet_door_clearance_zone(width_value: float, depth_value: float, x: float, z: float,
+                                 rotation: float, sign: float) -> Polygon:
+    width = width_value / 2 + CABINET_DOOR_LATERAL_MARGIN
+    depth = depth_value / 2
+    low_z, high_z = (depth, depth + CABINET_DOOR_CLEARANCE) if sign > 0 else (-depth - CABINET_DOOR_CLEARANCE, -depth)
+    shape = box(-width, low_z, width, high_z)
+    shape = rotate(shape, -rotation, origin=(0, 0))
+    return translate(shape, xoff=x, yoff=z)
+
+
 def cabinet_door_clearance_zone(item: dict) -> Polygon | None:
     """Return the floor area that must stay clear in front of cabinet doors.
 
     This is a configurable product default for opening and standing space. It
     does not model individual hinged-leaf arcs, handles, drawers, or building
-    code compliance.
+    code compliance. Repeated generation checks reuse cached rigid footprints.
     """
     if not has_opening_doors(item):
         return None
-    width = float(item["width"]) / 2 + CABINET_DOOR_LATERAL_MARGIN
-    depth = float(item["depth"]) / 2
-    sign = _front_sign(item)
-    low_z, high_z = (depth, depth + CABINET_DOOR_CLEARANCE) if sign > 0 else (-depth - CABINET_DOOR_CLEARANCE, -depth)
-    shape = box(-width, low_z, width, high_z)
-    shape = rotate(shape, -float(item.get("rotation", 0)), origin=(0, 0))
-    return translate(shape, xoff=item.get("x", 0), yoff=item.get("z", 0))
+    return _cabinet_door_clearance_zone(
+        float(item["width"]), float(item["depth"]), float(item.get("x", 0)),
+        float(item.get("z", 0)), float(item.get("rotation", 0)), _front_sign(item),
+    )
 
 
 def cabinet_door_clearance_conflicts(item: dict, other: dict) -> bool:

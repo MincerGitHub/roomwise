@@ -9,7 +9,7 @@ from roomwise.generator import generate_layouts
 from roomwise.geometry import cabinet_door_clearance_conflicts, footprint
 from roomwise.intent_planner import _position_lock_guard, _scene_payload, compile_plan, validate_plan_against_scene
 from roomwise.relative_constraints import evaluate_relative_position, relative_position_placements
-from roomwise.facing_constraints import evaluate_facing_preference
+from roomwise.facing_constraints import evaluate_facing_preference, facing_item_placements
 from roomwise.schemas import Scene
 
 
@@ -120,6 +120,65 @@ def test_face_item_places_an_armchair_toward_a_locked_coffee_table():
     assert check["satisfied"], check
     assert evaluate_facing_preference(placed["chair"], placed["table"], scene["preferences"][0])["satisfied"]
     assert [placed["table"][key] for key in ("x", "z", "rotation", "locked")] == [4., 4., 0., True]
+
+
+def test_face_item_moves_an_overlapping_armchair_to_a_clear_facing_position():
+    scene = demo_scene()
+    scene["room"].update(width=8., depth=8., door=None, windows=[])
+    chair = _item("armchair", "chair", 4., 4., rotation=0.)
+    table = _item("coffee_table", "table", 4., 4., rotation=0., locked=True)
+    scene["items"] = [chair, table]
+    scene["preferences"] = [{"kind": "face_item", "itemId": "chair", "targetId": "table", "required": True}]
+    assert footprint(chair).intersection(footprint(table)).area > 0
+
+    result = generate_layouts(scene, mode="rules", count=1, seed=17)
+
+    assert result["candidates"], result["diagnostics"]
+    candidate = result["candidates"][0]
+    placed = {item["id"]: item for item in candidate["scene"]["items"]}
+    check = next(value for value in candidate["requirements"]["checks"] if value["kind"] == "face_item")
+    assert candidate["validation"]["valid"]
+    assert check["satisfied"], check
+    assert footprint(placed["chair"]).intersection(footprint(placed["table"])).area == pytest.approx(0.)
+    assert math.dist((placed["chair"]["x"], placed["chair"]["z"]),
+                     (chair["x"], chair["z"])) > .5
+
+
+def test_face_item_positions_unlocked_target_before_facing_subject():
+    scene = demo_scene()
+    scene["room"].update(width=8., depth=8., door=None, windows=[])
+    chair = _item("armchair", "chair", 4., 4., rotation=0.)
+    table = _item("coffee_table", "table", 4., 4., rotation=0.)
+    scene["items"] = [chair, table]
+    scene["preferences"] = [{"kind": "face_item", "itemId": "chair", "targetId": "table", "required": True}]
+
+    result = generate_layouts(scene, mode="rules", count=1, seed=23)
+
+    assert result["candidates"], result["diagnostics"]
+    candidate = result["candidates"][0]
+    placed = {item["id"]: item for item in candidate["scene"]["items"]}
+    check = next(value for value in candidate["requirements"]["checks"] if value["kind"] == "face_item")
+    assert candidate["validation"]["valid"]
+    assert check["satisfied"], check
+    assert math.dist((placed["table"]["x"], placed["table"]["z"]), (4., 4.)) > .01
+    assert footprint(placed["chair"]).distance(footprint(placed["table"])) >= .025
+
+
+def test_structured_face_item_plan_compiles_to_the_same_executor():
+    scene = demo_scene()
+    plan = {"action": "apply", "operations": [{"name": "face_item", "itemIds": ["chair-1"],
+             "targetId": "desk-1", "required": True}]}
+
+    validated = validate_plan_against_scene(plan, scene)
+    text = compile_plan(validated, scene)
+    reply = interpret_command(scene, text)
+
+    assert text == "chair-1朝向desk-1"
+    assert reply["action"] == "generate", reply
+    assert reply["scene"]["preferences"][-1] == {
+        "kind": "face_item", "itemId": "chair-1", "targetId": "desk-1", "required": True,
+    }
+    assert _position_lock_guard(validated, "书椅朝向桌子", scene, None) is None
 
 
 def test_relative_generation_never_returns_a_nightstand_in_front_of_the_wardrobe():

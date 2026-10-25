@@ -6,6 +6,7 @@ import pytest
 
 from roomwise import command_service as service
 from roomwise.catalog import demo_scene, CATALOG
+from roomwise.generator import generate_layouts
 from roomwise.schemas import Scene
 
 
@@ -44,6 +45,7 @@ def test_bed_in_front_of_wardrobe_alias_maps_to_front():
 
 def test_chair_facing_coffee_table_creates_a_facing_preference_without_moving_table():
     scene = demo_scene()
+    scene["room"].update(width=8., depth=8., door=None, windows=[])
     chair = next(item for item in scene["items"] if item["id"] == "chair-1")
     chair["label"] = "木质扶手椅"
     chair["category"] = "armchair"
@@ -63,15 +65,24 @@ def test_chair_facing_coffee_table_creates_a_facing_preference_without_moving_ta
 
 def test_chair_facing_coffee_table_generates_a_checked_rotation():
     scene = demo_scene()
+    scene["room"].update(width=8., depth=8., door=None, windows=[])
     chair = next(item for item in scene["items"] if item["id"] == "chair-1")
     chair.update(label="木质扶手椅", category="armchair", x=1., z=1., rotation=0.)
     table = next(item for item in scene["items"] if item["id"] == "desk-1")
     table.update(label="茶几", category="coffee_table", x=4., z=4., rotation=0., locked=True)
+    scene["preferences"] = []  # The demo's near-window request belonged to the renamed desk.
     reply = service.interpret_command(scene, "木质扶手椅朝向茶几")
 
     assert reply["action"] == "generate", reply
-    result = service.apply_command(reply["scene"], "生成布局")
-    assert result["action"] == "generate"
+    result = generate_layouts(reply["scene"], mode="rules", count=1, seed=31)
+    assert result["candidates"], result["diagnostics"]
+    candidate = result["candidates"][0]
+    check = next(value for value in candidate["requirements"]["checks"] if value["kind"] == "face_item")
+    assert candidate["validation"]["valid"]
+    assert check["satisfied"], check
+    placed = {item["id"]: item for item in candidate["scene"]["items"]}
+    assert (placed["desk-1"]["x"], placed["desk-1"]["z"], placed["desk-1"]["rotation"]) == (
+        table["x"], table["z"], table["rotation"])
 
 
 @pytest.mark.parametrize("text", [

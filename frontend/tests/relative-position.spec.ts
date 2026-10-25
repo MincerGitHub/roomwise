@@ -9,6 +9,22 @@ const scene={
  ],preferences:[],
 };
 
+function footprintsOverlap(a:{x:number;z:number;width:number;depth:number;rotation:number},b:{x:number;z:number;width:number;depth:number;rotation:number}){
+ const corners=(item:typeof a)=>{
+  const angle=item.rotation*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
+  return [[-1,-1],[-1,1],[1,-1],[1,1]].map(([sx,sz])=>[
+   item.x+sx*item.width/2*c+sz*item.depth/2*s,
+   item.z-sx*item.width/2*s+sz*item.depth/2*c,
+  ] as const);
+ };
+ const first=corners(a),second=corners(b);
+ const axes=[a,b].flatMap(item=>{const angle=item.rotation*Math.PI/180;return [[Math.cos(angle),-Math.sin(angle)],[Math.sin(angle),Math.cos(angle)]]});
+ return axes.every(([x,z])=>{
+  const av=first.map(point=>point[0]*x+point[1]*z),bv=second.map(point=>point[0]*x+point[1]*z);
+  return Math.max(...av)>=Math.min(...bv)&&Math.max(...bv)>=Math.min(...av);
+ });
+}
+
 test('bed in front of a locked wardrobe follows its local front and stays a preview until applied',async({page})=>{
  await page.goto('/');
  await page.locator('input[type="file"][accept=".json"]').setInputFiles({
@@ -105,6 +121,37 @@ test('a chair can face a coffee table through command, preview and apply',async(
  await expect(page.locator('.preview-requirements')).toContainText('正面需朝向茶几');
  await page.locator('.preview-banner .btn.primary').click();
  await expect(page.locator('.preview-banner')).toHaveCount(0);
+});
+
+test('an overlapping unlocked target is staged before placing a chair toward it',async({page})=>{
+ const overlapping={
+  id:'face-item-overlap',name:'朝向目标先选位',version:0,
+  room:{width:8,depth:8,height:2.7,polygon:null,door:null,windows:[]},
+  items:[
+   {id:'chair-1',label:'木质扶手椅',category:'armchair',width:.8,depth:.8,height:.85,x:4,z:4,rotation:0,locked:false,keep:true,source:'brought'},
+   {id:'table-1',label:'茶几',category:'coffee_table',width:1,depth:.6,height:.42,x:4,z:4,rotation:0,locked:false,keep:true,source:'existing'},
+  ],preferences:[],
+ };
+ await page.goto('/');
+ await page.locator('input[type="file"][accept=".json"]').setInputFiles({name:'face-item-overlap.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(overlapping))});
+ const response=page.waitForResponse(r=>r.url().endsWith('/api/generate')&&r.request().method()==='POST',{timeout:45000});
+ await page.getByLabel('输入修改要求').fill('木质扶手椅要朝向茶几');
+ await page.getByLabel('发送要求').click();
+ const generated=await (await response).json();
+ expect(generated.candidates.length).toBeGreaterThan(0);
+ for(const candidate of generated.candidates){
+  expect(candidate.validation.valid).toBe(true);
+  const items=candidate.scene.items as {id:string;x:number;z:number;rotation:number;locked:boolean;width:number;depth:number}[];
+  const chair=items.find(item=>item.id==='chair-1')!;
+  const table=items.find(item=>item.id==='table-1')!;
+  expect(Math.hypot(chair.x-4,chair.z-4)).toBeGreaterThan(.01);
+  expect(chair.locked).toBe(false);
+  expect(table.locked).toBe(false);
+  expect(candidate.requirements.checks).toEqual(expect.arrayContaining([
+   expect.objectContaining({kind:'face_item',itemId:'chair-1',targetId:'table-1',satisfied:true}),
+  ]));
+  expect(footprintsOverlap(chair,table)).toBe(false);
+ }
 });
 
 for(const relation of [

@@ -16,16 +16,16 @@ test('disabled vision keeps a draft, manual confirmation exports a GLB and adds 
  await dialog.getByLabel('家具名称',{exact:true}).fill(name);
  await dialog.getByLabel('家具类别',{exact:true}).selectOption('armchair');
  await dialog.getByLabel('家具宽（米）').fill('0.8');
- await dialog.getByLabel('家具深（米）').fill('0.7');
- await dialog.getByLabel('家具高（米）').fill('0.9');
+ await expect(dialog.getByLabel('家具深（米）')).toHaveValue('0.8');
+ await expect(dialog.getByLabel('家具高（米）')).toHaveValue('0.85');
  const preview=dialog.getByLabel('家具参数化三维预览');
  await expect(preview.locator('canvas')).toBeVisible();
- await expect.poll(async()=>{const bounds=JSON.parse((await preview.getAttribute('data-bounds'))!);return Math.abs(bounds.width-.8)+Math.abs(bounds.depth-.7)+Math.abs(bounds.height-.9)+Math.abs(bounds.minY)}).toBeLessThan(.00001);
- for(const checkbox of await dialog.locator('.furniture-confirmations input').all())await checkbox.check();
+ await expect.poll(async()=>{const bounds=JSON.parse((await preview.getAttribute('data-bounds'))!);return Math.abs(bounds.width-.8)+Math.abs(bounds.depth-.8)+Math.abs(bounds.height-.85)+Math.abs(bounds.minY)}).toBeLessThan(.00001);
+ await expect(dialog.locator('.furniture-confirmations input')).toHaveCount(0);
  const publish=page.waitForResponse(response=>response.url().includes('/publish')&&response.request().method()==='POST');
  await dialog.getByRole('button',{name:'确认并保存到家具库'}).click();
  const response=await publish;expect(response.status()).toBe(200);
- const asset=await response.json();expect(asset.snapshot.dimensionsConfirmed).toBe(true);expect(asset.snapshot.dimensionSources.width).toBe('user');
+ const asset=await response.json();expect(asset.snapshot.dimensionsConfirmed).toBe(true);expect(asset.snapshot.dimensionSources.width).toBe('user');expect(asset.snapshot.dimensionSources.depth).toBe('template');expect(asset.snapshot.dimensionSources.height).toBe('template');
  const binary=await page.request.get(asset.assetUrl);expect(binary.ok()).toBe(true);expect((await binary.body()).subarray(0,4).toString()).toBe('glTF');
  const card=dialog.locator('.owned-furniture-card').filter({hasText:name});
  await card.getByRole('button',{name:'加入当前房间'}).click();
@@ -143,29 +143,48 @@ test('unconsented upload makes no model submission and crop stays local',async({
  await page.getByRole('button',{name:'使用框选区域'}).click();expect(calls).toBe(0);
 });
 
-test('model fields are prefilled but conflicting multi-view targets cannot publish',async({page})=>{
+for(const missing of [false,true])test(`uncertain images publish in one click with ${missing?'missing':'recognized'} dimensions`,async({page})=>{
  const parameters={primaryColor:'#789167',secondaryColor:null,material:'fabric',hasBack:true,hasArms:true,hasLegs:true,drawerCount:null,doorCount:null,shelfCount:null,seatCount:null,seatHeightRatio:.5};
- const properties={label:'模型识别的扶手椅',category:'armchair',subtype:'软包椅',width:.8,depth:.7,height:.9,dimensionSources:{width:'estimated',depth:'estimated',height:'annotation'},evidence:{width:'估计',depth:'估计',height:'900 mm'},parameters,styleTags:['简约'],frontDirection:'positive_z'};
- const recognition={properties,views:[{imageIndex:0,view:'composite',description:'拼接视图'}],sameObject:false,multipleObjects:false,viewConflict:true,needsCrop:false,warnings:['视图可能来自不同家具'],uncertainFields:['尺寸冲突']};
+ const properties={label:missing?null:'模型识别的扶手椅',category:'armchair',subtype:'软包椅',width:missing?null:.8,depth:missing?null:.7,height:missing?null:.9,dimensionSources:{width:missing?'unknown':'estimated',depth:missing?'unknown':'estimated',height:missing?'unknown':'annotation'},evidence:{width:'估计',depth:'估计',height:'900 mm'},parameters,styleTags:['简约'],frontDirection:missing?null:'positive_z'};
+ const recognition={properties,views:[{imageIndex:0,view:'composite',description:'拼接视图'}],sameObject:false,multipleObjects:true,viewConflict:true,needsCrop:true,warnings:['视图可能来自不同家具'],uncertainFields:['尺寸冲突']};
  const draft={id:'mock-draft',version:2,photoUrls:['/mock-photo.png'],properties,recognition,jobId:'mock-job',updatedAt:'2026-10-23'};
- let submissions=0;
+ let submissions=0,publications=0;
+ let asset:Record<string,unknown>|null=null;
+ await page.route('**/api/assets',route=>route.fulfill({json:{url:'/uploads/assets/mock-furniture.glb'}}));
  await page.route(/\/api\/furniture(?:\/|$)/,async route=>{
   const path=new URL(route.request().url()).pathname;
-  const body=path.endsWith('/status')?{enabled:true,message:'模拟视觉服务，不进行付费调用'}:path.endsWith('/analyze')?{draftId:draft.id,jobId:draft.jobId}:path.includes('/jobs/')?{id:draft.jobId,draftId:draft.id,status:'complete',error:null,errorCode:null}:path.includes('/drafts/')?draft:{assets:[],drafts:[draft]};
+  if(path.endsWith('/save')){
+   draft.properties=route.request().postDataJSON().properties;draft.version++;
+  }
+  if(path.endsWith('/publish')){
+   const request=route.request().postDataJSON();
+   expect(Object.values(request.confirmations)).toEqual([true,true,true,true,true]);
+   asset={id:'mock-asset',version:1,properties:draft.properties,photoUrls:draft.photoUrls,assetUrl:request.assetUrl,snapshot:{...draft.properties,version:1,photoUrls:draft.photoUrls,dimensionsConfirmed:true}};
+   publications++;
+  }
+  const body=path.endsWith('/status')?{enabled:true,message:'模拟视觉服务，不进行付费调用'}:path.endsWith('/analyze')?{draftId:draft.id,jobId:draft.jobId}:path.includes('/jobs/')?{id:draft.jobId,draftId:draft.id,status:'complete',error:null,errorCode:null}:path.endsWith('/publish')?asset:path.includes('/drafts/')?draft:{assets:asset?[asset]:[],drafts:asset?[]:[draft]};
   if(path.endsWith('/analyze'))submissions++;
   await route.fulfill({json:body});
  });
  await page.goto('/');await page.getByRole('button',{name:'自有家具库',exact:true}).click();
  await page.getByLabel('选择家具图片').setInputFiles([photo,{...photo,name:'side.png'},{...photo,name:'back.png'}]);
  await page.locator('.furniture-upload input[type=checkbox]').check();await page.getByRole('button',{name:'上传并识别家具'}).click();
- await expect(page.getByLabel('家具名称',{exact:true})).toHaveValue(properties.label);
- await expect(page.getByLabel('家具宽（米）')).toHaveValue('0.8');
- await expect(page.getByText('模型原值：0.8 m')).toBeVisible();
- await expect(page.getByRole('alert')).toContainText('视图冲突');
- for(const checkbox of await page.locator('.furniture-confirmations input').all())await checkbox.check();
- await expect(page.getByRole('button',{name:'确认并保存到家具库'})).toBeDisabled();
+ await expect(page.getByLabel('家具名称',{exact:true})).toHaveValue(missing?'扶手椅':properties.label!);
+ await expect(page.getByLabel('家具宽（米）')).toHaveValue(missing?'0.75':'0.8');
+ await expect(page.getByRole('alert')).toHaveCount(0);
+ await expect(page.locator('.furniture-confirmations input')).toHaveCount(0);
+ await expect(page.getByText('视图可能来自不同家具')).not.toBeVisible();
+ await expect(page.getByRole('button',{name:'确认并保存到家具库'})).toBeEnabled();
  await page.getByLabel('家具类别',{exact:true}).selectOption('rug');
  await expect(page.locator('.furniture-parameters').getByText('扶手',{exact:true})).toHaveCount(0);
- await expect(page.locator('.furniture-confirmations input:checked')).toHaveCount(0);
+ await expect(page.getByLabel('家具宽（米）')).toHaveValue(missing?'1.8':'0.8');
+ await expect(page.getByRole('button',{name:'确认并保存到家具库'})).toBeEnabled();
+ await page.getByLabel('家具宽（米）').fill('');
+ await expect(page.getByRole('button',{name:'确认并保存到家具库'})).toBeEnabled();
+ await page.getByRole('button',{name:'确认并保存到家具库'}).click();
+ await expect(page.locator('.owned-furniture-card')).toBeVisible();
+ expect(draft.properties.width).toBe(1.8);
+ expect(draft.properties.dimensionSources.width).toBe('template');
+ expect(publications).toBe(1);
  expect(submissions).toBe(1);
 });

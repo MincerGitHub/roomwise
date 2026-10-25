@@ -1,6 +1,6 @@
 export type Wall='south'|'north'|'east'|'west';
 export type FurnitureParameters={primaryColor:string|null;secondaryColor:string|null;material:'wood'|'fabric'|'leather'|'metal'|'plastic'|'glass'|'mixed'|'unknown';hasBack:boolean|null;hasArms:boolean|null;hasLegs:boolean|null;drawerCount:number|null;doorCount:number|null;shelfCount:number|null;seatCount:number|null;seatHeightRatio:number|null};
-export type DimensionSources=Record<'width'|'depth'|'height','annotation'|'estimated'|'user'|'unknown'>;
+export type DimensionSources=Record<'width'|'depth'|'height','annotation'|'estimated'|'user'|'template'|'unknown'>;
 export type FurnitureProperties={label:string|null;category:string|null;subtype:string|null;width:number|null;depth:number|null;height:number|null;dimensionSources:DimensionSources;evidence:Record<'width'|'depth'|'height',string>;parameters:FurnitureParameters;styleTags:string[];frontDirection:'positive_z'|'negative_z'|null};
 export type FurnitureSnapshot={version:number;label:string;category:string;width:number;depth:number;height:number;dimensionsConfirmed:true;parameters:FurnitureParameters;dimensionSources:DimensionSources;photoUrls:string[];frontDirection:'positive_z'|'negative_z';subtype:string|null;styleTags:string[]};
 export type FurnitureRecognition={properties:FurnitureProperties;views:{imageIndex:number;view:string;description:string}[];sameObject:boolean|null;multipleObjects:boolean;viewConflict:boolean;needsCrop:boolean;warnings:string[];uncertainFields:string[]};

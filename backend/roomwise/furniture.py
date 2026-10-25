@@ -12,6 +12,7 @@ import warnings
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from .catalog import CATALOG
 from .furniture_schemas import FurnitureProperties, PublishFurniture, SaveFurnitureDraft
 from .furniture_vision import VisionError, recognize_furniture
 from .schemas import FurnitureSnapshot
@@ -187,8 +188,13 @@ class FurnitureService:
             draft = self.get(connection, "furniture_drafts", identifier)
             self.editable(connection, draft, request.expectedVersion)
             properties = request.properties.model_dump()
+            template = next((item for item in CATALOG if item["category"] == properties["category"]), None)
             for name in ("width", "depth", "height"):
-                if properties[name] != draft["properties"][name]:
+                if properties["dimensionSources"][name] == "template":
+                    if template is None or properties[name] != template[name]:
+                        raise FurnitureError(400, "模板尺寸与类别不匹配")
+                    properties["evidence"][name] = "类别模板"
+                elif properties[name] != draft["properties"][name]:
                     properties["dimensionSources"][name] = "user" if properties[name] is not None else "unknown"
                 elif properties["dimensionSources"][name] != draft["properties"]["dimensionSources"][name]:
                     raise FurnitureError(400, "尺寸来源不可直接改写；修改尺寸后由系统记录为用户填写。")
@@ -216,10 +222,6 @@ class FurnitureService:
                 return json.loads(previous["body"])
             draft = self.get(connection, "furniture_drafts", identifier)
             self.editable(connection, draft, request.expectedVersion)
-            result = draft.get("recognition") or {}
-            multi_view_unknown = bool(result) and len(draft["photoUrls"]) > 1 and result.get("sameObject") is not True
-            if multi_view_unknown or result.get("sameObject") is False or any(result.get(key) for key in ("multipleObjects", "viewConflict", "needsCrop")):
-                raise FurnitureError(400, "图片目标不明确或视图冲突，请裁剪目标、拆图或补拍后新建识别，不能直接发布。")
             properties = FurnitureProperties.model_validate(draft["properties"]).model_dump()
             if any(properties[key] is None for key in ("category", "label", "width", "depth", "height", "frontDirection")):
                 raise FurnitureError(400, "请补全名称、类别、宽深高和正面方向，再确认发布。")

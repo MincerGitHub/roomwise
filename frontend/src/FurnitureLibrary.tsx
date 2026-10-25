@@ -2,14 +2,13 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {X} from 'lucide-react';
 import {api,clone,type CatalogItem,type FurnitureAsset,type FurnitureDraft,type FurnitureJob,type FurnitureParameters,type FurnitureProperties,type Item} from './types';
 import {exportFurnitureGLB,parameterKeys,resetCategoryParameters} from './furnitureMesh';
+import {completeFurnitureProperties} from './furnitureProperties';
 import FurniturePreview from './FurniturePreview';
 import FurnitureCrop from './FurnitureCrop';
 
 type Props={catalog:CatalogItem[];onClose:()=>void;onAdd:(asset:FurnitureAsset)=>void;initialDraftId?:string|null};
-type Confirmation='category'|'label'|'dimensions'|'direction'|'structure';
-const confirmationNames:Record<Confirmation,string>={category:'已核对类别（未知类型已明确选择近似类别）',label:'已核对名称',dimensions:'已核对宽深高，接受估计误差或已实测修正',direction:'已核对正面 / 床头方向',structure:'已核对结构和外观，接受模板补全'};
-const initialChecks:Record<Confirmation,boolean>={category:false,label:false,dimensions:false,direction:false,structure:false};
-const sourceNames={annotation:'图纸标注读取',estimated:'视觉估计，非测量',user:'用户填写',unknown:'无法判断'};
+const publishConfirmations={category:true,label:true,dimensions:true,direction:true,structure:true};
+const sourceNames={annotation:'图纸标注读取',estimated:'视觉估计，非测量',user:'用户填写',template:'模板尺寸',unknown:'无法判断'};
 const parameterNames:Record<keyof FurnitureParameters,string>={primaryColor:'主色',secondaryColor:'辅助色',material:'外观材质',hasBack:'靠背',hasArms:'扶手',hasLegs:'支腿',drawerCount:'抽屉数量',doorCount:'柜门数量',shelfCount:'层板数量',seatCount:'座位数',seatHeightRatio:'座面高度 / 总高'};
 const materialNames={unknown:'未知',wood:'木质外观',fabric:'织物外观',leather:'皮革外观',metal:'金属外观',plastic:'塑料外观',glass:'玻璃外观',mixed:'混合'};
 
@@ -25,14 +24,14 @@ async function multipart<T>(path:string,form:FormData):Promise<T>{
 
 export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:Props){
  const [assets,setAssets]=useState<FurnitureAsset[]>([]),[drafts,setDrafts]=useState<FurnitureDraft[]>([]),[draft,setDraft]=useState<FurnitureDraft|null>(null),[properties,setProperties]=useState<FurnitureProperties|null>(null);
- const [files,setFiles]=useState<File[]>([]),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[jobId,setJobId]=useState<string|null>(null),[job,setJob]=useState<FurnitureJob|null>(null),[checks,setChecks]=useState(initialChecks);
+ const [files,setFiles]=useState<File[]>([]),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[jobId,setJobId]=useState<string|null>(null),[job,setJob]=useState<FurnitureJob|null>(null);
  const [status,setStatus]=useState<{enabled:boolean;message:string}|null>(null),[dirty,setDirty]=useState(false),[styleText,setStyleText]=useState('');
  const requestId=useRef(crypto.randomUUID()),pendingPublish=useRef<{draftId:string;expectedVersion:number;assetUrl:string;requestId:string}|null>(null),openGeneration=useRef(0),alive=useRef(true),inFlight=useRef(false);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;openGeneration.current++}},[]);
  async function refresh(){const listing=await api<{assets:FurnitureAsset[];drafts:FurnitureDraft[]}>('/furniture');if(alive.current){setAssets(listing.assets);setDrafts(listing.drafts)}}
  useEffect(()=>{refresh().catch(error=>setMessage(String(error)));api<{enabled:boolean;message:string}>('/furniture/status').then(setStatus).catch(error=>setMessage(String(error)))},[]);
  useEffect(()=>{if(initialDraftId)openDraft(initialDraftId)},[initialDraftId]);
- function loadDraft(value:FurnitureDraft){setDraft(value);setProperties(clone(value.properties));setStyleText(value.properties.styleTags.join(','));setChecks({...initialChecks});setDirty(false);requestId.current=crypto.randomUUID();pendingPublish.current=null}
+ function loadDraft(value:FurnitureDraft){setDraft(value);setProperties(completeFurnitureProperties(value.properties,catalog));setStyleText(value.properties.styleTags.join(','));setDirty(false);requestId.current=crypto.randomUUID();pendingPublish.current=null}
  async function openDraft(identifier:string){
   if(inFlight.current)return;const generation=++openGeneration.current;setJobId(null);
   try{const value=await api<FurnitureDraft>(`/furniture/drafts/${identifier}`);if(!alive.current||generation!==openGeneration.current)return;loadDraft(value);setMessage('');setJob(null);if(value.jobId)setJobId(value.jobId);else setJobId(null)}catch(error){setMessage(String(error))}
@@ -47,7 +46,15 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
    }catch(error){if(!cancelled&&alive.current){setMessage(`状态查询失败，草稿仍保留。${String(error)}`);timer=setTimeout(poll,3000)}}
   };poll();return()=>{cancelled=true;clearTimeout(timer)};
  },[jobId]);
- function update(patch:Partial<FurnitureProperties>){if(!properties)return;const next={...properties,...patch,dimensionSources:{...properties.dimensionSources}};for(const key of ['width','depth','height'] as const){if(key in patch)next.dimensionSources[key]=draft&&patch[key]===draft.properties[key]?draft.properties.dimensionSources[key]:patch[key]===null?'unknown':'user'}setProperties(next);setChecks({...initialChecks});setDirty(true);pendingPublish.current=null;requestId.current=crypto.randomUUID()}
+ function update(patch:Partial<FurnitureProperties>){
+  if(!properties)return;let next={...properties,...patch,dimensionSources:{...properties.dimensionSources}};
+  for(const key of ['width','depth','height'] as const){
+   if(key in patch)next.dimensionSources[key]=draft&&patch[key]===draft.properties[key]?draft.properties.dimensionSources[key]:patch[key]===null?'unknown':'user';
+   if('category' in patch&&patch.category!==properties.category&&next.dimensionSources[key]==='template'){next[key]=null;next.dimensionSources[key]='unknown'}
+  }
+  if('category' in patch)next=completeFurnitureProperties(next,catalog);
+  setProperties(next);setDirty(true);pendingPublish.current=null;requestId.current=crypto.randomUUID();
+ }
  function updateParameter(key:keyof FurnitureParameters,value:unknown){if(properties)update({parameters:{...properties.parameters,[key]:value}})}
  async function guarded(operation:()=>Promise<void>){if(inFlight.current)return;inFlight.current=true;setBusy(true);setMessage('');try{await operation()}catch(error){if(alive.current)setMessage(error instanceof Error?error.message:String(error))}finally{inFlight.current=false;if(alive.current)setBusy(false)}}
  async function submit(){await guarded(async()=>{
@@ -57,27 +64,26 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
   const result=await multipart<{draftId:string;jobId:string}>('/furniture/analyze',form);openGeneration.current++;
   const value=await api<FurnitureDraft>(`/furniture/drafts/${result.draftId}`);if(!alive.current)return;loadDraft(value);setJob(null);setJobId(result.jobId);setFiles([]);await refresh();
  })}
- async function saveDraft(){if(!draft||!properties)return;await guarded(async()=>{const value=await api<FurnitureDraft>(`/furniture/drafts/${draft.id}/save`,{expectedVersion:draft.version,properties});if(alive.current){setDraft(value);setProperties(clone(value.properties));setDirty(false);pendingPublish.current=null;requestId.current=crypto.randomUUID();setMessage('草稿已保存到本机。')}await refresh()})}
+ async function saveDraft(){if(!draft||!properties)return;await guarded(async()=>{const value=await api<FurnitureDraft>(`/furniture/drafts/${draft.id}/save`,{expectedVersion:draft.version,properties:completeFurnitureProperties(properties,catalog)});if(alive.current){setDraft(value);setProperties(clone(value.properties));setDirty(false);pendingPublish.current=null;requestId.current=crypto.randomUUID();setMessage('草稿已保存到本机。')}await refresh()})}
+ const modelProperties=useMemo(()=>properties?completeFurnitureProperties(properties,catalog):null,[properties,catalog]);
  const preview=useMemo<Item|null>(()=>{
-  if(!properties?.category||!properties.width||!properties.depth||!properties.height)return null;
-  const snapshot={...properties,version:1,label:properties.label||'待确认家具',category:properties.category,width:properties.width,depth:properties.depth,height:properties.height,photoUrls:draft?.photoUrls||[],frontDirection:properties.frontDirection||'positive_z',dimensionsConfirmed:true as const};
+  if(!modelProperties?.category||!modelProperties.width||!modelProperties.depth||!modelProperties.height)return null;
+  const snapshot={...modelProperties,version:1,label:modelProperties.label||'待确认家具',category:modelProperties.category,width:modelProperties.width,depth:modelProperties.depth,height:modelProperties.height,photoUrls:draft?.photoUrls||[],frontDirection:modelProperties.frontDirection||'positive_z',dimensionsConfirmed:true as const};
   return {id:'furniture-preview',label:snapshot.label,category:snapshot.category,width:snapshot.width,depth:snapshot.depth,height:snapshot.height,x:0,z:0,rotation:0,keep:true,locked:false,source:'brought',furnitureSnapshot:snapshot};
- },[properties,draft?.photoUrls]);
- const blocked=!!draft?.recognition&&(draft.recognition.sameObject===false||(draft.photoUrls.length>1&&draft.recognition.sameObject!==true)||draft.recognition.multipleObjects||draft.recognition.viewConflict||draft.recognition.needsCrop);
- const allChecked=Object.values(checks).every(Boolean);
- async function publish(){if(!draft||!properties||!preview||!allChecked||blocked)return;await guarded(async()=>{
+ },[modelProperties,draft?.photoUrls]);
+ async function publish(){if(!draft||!modelProperties||!preview)return;await guarded(async()=>{
   let pending=pendingPublish.current;
   if(!pending){
-   const saved=await api<FurnitureDraft>(`/furniture/drafts/${draft.id}/save`,{expectedVersion:draft.version,properties});
+   const saved=await api<FurnitureDraft>(`/furniture/drafts/${draft.id}/save`,{expectedVersion:draft.version,properties:modelProperties});
    if(alive.current){setDraft(saved);setProperties(clone(saved.properties));setDirty(false)}
    const blob=await exportFurnitureGLB(preview);const form=new FormData();form.append('file',blob,'furniture.glb');
    const uploaded=await multipart<{url:string}>('/assets',form);
    pending={draftId:draft.id,expectedVersion:saved.version,assetUrl:uploaded.url,requestId:requestId.current};pendingPublish.current=pending;
   }
-  await api<FurnitureAsset>(`/furniture/drafts/${pending.draftId}/publish`,{requestId:pending.requestId,expectedVersion:pending.expectedVersion,assetUrl:pending.assetUrl,confirmations:checks});
-  if(alive.current){setDraft(null);setProperties(null);setJob(null);setMessage('已保存到自有家具库。可从下方加入当前房间。');pendingPublish.current=null}await refresh();
+  await api<FurnitureAsset>(`/furniture/drafts/${pending.draftId}/publish`,{requestId:pending.requestId,expectedVersion:pending.expectedVersion,assetUrl:pending.assetUrl,confirmations:publishConfirmations});
+  if(alive.current){setDraft(null);setProperties(null);setJob(null);pendingPublish.current=null}await refresh();
  })}
- async function retry(){if(!draft)return;await guarded(async()=>{if(!consent)throw new Error('请重新勾选同意云端发送与计费');const result=await api<{jobId:string}>(`/furniture/drafts/${draft.id}/retry`,{consent:true});setJob(null);setJobId(result.jobId);setChecks({...initialChecks})})}
+ async function retry(){if(!draft)return;await guarded(async()=>{if(!consent)throw new Error('请重新勾选同意云端发送与计费');const result=await api<{jobId:string}>(`/furniture/drafts/${draft.id}/retry`,{consent:true});setJob(null);setJobId(result.jobId)})}
  async function editAsset(asset:FurnitureAsset){await guarded(async()=>{const value=await api<FurnitureDraft>(`/furniture/${asset.id}/edit`,{});openGeneration.current++;loadDraft(value);setJob(null);setJobId(null);await refresh()})}
  function selectFiles(selected:FileList|null){if(!selected)return;const values=Array.from(selected);if(values.length>3||values.some(file=>file.size>10*1024*1024||!(/\.(jpe?g|png|webp)$/i.test(file.name)))){setMessage('请选择 1—3 张 JPEG、PNG、WebP，每张不超过 10 MB。');return}setFiles(values);setMessage('')}
  return <div className="modal-backdrop furniture-backdrop"><section className="modal furniture-library" role="dialog" aria-modal="true" aria-labelledby="furniture-title">
@@ -93,8 +99,7 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
   {jobId&&<p role="status">{job?.status==='processing'?'正在联合识别视图…':'识别任务已排队…'} 可以关闭窗口；任务和草稿保存在本机。请勿重复提交。</p>}
   {draft&&properties&&<fieldset disabled={busy||!!jobId} className="furniture-editor"><legend>2. 核对属性与三维预览</legend>
    <div className="furniture-photos">{draft.photoUrls.map((url,index)=><a href={url} target="_blank" rel="noreferrer" key={url}><img src={url} alt={`家具原图 ${index+1}`}/></a>)}</div>
-   {blocked&&<p role="alert" className="furniture-message">目标不明确、不是同一件家具或视图冲突。请在上方裁剪 / 更换图片后重新提交，不能直接发布。</p>}
-   {draft.recognition&&<div className="furniture-evidence"><strong>识别依据与不确定项</strong><p>{draft.recognition.views.map(view=>`图${view.imageIndex+1} ${view.view}：${view.description}`).join('；')}</p>{[...draft.recognition.warnings,...draft.recognition.uncertainFields].map((text,index)=><p key={index}>{text}</p>)}</div>}
+   {draft.recognition&&<details className="furniture-evidence"><summary>识别详情</summary><p>{draft.recognition.views.map(view=>`图${view.imageIndex+1} ${view.view}：${view.description}`).join('；')}</p>{[...draft.recognition.warnings,...draft.recognition.uncertainFields].map((text,index)=><p key={index}>{text}</p>)}</details>}
    <div className="furniture-editor-grid"><div>
     <label className="field">家具名称<input value={properties.label||''} onChange={event=>update({label:event.target.value||null})}/></label>
     <label className="field">家具类别<select aria-label="家具类别" value={properties.category||''} onChange={event=>{const category=event.target.value||null;update({category,parameters:resetCategoryParameters(category,properties.parameters),frontDirection:category?(category.includes('bed')?'negative_z':'positive_z'):null})}}><option value="">未知 / 请选择受支持的近似类别</option>{catalog.map(value=><option key={value.category} value={value.category}>{value.label}</option>)}</select></label>
@@ -110,8 +115,7 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
     if(key.startsWith('has'))return <label className="field" key={key}>{parameterNames[key]}<select value={value===null?'':String(value)} onChange={event=>updateParameter(key,event.target.value===''?null:event.target.value==='true')}><option value="">未知，模板补全</option><option value="true">有</option><option value="false">无</option></select></label>;
     return <label className="field" key={key}>{parameterNames[key]}{value===null?'（模板默认）':''}<input type="number" step={key==='seatHeightRatio'?.01:1} min={key==='seatHeightRatio'?.15:key==='shelfCount'||key==='seatCount'?1:0} max={key==='seatHeightRatio'?.8:key==='seatCount'||key==='doorCount'?8:12} value={typeof value==='number'?value:''} placeholder="未知，模板补全" onChange={event=>updateParameter(key,event.target.value===''?null:Number(event.target.value))}/></label>;
    })}</div>
-   <div className="furniture-confirmations">{(Object.keys(confirmationNames) as Confirmation[]).map(key=><label className="furniture-check" key={key}><input type="checkbox" checked={checks[key]} onChange={event=>setChecks(previous=>({...previous,[key]:event.target.checked}))}/>{confirmationNames[key]}</label>)}</div>
-   <div className="furniture-actions"><button className="btn" onClick={saveDraft}>保存草稿</button>{!draft.editingAssetId&&<button className="btn" disabled={!consent} onClick={retry}>同意计费并重新识别</button>}<button className="btn primary" disabled={!allChecked||!preview||blocked||!properties.label?.trim()||!properties.frontDirection} onClick={publish}>确认并保存到家具库</button></div>
+   <div className="furniture-actions"><button className="btn" onClick={saveDraft}>保存草稿</button>{!draft.editingAssetId&&<button className="btn" disabled={!consent} onClick={retry}>同意计费并重新识别</button>}<button className="btn primary" disabled={!preview} onClick={publish}>确认并保存到家具库</button></div>
   </fieldset>}
   <section className="furniture-saved"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">LIBRARY</span><h3>已确认家具 <span className="furniture-count">{assets.length}</span></h3></div><p>选择家具即可加入房间</p></div><div className="owned-furniture-grid">{assets.map(asset=><article key={asset.id} className="owned-furniture-card"><img src={asset.photoUrls[0]} alt={asset.snapshot.label}/><div className="owned-furniture-meta"><strong>{asset.snapshot.label}</strong><span>v{asset.version}</span></div><small>{asset.snapshot.width} × {asset.snapshot.depth} × {asset.snapshot.height} m</small><div className="furniture-actions"><button className="btn primary" aria-label="加入当前房间" disabled={busy||!!jobId} onClick={()=>onAdd(asset)}>加入房间</button><button className="btn" disabled={busy||!!jobId} onClick={()=>editAsset(asset)}>修改</button></div></article>)}</div>{!assets.length&&<p className="furniture-empty">保存后的家具会显示在这里</p>}</section>
   <section className="furniture-draft-section"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">DRAFTS</span><h3>待确认草稿 <span className="furniture-count">{drafts.length}</span></h3></div></div><div className="furniture-drafts">{drafts.map(value=><button className="btn" disabled={busy||!!jobId} key={value.id} onClick={()=>{if(dirty&&!window.confirm('放弃未保存修改并打开其他草稿？'))return;openDraft(value.id)}}>{value.properties.label||'未命名家具'} · {value.id.slice(0,8)}</button>)}</div></section>

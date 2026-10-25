@@ -78,7 +78,7 @@ test('deleting furniture ignores a late reply when opening its revision',async({
  await page.route(`**/api/furniture/drafts/${draft.id}`,route=>{pending=route});
  await page.route(`**/api/furniture/${asset.id}?expectedVersion=1`,route=>{deleted=true;return route.fulfill({json:{id:asset.id,deleted:true}})});
  await page.goto('/');await page.getByRole('button',{name:'自有家具库',exact:true}).click();
- await page.locator('.furniture-drafts button').click();
+ await page.locator('.furniture-draft-open').click();
  await expect.poll(()=>!!pending).toBe(true);
  page.once('dialog',confirmation=>confirmation.accept());
  await page.getByRole('button',{name:`删除${properties.label}`,exact:true}).click();

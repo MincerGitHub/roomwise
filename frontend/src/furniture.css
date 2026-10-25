@@ -232,11 +232,14 @@
 .owned-furniture-card > small { color: #818b7e; font-size: 11px; }
 .owned-furniture-card .furniture-actions { gap: 7px; margin-top: 5px; }
 .owned-furniture-card .furniture-actions .btn { min-height: 36px; flex: 1; padding: 7px 9px; border-radius: 10px; font-size: 11px; }
-.owned-furniture-card .furniture-actions .furniture-delete { flex: 0 0 auto; color: #a05442; border-color: #e8d8d0; background: #fffaf7; }
-.owned-furniture-card .furniture-actions .furniture-delete:hover { color: #853f30; border-color: #cfab9e; background: #fff1e9; }
+.furniture-library .furniture-delete { flex: 0 0 auto; color: #a05442; border-color: #e8d8d0; background: #fffaf7; }
+.furniture-library .furniture-delete:hover { color: #853f30; border-color: #cfab9e; background: #fff1e9; }
+.owned-furniture-card .furniture-actions .furniture-delete { flex: 0 0 auto; }
 .furniture-empty { padding: 18px; border: 1px dashed #dce4d3; border-radius: 14px; color: #8a9286; font-size: 12px; text-align: center; }
 .furniture-drafts { gap: 8px; }
 .furniture-drafts .btn { min-height: 35px; border-radius: 10px; background: rgba(255,255,255,.7); font-size: 11px; }
+.furniture-draft { display: flex; align-items: stretch; gap: 5px; max-width: 100%; }
+.furniture-draft-open { min-width: 0; overflow-wrap: anywhere; text-align: left; }
 .furniture-library .furniture-editor { margin-top: 20px; }
 .furniture-library .field { color: #687467; font-size: 12px; }
 .furniture-library .field input,

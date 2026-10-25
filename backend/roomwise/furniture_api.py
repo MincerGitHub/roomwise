@@ -114,6 +114,11 @@ def draft(draft_id: str):
     return invoke(service().draft, draft_id)
 
 
+@router.delete("/drafts/{draft_id}")
+def delete_draft(draft_id: str, expectedVersion: int = Query(..., ge=1)):
+    return invoke(service().delete_draft, draft_id, expectedVersion)
+
+
 @router.post("/drafts/{draft_id}/save")
 def save(draft_id: str, request: SaveFurnitureDraft):
     return invoke(service().save, draft_id, request)

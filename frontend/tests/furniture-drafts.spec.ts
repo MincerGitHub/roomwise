@@ -35,6 +35,7 @@ test('draft deletion can be cancelled and persists without changing another draf
  await row.getByRole('button',{name:/删除草稿/}).click();
  expect((await deleted).status()).toBe(200);
  await expect(row).toHaveCount(0);await expect(label).toHaveCount(0);
+ await expect(dialog.locator('.furniture-message')).toHaveCount(0);
  await expect(section.locator('.furniture-count')).toHaveText(String(count-1));
  expect((await page.request.get(`/api/furniture/drafts/${draft.id}`)).status()).toBe(404);
  expect(await (await page.request.get(`/api/furniture/drafts/${other.id}`)).json()).toEqual(other);
@@ -73,6 +74,7 @@ test('an active recognition draft can be deleted without late polling restoring 
  page.once('dialog',confirmation=>confirmation.accept());
  await row.getByRole('button',{name:/删除草稿/}).click();
  await expect(row).toHaveCount(0);await expect(page.getByLabel('家具名称',{exact:true})).toHaveCount(0);
+ await expect(page.locator('.furniture-message')).toHaveCount(0);
  await expect(page.getByLabel('选择家具图片')).toBeEnabled();
  expect((await page.request.get(`/api/furniture/drafts/${draft.id}`)).status()).toBe(404);
 });

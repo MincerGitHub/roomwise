@@ -42,7 +42,7 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
   const stale=()=>cancelled||!alive.current||generation!==openGeneration.current;
   const poll=async()=>{
    try{const result=await api<FurnitureJob>(`/furniture/jobs/${jobId}`);if(stale())return;setJob(result);
-    if(result.errorCode==='draft_deleted'){clearEditor();setMessage('草稿已删除。');refresh().catch(()=>{});return}
+    if(result.errorCode==='draft_deleted'){clearEditor();setMessage('');refresh().catch(()=>{});return}
     if(result.status==='complete'||result.status==='failed'){
      const value=await api<FurnitureDraft>(`/furniture/drafts/${result.draftId}`);if(stale())return;loadDraft(value);setJobId(null);if(result.error)setMessage(result.error);refresh().catch(()=>{});
     }else timer=setTimeout(poll,1200);
@@ -109,7 +109,7 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
    // Invalidate pending draft loads and job replies before sending the deletion.
    openGeneration.current++;
    try{await api(`/furniture/drafts/${value.id}?expectedVersion=${value.version}`,undefined,'DELETE')}catch(error){await refresh().catch(()=>{});throw error}
-   if(alive.current){setDrafts(previous=>previous.filter(entry=>entry.id!==value.id));if(draft?.id===value.id)clearEditor();setMessage(`草稿“${name}”已删除。`)}
+   if(alive.current){setDrafts(previous=>previous.filter(entry=>entry.id!==value.id));if(draft?.id===value.id)clearEditor()}
    await refresh();
   });
  }

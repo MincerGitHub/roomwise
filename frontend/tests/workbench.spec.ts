@@ -1,4 +1,14 @@
-import {test,expect} from '@playwright/test';
+﻿import {test,expect} from '@playwright/test';
+
+test('the fallback north-wall wardrobe faces into the room',async({page})=>{
+ await page.goto('/');
+ const layout=JSON.parse((await page.locator('.scene-canvas').getAttribute('data-layout'))!);
+ const wardrobe=layout.find((item:[string,number,number,number])=>item[0]==='wardrobe-1');
+
+ // The fallback wardrobe sits against the north wall (large z), so its local
+ // +z front must point south, into the usable room.
+ expect(wardrobe).toEqual(['wardrobe-1',1.15,3.8,180]);
+});
 
 test('candidate preview is isolated until explicitly applied',async({page})=>{
  await page.goto('/');

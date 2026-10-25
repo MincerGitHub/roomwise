@@ -96,9 +96,9 @@ class FurnitureParameters(DataModel):
 
 
 class DimensionSources(DataModel):
-    width: Literal["annotation", "estimated", "user", "unknown"] = "unknown"
-    depth: Literal["annotation", "estimated", "user", "unknown"] = "unknown"
-    height: Literal["annotation", "estimated", "user", "unknown"] = "unknown"
+    width: Literal["annotation", "estimated", "user", "template", "unknown"] = "unknown"
+    depth: Literal["annotation", "estimated", "user", "template", "unknown"] = "unknown"
+    height: Literal["annotation", "estimated", "user", "template", "unknown"] = "unknown"
 
 
 class FurnitureSnapshot(DataModel):

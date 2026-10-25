@@ -15,6 +15,7 @@ import pytest
 
 from roomwise import furniture_api, furniture_vision, main
 from roomwise.catalog import demo_scene
+from roomwise.catalog import CATALOG
 from roomwise.furniture import FurnitureError, FurnitureService
 from roomwise.furniture_schemas import FurnitureProperties, FurnitureRecognition, PublishFurniture, SaveFurnitureDraft
 from roomwise.furniture_vision import VisionError, recognition_schema, recognize_furniture, vision_status
@@ -154,11 +155,18 @@ def test_publish_requires_confirmation_complete_dimensions_and_glb(environment):
 
 
 @pytest.mark.parametrize("flag,value", [("sameObject", False), ("multipleObjects", True), ("viewConflict", True), ("needsCrop", True)])
-def test_ambiguous_images_cannot_be_published(environment, flag, value):
+def test_ambiguous_images_can_be_published_after_confirmation(environment, flag, value):
     client, service = environment
     service.analyzer = lambda paths: (recognized(**{flag: value}), {})
     draft = completed(environment)
-    assert client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=publication(draft, service)).status_code == 400
+    body = publication(draft, service)
+    body["confirmations"]["dimensions"] = False
+    assert client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=body).status_code == 422
+    body["confirmations"]["dimensions"] = True
+    response = client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=body)
+    assert response.status_code == 200, response.text
+    assert response.json()["snapshot"]["dimensionsConfirmed"] is True
+    assert len(service.listing()["assets"]) == 1
     assert service.draft(draft["id"])["recognition"][flag] == value
 
 
@@ -400,13 +408,57 @@ def test_restart_marks_jobs_interrupted_without_auto_retry(environment):
         restarted.close()
 
 
-def test_unknown_multi_view_identity_stays_draft(environment):
+def test_unknown_multi_view_identity_can_be_published_after_confirmation(environment):
     client, service = environment
     service.analyzer = lambda paths: (recognized(sameObject=None), {})
     task = upload(client, 3)
     service.process(task["jobId"])
     draft = service.draft(task["draftId"])
-    assert client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=publication(draft, service)).status_code == 400
+    response = client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=publication(draft, service))
+    assert response.status_code == 200, response.text
+    assert len(response.json()["photoUrls"]) == 3
+    assert service.draft(draft["id"])["recognition"]["sameObject"] is None
+
+
+def test_poor_images_can_use_traceable_template_dimensions_and_keep_recognition(environment):
+    client, service = environment
+    result = recognized(sameObject=None, multipleObjects=True, viewConflict=True, needsCrop=True)
+    result["properties"].update(label=None, width=None, depth=None, height=None, frontDirection=None)
+    result["properties"]["dimensionSources"] = dict.fromkeys(("width", "depth", "height"), "unknown")
+    service.analyzer = lambda paths: (result, {})
+    task = upload(client, 3)
+    service.process(task["jobId"])
+    draft = service.draft(task["draftId"])
+    template = next(item for item in CATALOG if item["category"] == "armchair")
+    properties = deepcopy(draft["properties"])
+    properties.update({key: template[key] for key in ("label", "width", "depth", "height")})
+    properties.update(frontDirection="positive_z", dimensionSources=dict.fromkeys(("width", "depth", "height"), "template"))
+    saved = service.save(draft["id"], SaveFurnitureDraft(expectedVersion=draft["version"], properties=properties))
+    response = client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=publication(saved, service))
+    assert response.status_code == 200, response.text
+    asset = response.json()
+    assert set(asset["snapshot"]["dimensionSources"].values()) == {"template"}
+    assert asset["properties"]["evidence"]["width"] == "类别模板"
+    assert service.draft(draft["id"])["recognition"]["properties"]["width"] is None
+    assert service.draft(draft["id"])["recognition"]["viewConflict"] is True
+    scene = demo_scene()
+    scene["items"][0].update({key: asset["snapshot"][key] for key in ("label", "category", "width", "depth", "height")})
+    scene["items"][0].update(furnitureAssetId=asset["id"], furnitureSnapshot=asset["snapshot"])
+    assert Scene.model_validate(scene).items[0].furnitureSnapshot.dimensionSources.width == "template"
+
+
+def test_template_source_cannot_disguise_arbitrary_or_model_dimensions(environment):
+    client, service = environment
+    draft = completed(environment)
+    properties = deepcopy(draft["properties"])
+    properties["dimensionSources"]["width"] = "template"
+    properties["width"] = 4
+    response = client.post(f"/api/furniture/drafts/{draft['id']}/save", json={"expectedVersion": draft["version"], "properties": properties})
+    assert response.status_code == 400
+    model_result = recognized()
+    model_result["properties"]["dimensionSources"]["width"] = "template"
+    with pytest.raises(ValidationError):
+        FurnitureRecognition.model_validate(model_result)
 
 
 def test_confirmed_furniture_can_participate_in_rule_layout_without_losing_identity(environment):

@@ -17,6 +17,9 @@ from shapely.ops import unary_union
 SEAT_CATEGORIES = {"chair", "dressing_chair", "stool"}
 TABLE_CATEGORIES = {"desk", "table", "dressing_table", "coffee_table"}
 ACCESS_CATEGORIES = {"double_bed", "single_bed", "kids_bed", "wardrobe", "desk", "table", "sofa", "armchair", "cabinet", "bookshelf", "children_cabinet", "dressing_table", "tv_stand"}
+DOOR_CLEARANCE_CATEGORIES = {"wardrobe", "cabinet", "children_cabinet", "tv_stand"}
+CABINET_DOOR_CLEARANCE = .70
+CABINET_DOOR_LATERAL_MARGIN = .05
 EPSILON = 1e-6
 
 
@@ -28,6 +31,57 @@ def footprint(item: dict) -> Polygon:
     shape = box(-item["width"] / 2, -item["depth"] / 2, item["width"] / 2, item["depth"] / 2)
     shape = rotate(shape, -float(item.get("rotation", 0)), origin=(0, 0))
     return translate(shape, xoff=item.get("x", 0), yoff=item.get("z", 0))
+
+
+def _furniture_parameters(item: dict) -> dict:
+    """Return confirmed custom-furniture parameters when they exist."""
+    snapshot = item.get("furnitureSnapshot") or {}
+    parameters = snapshot.get("parameters") or item.get("parameters") or {}
+    return parameters if isinstance(parameters, dict) else {}
+
+
+def _front_sign(item: dict) -> float:
+    snapshot = item.get("furnitureSnapshot") or {}
+    return -1. if snapshot.get("frontDirection") == "negative_z" else 1.
+
+
+def has_opening_doors(item: dict) -> bool:
+    """Whether an item needs a front use zone for its opening doors.
+
+    Catalog storage categories default to opening-door cabinets. A confirmed
+    ``doorCount`` on a custom asset is authoritative, allowing a drawer-only
+    cabinet to opt out and another supported item to opt in.
+    """
+    door_count = _furniture_parameters(item).get("doorCount")
+    if door_count is not None:
+        return isinstance(door_count, (int, float)) and not isinstance(door_count, bool) and door_count > 0
+    return item.get("category") in DOOR_CLEARANCE_CATEGORIES
+
+
+def cabinet_door_clearance_zone(item: dict) -> Polygon | None:
+    """Return the floor area that must stay clear in front of cabinet doors.
+
+    This is a configurable product default for opening and standing space. It
+    does not model individual hinged-leaf arcs, handles, drawers, or building
+    code compliance.
+    """
+    if not has_opening_doors(item):
+        return None
+    width = float(item["width"]) / 2 + CABINET_DOOR_LATERAL_MARGIN
+    depth = float(item["depth"]) / 2
+    sign = _front_sign(item)
+    low_z, high_z = (depth, depth + CABINET_DOOR_CLEARANCE) if sign > 0 else (-depth - CABINET_DOOR_CLEARANCE, -depth)
+    shape = box(-width, low_z, width, high_z)
+    shape = rotate(shape, -float(item.get("rotation", 0)), origin=(0, 0))
+    return translate(shape, xoff=item.get("x", 0), yoff=item.get("z", 0))
+
+
+def cabinet_door_clearance_conflicts(item: dict, other: dict) -> bool:
+    """Whether ``other`` occupies the door use zone of ``item``."""
+    if item.get("id") == other.get("id") or other.get("category") == "rug":
+        return False
+    clearance = cabinet_door_clearance_zone(item)
+    return clearance is not None and clearance.intersection(footprint(other)).area > EPSILON
 
 
 def door_zone(room: dict):
@@ -89,6 +143,8 @@ def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0)
             return True
         if gap and item["category"] != "rug" and other["category"] != "rug" and inter <= EPSILON and fp.distance(other_fp) < gap:
             return True
+        if cabinet_door_clearance_conflicts(item, other) or cabinet_door_clearance_conflicts(other, item):
+            return True
     return False
 
 
@@ -142,7 +198,7 @@ def accessibility(scene: dict, step: float = .18, radius: float = .15):
         if item["category"] not in ACCESS_CATEGORIES:
             continue
         shape = footprint(item)
-        # Check a perimeter zone; precise fronts and drawer sweeps are an extension.
+        # Check a perimeter zone. Door-front use zones are checked separately.
         if not any(.12 <= p.distance(shape) <= .55 for p in reach_points):
             unreachable.append(item["id"])
     return {"evaluated": True, "reachable": not unreachable, "unreachableItemIds": unreachable, "gridStep": round(float(step), 4), "walkingDiameter": 2 * radius, "reachableCells": len(indices), "freeCells": int(free.sum()), "reason": "基于家具外围和入口的近似步行检查，未模拟柜门开启"}
@@ -154,7 +210,7 @@ def validate_scene(scene: dict, check_access: bool = True):
     items = scene["items"]
     issues = []
     polygons = {i["id"]: footprint(i) for i in items}
-    collisions = out = door_count = 0
+    collisions = out = door_count = cabinet_door_count = 0
     zone = door_zone(room)
     for item in items:
         fp = polygons[item["id"]]
@@ -179,6 +235,18 @@ def validate_scene(scene: dict, check_access: bool = True):
                 continue
             collisions += 1
             issues.append({"type": "collision", "severity": "error", "itemIds": [a["id"], b["id"]], "message": f"{a['label']}与{b['label']}的占地范围相交", "overlapArea": round(area, 4)})
+    for cabinet in items:
+        if not has_opening_doors(cabinet):
+            continue
+        for blocker in items:
+            if not cabinet_door_clearance_conflicts(cabinet, blocker):
+                continue
+            cabinet_door_count += 1
+            issues.append({
+                "type": "cabinet_door_clearance", "severity": "error",
+                "itemIds": [blocker["id"], cabinet["id"]],
+                "message": f"{blocker['label']}占用了{cabinet['label']}柜门前 {CABINET_DOOR_CLEARANCE:.2f} 米使用区",
+            })
     access = accessibility(scene) if check_access and not out and not door_count else {"evaluated": False, "reachable": None, "unreachableItemIds": [], "reason": "需先处理越界或门口冲突"}
     if access.get("evaluated") and access.get("reachable") is False:
         issues.append({"type": "unreachable", "severity": "error", "itemIds": access["unreachableItemIds"], "message": "部分家具外围无法从入口沿近似步行网格到达"})
@@ -188,8 +256,8 @@ def validate_scene(scene: dict, check_access: bool = True):
     return {
         "valid": not any(i["severity"] == "error" for i in issues),
         "issues": issues,
-        "metrics": {"collisions": collisions, "outOfBounds": out, "doorConflicts": door_count, "reachable": access.get("reachable"), "checkedItems": len(items), "roomArea": round(shell.area, 3), "freeArea": round(free_area, 3), "accessibility": access},
-        "limitations": ["以确认后的二维占地和高度检查，未使用精细家具网格", "局部桌椅交叠与地毯按类别例外处理", "通行检查为工程近似，不能代表建筑规范验收"],
+        "metrics": {"collisions": collisions, "outOfBounds": out, "doorConflicts": door_count, "cabinetDoorConflicts": cabinet_door_count, "reachable": access.get("reachable"), "checkedItems": len(items), "roomArea": round(shell.area, 3), "freeArea": round(free_area, 3), "accessibility": access},
+        "limitations": ["以确认后的二维占地和高度检查，未使用精细家具网格", f"带门柜体正面保留 {CABINET_DOOR_CLEARANCE:.2f} 米使用区，未模拟单扇柜门的精细转动轨迹", "局部桌椅交叠与地毯按类别例外处理", "通行检查为工程近似，不能代表建筑规范验收"],
     }
 
 

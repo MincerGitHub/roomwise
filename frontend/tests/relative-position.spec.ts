@@ -53,11 +53,39 @@ test('bed in front of a locked wardrobe follows its local front and stays a prev
  expect(applied.find((item:[string,number,number,number])=>item[0]==='wardrobe-target')).toEqual(['wardrobe-target',3,5,180]);
 });
 
+test('the bed can stay left of the wardrobe while every generated nightstand clears its doors',async({page})=>{
+ const cabinetScene={
+  id:'cabinet-door-clearance',name:'衣柜柜门净空回归',version:0,
+  room:{width:5.2,depth:4.2,height:2.7,polygon:null,door:{wall:'south',offset:.45,width:.9,clearance:.9},windows:[{id:'window-1',wall:'north',offset:2.3,width:1.5,sillHeight:.9}]},
+  items:[
+   {id:'bed-1',label:'旧双人床',category:'double_bed',width:1.8,depth:2,height:.55,x:3.03,z:2.64,rotation:180,locked:false,keep:true,source:'brought'},
+   {id:'wardrobe-1',label:'房内衣柜',category:'wardrobe',width:1.8,depth:.6,height:2.1,x:1.15,z:3.8,rotation:180,locked:true,keep:true,source:'existing'},
+   {id:'desk-1',label:'旧书桌',category:'desk',width:1.2,depth:.6,height:.75,x:3.7,z:.55,rotation:0,locked:false,keep:true,source:'brought'},
+   {id:'chair-1',label:'办公椅',category:'chair',width:.5,depth:.5,height:.85,x:3.7,z:1.1,rotation:180,locked:false,keep:true,source:'brought'},
+   {id:'nightstand-1',label:'床头柜',category:'nightstand',width:.5,depth:.45,height:.5,x:1.9,z:3.2,rotation:0,locked:false,keep:true,source:'existing'},
+  ],preferences:[],
+ };
+ await page.goto('/');
+ await page.locator('input[type="file"][accept=".json"]').setInputFiles({name:'cabinet-door-clearance.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(cabinetScene))});
+ const response=page.waitForResponse(r=>r.url().endsWith('/api/generate')&&r.request().method()==='POST',{timeout:45000});
+ await page.getByLabel('输入修改要求').fill('把旧双人床放在房内衣柜左侧');
+ await page.getByLabel('发送要求').click();
+ const generated=await (await response).json();
+ expect(generated.candidates.length).toBeGreaterThan(0);
+ for(const candidate of generated.candidates){
+  expect(candidate.validation.valid).toBe(true);
+  expect(candidate.validation.metrics.cabinetDoorConflicts).toBe(0);
+  expect(candidate.validation.issues.some((issue:{type:string})=>issue.type==='cabinet_door_clearance')).toBe(false);
+  const wardrobe=candidate.scene.items.find((item:{id:string})=>item.id==='wardrobe-1');
+  expect([wardrobe.x,wardrobe.z,wardrobe.rotation,wardrobe.locked]).toEqual([1.15,3.8,180,true]);
+ }
+});
+
 for(const relation of [
  {direction:'front',word:'前面',label:'前方',rotation:0,axis:'z',sign:1},
  {direction:'back',word:'后面',label:'后方',rotation:90,axis:'x',sign:-1},
- {direction:'left',word:'左边',label:'左侧',rotation:180,axis:'x',sign:1},
- {direction:'right',word:'右边',label:'右侧',rotation:270,axis:'z',sign:1},
+ {direction:'left',word:'左边',label:'左侧（面对正面）',rotation:180,axis:'x',sign:1},
+ {direction:'right',word:'右边',label:'右侧（面对正面）',rotation:270,axis:'z',sign:1},
 ] as const){
  test(`${relation.direction} follows a wardrobe rotated ${relation.rotation} degrees through command, preview and apply`,async({page})=>{
   const fixture={...scene,room:{...scene.room,width:8,depth:8},items:scene.items.map(item=>item.id==='wardrobe-target'?{...item,x:4,z:4,rotation:relation.rotation}:item)};
@@ -88,7 +116,9 @@ for(const relation of [
   const original=await canvas.getAttribute('data-layout');
   await page.getByLabel('预览方案 1').click();
   await expect(page.locator('.preview-banner')).toBeVisible();
-  await expect(page.locator('.preview-requirements')).toContainText(relation.label);
+  await expect(page.locator('.preview-requirements')).toContainText(
+   relation.direction==='left'?'左侧':relation.direction==='right'?'右侧':relation.label,
+  );
   await page.locator('.preview-banner').getByRole('button',{name:'退出预览'}).click();
   await expect(canvas).toHaveAttribute('data-layout',original!);
   await page.getByLabel('预览方案 1').click();

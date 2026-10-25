@@ -6,7 +6,7 @@ import pytest
 from roomwise.catalog import CATALOG, demo_scene
 from roomwise.command_service import interpret_command
 from roomwise.generator import generate_layouts
-from roomwise.geometry import footprint
+from roomwise.geometry import cabinet_door_clearance_conflicts, footprint
 from roomwise.intent_planner import _position_lock_guard, _scene_payload, compile_plan, validate_plan_against_scene
 from roomwise.relative_constraints import evaluate_relative_position, relative_position_placements
 from roomwise.schemas import Scene
@@ -100,6 +100,33 @@ def test_fallback_room_bed_on_wardrobe_left_uses_edge_alignment():
     assert check["metrics"]["lateralOverlapMeters"] >= check["metrics"]["minLateralOverlapMeters"]
     assert [placed["wardrobe-1"][key] for key in ("x", "z", "rotation", "locked")] == [
         items["wardrobe-1"][key] for key in ("x", "z", "rotation", "locked")]
+
+
+def test_relative_generation_never_returns_a_nightstand_in_front_of_the_wardrobe():
+    scene = demo_scene()
+    scene["room"].update(
+        width=5.2, depth=4.2,
+        door={"wall": "south", "offset": .45, "width": .9, "clearance": .9},
+    )
+    items = {item["id"]: item for item in scene["items"]}
+    items["bed-1"].update(x=3.03, z=2.64, rotation=180., locked=False)
+    items["wardrobe-1"].update(width=1.8, x=1.15, z=3.8, rotation=180., locked=True)
+    items["desk-1"].update(x=3.7, z=.55, rotation=0., locked=False)
+    items["chair-1"].update(width=.5, depth=.5, x=3.7, z=1.1, rotation=180., locked=False)
+    items["nightstand-1"].update(width=.5, depth=.45, x=1.9, z=3.2, rotation=0., locked=False)
+    scene["preferences"] = [{"kind": "relative_position", "itemId": "bed-1",
+                             "targetId": "wardrobe-1", "direction": "left", "required": True}]
+
+    result = generate_layouts(scene, mode="rules", count=3, seed=42)
+
+    assert result["candidates"], result["diagnostics"]
+    for candidate in result["candidates"]:
+        assert candidate["validation"]["valid"]
+        placed = {item["id"]: item for item in candidate["scene"]["items"]}
+        assert all(not cabinet_door_clearance_conflicts(cabinet, other)
+                   for cabinet in placed.values() for other in placed.values())
+        assert [placed["wardrobe-1"][key] for key in ("x", "z", "rotation", "locked")] == [
+            items["wardrobe-1"][key] for key in ("x", "z", "rotation", "locked")]
 
 
 def test_locked_subject_cannot_satisfy_a_relative_position_by_moving():

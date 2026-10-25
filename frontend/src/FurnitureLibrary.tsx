@@ -31,8 +31,8 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
  async function refresh(){const listing=await api<{assets:FurnitureAsset[];drafts:FurnitureDraft[]}>('/furniture');if(alive.current){setAssets(listing.assets);setDrafts(listing.drafts)}}
  useEffect(()=>{refresh().catch(error=>setMessage(String(error)));api<{enabled:boolean;message:string}>('/furniture/status').then(setStatus).catch(error=>setMessage(String(error)))},[]);
  useEffect(()=>{if(initialDraftId)openDraft(initialDraftId)},[initialDraftId]);
- function loadDraft(value:FurnitureDraft){setDraft(value);setProperties(clone(value.properties));setStyleText(value.properties.styleTags.join(','));setChecks({...initialChecks});setDirty(false);requestId.current=crypto.randomUUID();pendingPublish.current=null}
- function clearEditor(){setDraft(null);setProperties(null);setJob(null);setJobId(null);setDirty(false);setStyleText('');setChecks({...initialChecks});pendingPublish.current=null;requestId.current=crypto.randomUUID()}
+ function loadDraft(value:FurnitureDraft){const completed=completeFurnitureProperties(value.properties,catalog);setDraft(value);setProperties(completed);setStyleText(completed.styleTags.join(','));setDirty(false);requestId.current=crypto.randomUUID();pendingPublish.current=null}
+ function clearEditor(){setDraft(null);setProperties(null);setJob(null);setJobId(null);setDirty(false);setStyleText('');pendingPublish.current=null;requestId.current=crypto.randomUUID()}
  async function openDraft(identifier:string){
   if(inFlight.current)return;const generation=++openGeneration.current;setJobId(null);
   try{const value=await api<FurnitureDraft>(`/furniture/drafts/${identifier}`);if(!alive.current||generation!==openGeneration.current)return;loadDraft(value);setMessage('');setJob(null);if(value.jobId)setJobId(value.jobId);else setJobId(null)}catch(error){if(alive.current&&generation===openGeneration.current)setMessage(String(error))}
@@ -96,7 +96,7 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
    if(alive.current){
     setAssets(previous=>previous.filter(value=>value.id!==asset.id));
     setDrafts(previous=>previous.filter(value=>value.editingAssetId!==asset.id&&value.publishedAssetId!==asset.id));
-    if(draft?.editingAssetId===asset.id||draft?.publishedAssetId===asset.id){setDraft(null);setProperties(null);setJob(null);setJobId(null);setDirty(false);setChecks({...initialChecks});pendingPublish.current=null}
+    if(draft?.editingAssetId===asset.id||draft?.publishedAssetId===asset.id)clearEditor();
     setMessage(`已从家具库删除“${asset.snapshot.label}”。已加入房间和已保存方案中的家具仍保留。`);
    }
    await refresh();

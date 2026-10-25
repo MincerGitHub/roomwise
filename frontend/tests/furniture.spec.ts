@@ -1,8 +1,8 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Route} from '@playwright/test';
 
 const photo={name:'owned-chair.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64')};
 
-test('disabled vision keeps a draft, manual confirmation exports a GLB and adds independent instances',async({page})=>{
+test('manual furniture publication, independent instances and library deletion preserve saved rooms',async({page})=>{
  await page.goto('/');
  await page.getByRole('button',{name:'自有家具库',exact:true}).click();
  const dialog=page.getByRole('dialog');
@@ -35,6 +35,60 @@ test('disabled vision keeps a draft, manual confirmation exports a GLB and adds 
  await page.locator('.owned-furniture-card').filter({hasText:name}).getByRole('button',{name:'加入当前房间'}).click();
  const after=JSON.parse((await canvas.getAttribute('data-layout'))!);expect(after.length).toBe(before.length+1);
  expect(new Set(after.map((item:[string,number,number,number])=>item[0])).size).toBe(after.length);
+ const savedResponse=page.waitForResponse('**/api/scenes/save');
+ await page.getByRole('button',{name:'另存',exact:true}).click();
+ const saved=await (await savedResponse).json();
+ await page.getByRole('button',{name:'自有家具库',exact:true}).click();
+ const savedCard=page.locator('.owned-furniture-card').filter({hasText:name});
+ let deletes=0;page.on('request',request=>{if(request.method()==='DELETE'&&request.url().includes(`/furniture/${asset.id}`))deletes++});
+ page.once('dialog',confirmation=>confirmation.dismiss());
+ await savedCard.getByRole('button',{name:`删除${name}`,exact:true}).click();
+ await expect(savedCard).toBeVisible();expect(deletes).toBe(0);
+ // Removing an asset while editing it must also close its obsolete revision.
+ await savedCard.getByRole('button',{name:'修改',exact:true}).click();
+ await expect(dialog.getByLabel('家具名称',{exact:true})).toHaveValue(name);
+ await dialog.getByLabel('家具名称',{exact:true}).fill(`${name}修订`);
+ page.once('dialog',async confirmation=>{expect(confirmation.message()).toContain('已加入房间和已保存方案中的家具会保留');await confirmation.accept()});
+ const removed=page.waitForResponse(response=>response.request().method()==='DELETE'&&response.url().includes(`/furniture/${asset.id}`));
+ await savedCard.getByRole('button',{name:`删除${name}`,exact:true}).click();
+ expect((await removed).status()).toBe(200);
+ await expect(savedCard).toHaveCount(0);
+ await expect(dialog.getByLabel('家具名称',{exact:true})).toHaveCount(0);
+ await expect(dialog.getByRole('status').filter({hasText:'已从家具库删除'})).toBeVisible();
+ await page.getByRole('button',{name:'关闭自有家具库'}).click();
+ expect(JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(after);
+ const restored=await (await page.request.get(`/api/scenes/${saved.id}`)).json();
+ const placed=restored.items.filter((item:{furnitureAssetId?:string})=>item.furnitureAssetId===asset.id);
+ expect(placed).toHaveLength(2);for(const instance of placed)expect(instance.furnitureSnapshot).toEqual(asset.snapshot);
+ expect((await page.request.get(asset.assetUrl)).ok()).toBe(true);
+ expect((await page.request.get(asset.photoUrls[0])).ok()).toBe(true);
+ await page.reload();await page.getByRole('button',{name:'自有家具库',exact:true}).click();
+ await expect(page.locator('.owned-furniture-card').filter({hasText:name})).toHaveCount(0);
+ const listing=await (await page.request.get('/api/furniture')).json();
+ expect(listing.assets.some((value:{id:string})=>value.id===asset.id)).toBe(false);
+ expect(listing.drafts.some((value:{editingAssetId?:string})=>value.editingAssetId===asset.id)).toBe(false);
+});
+
+test('deleting furniture ignores a late reply when opening its revision',async({page})=>{
+ const properties={label:'待删除家具',category:'armchair',subtype:null,width:.8,depth:.7,height:.9,dimensionSources:{width:'user',depth:'user',height:'user'},evidence:{width:'',depth:'',height:''},parameters:{primaryColor:null,secondaryColor:null,material:'unknown',hasBack:null,hasArms:null,hasLegs:null,drawerCount:null,doorCount:null,shelfCount:null,seatCount:null,seatHeightRatio:null},styleTags:[],frontDirection:'positive_z'};
+ const asset={id:'delete-race-asset',version:1,properties,photoUrls:[],assetUrl:'/uploads/unused.glb',snapshot:{...properties,version:1,dimensionsConfirmed:true,photoUrls:[]},updatedAt:'2026-10-25'};
+ const draft={id:'delete-race-draft',version:1,properties,photoUrls:[],recognition:null,jobId:null,editingAssetId:asset.id,updatedAt:'2026-10-25'};
+ let deleted=false,pending:Route|undefined;
+ await page.route('**/api/furniture',route=>route.fulfill({json:deleted?{assets:[],drafts:[]}:{assets:[asset],drafts:[draft]}}));
+ await page.route(`**/api/furniture/drafts/${draft.id}`,route=>{pending=route});
+ await page.route(`**/api/furniture/${asset.id}?expectedVersion=1`,route=>{deleted=true;return route.fulfill({json:{id:asset.id,deleted:true}})});
+ await page.goto('/');await page.getByRole('button',{name:'自有家具库',exact:true}).click();
+ await page.locator('.furniture-drafts button').click();
+ await expect.poll(()=>!!pending).toBe(true);
+ page.once('dialog',confirmation=>confirmation.accept());
+ await page.getByRole('button',{name:`删除${properties.label}`,exact:true}).click();
+ await expect(page.getByRole('status').filter({hasText:'已从家具库删除'})).toBeVisible();
+ const lateReply=page.waitForResponse(`**/api/furniture/drafts/${draft.id}`);
+ await pending!.fulfill({json:draft});await (await lateReply).finished();
+ // Wait until browser fetch handlers and React updates have been rendered.
+ await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+ await expect(page.getByLabel('家具名称',{exact:true})).toHaveCount(0);
+ await expect(page.locator('.furniture-drafts button')).toHaveCount(0);
 });
 
 test('all twenty parameterized categories have exact bounds and compatible GLB output',async({page})=>{

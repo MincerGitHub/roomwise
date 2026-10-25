@@ -22,8 +22,8 @@ export type Candidate={id:string;scene:Scene;validation:Validation;score:number;
 export type VideoJob={status:string;progress:number;frames:{id:string;url:string;timestamp:number;sharpness:number}[];candidates:{trackId:string;label:string;category:string;confidence:number;frameUrl:string;bbox:number[]}[];detector?:string;limitations?:string[];error?:string};
 export const sourceNames={brought:'搬来的旧家具',existing:'房内已有',new:'新增示意'};
 export function clone<T>(obj:T):T{return structuredClone(obj)}
-export async function api<T>(path:string,body?:unknown):Promise<T>{
- const r=await fetch(`/api${path}`,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+export async function api<T>(path:string,body?:unknown,method?:'GET'|'POST'|'DELETE'):Promise<T>{
+ const r=await fetch(`/api${path}`,{method:method??(body===undefined?'GET':'POST'),...(body===undefined?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})});
  if(!r.ok){const raw=await r.text();let msg='';try{const j=JSON.parse(raw);msg=typeof j.detail==='string'?j.detail:Array.isArray(j.detail)?j.detail.map((x:{msg:string})=>x.msg).join('\uFF1B'):j.detail?.message||j.message||''}catch{}if(!msg)msg=raw.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,240);throw new Error(msg?`\u8bf7\u6c42\u5931\u8d25\uff08${r.status}\uff09\uff1a${msg}`:`\u8bf7\u6c42\u5931\u8d25\uff08${r.status}\uff09`)}return r.json();
 }
 export function downloadJSON(value:unknown,name:string){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}

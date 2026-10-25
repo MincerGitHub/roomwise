@@ -79,6 +79,20 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
  })}
  async function retry(){if(!draft)return;await guarded(async()=>{if(!consent)throw new Error('请重新勾选同意云端发送与计费');const result=await api<{jobId:string}>(`/furniture/drafts/${draft.id}/retry`,{consent:true});setJob(null);setJobId(result.jobId);setChecks({...initialChecks})})}
  async function editAsset(asset:FurnitureAsset){await guarded(async()=>{const value=await api<FurnitureDraft>(`/furniture/${asset.id}/edit`,{});openGeneration.current++;loadDraft(value);setJob(null);setJobId(null);await refresh()})}
+ async function deleteAsset(asset:FurnitureAsset){
+  if(!window.confirm(`从家具库删除“${asset.snapshot.label}”？已加入房间和已保存方案中的家具会保留。`))return;
+  await guarded(async()=>{
+   openGeneration.current++;
+   try{await api(`/furniture/${asset.id}?expectedVersion=${asset.version}`,undefined,'DELETE')}catch(error){await refresh().catch(()=>{});throw error}
+   if(alive.current){
+    setAssets(previous=>previous.filter(value=>value.id!==asset.id));
+    setDrafts(previous=>previous.filter(value=>value.editingAssetId!==asset.id&&value.publishedAssetId!==asset.id));
+    if(draft?.editingAssetId===asset.id||draft?.publishedAssetId===asset.id){setDraft(null);setProperties(null);setJob(null);setJobId(null);setDirty(false);setChecks({...initialChecks});pendingPublish.current=null}
+    setMessage(`已从家具库删除“${asset.snapshot.label}”。已加入房间和已保存方案中的家具仍保留。`);
+   }
+   await refresh();
+  });
+ }
  function selectFiles(selected:FileList|null){if(!selected)return;const values=Array.from(selected);if(values.length>3||values.some(file=>file.size>10*1024*1024||!(/\.(jpe?g|png|webp)$/i.test(file.name)))){setMessage('请选择 1—3 张 JPEG、PNG、WebP，每张不超过 10 MB。');return}setFiles(values);setMessage('')}
  return <div className="modal-backdrop furniture-backdrop"><section className="modal furniture-library" role="dialog" aria-modal="true" aria-labelledby="furniture-title">
   <div className="modal-heading"><div><span className="eyebrow">OWNED FURNITURE</span><h2 id="furniture-title">自有家具库 · 从图片添加</h2></div><button className="icon-btn" aria-label="关闭自有家具库" disabled={busy} onClick={()=>{if(dirty&&!window.confirm('有未保存的修改，确认关闭？原草稿仍保留。'))return;onClose()}}><X size={20}/></button></div>
@@ -113,7 +127,12 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
    <div className="furniture-confirmations">{(Object.keys(confirmationNames) as Confirmation[]).map(key=><label className="furniture-check" key={key}><input type="checkbox" checked={checks[key]} onChange={event=>setChecks(previous=>({...previous,[key]:event.target.checked}))}/>{confirmationNames[key]}</label>)}</div>
    <div className="furniture-actions"><button className="btn" onClick={saveDraft}>保存草稿</button>{!draft.editingAssetId&&<button className="btn" disabled={!consent} onClick={retry}>同意计费并重新识别</button>}<button className="btn primary" disabled={!allChecked||!preview||blocked||!properties.label?.trim()||!properties.frontDirection} onClick={publish}>确认并保存到家具库</button></div>
   </fieldset>}
-  <section className="furniture-saved"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">LIBRARY</span><h3>已确认家具 <span className="furniture-count">{assets.length}</span></h3></div><p>选择家具即可加入房间</p></div><div className="owned-furniture-grid">{assets.map(asset=><article key={asset.id} className="owned-furniture-card"><img src={asset.photoUrls[0]} alt={asset.snapshot.label}/><div className="owned-furniture-meta"><strong>{asset.snapshot.label}</strong><span>v{asset.version}</span></div><small>{asset.snapshot.width} × {asset.snapshot.depth} × {asset.snapshot.height} m</small><div className="furniture-actions"><button className="btn primary" aria-label="加入当前房间" disabled={busy||!!jobId} onClick={()=>onAdd(asset)}>加入房间</button><button className="btn" disabled={busy||!!jobId} onClick={()=>editAsset(asset)}>修改</button></div></article>)}</div>{!assets.length&&<p className="furniture-empty">保存后的家具会显示在这里</p>}</section>
+  <section className="furniture-saved"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">LIBRARY</span><h3>已确认家具 <span className="furniture-count">{assets.length}</span></h3></div><p>选择家具即可加入房间</p></div>
+   <div className="owned-furniture-grid">{assets.map(asset=><article key={asset.id} className="owned-furniture-card">
+    <img src={asset.photoUrls[0]} alt={asset.snapshot.label}/><div className="owned-furniture-meta"><strong>{asset.snapshot.label}</strong><span>v{asset.version}</span></div><small>{asset.snapshot.width} × {asset.snapshot.depth} × {asset.snapshot.height} m</small>
+    <div className="furniture-actions"><button className="btn primary" aria-label="加入当前房间" disabled={busy||!!jobId} onClick={()=>onAdd(asset)}>加入房间</button><button className="btn" disabled={busy||!!jobId} onClick={()=>editAsset(asset)}>修改</button><button className="btn furniture-delete" aria-label={`删除${asset.snapshot.label}`} disabled={busy||!!jobId} onClick={()=>deleteAsset(asset)}>删除</button></div>
+   </article>)}</div>{!assets.length&&<p className="furniture-empty">保存后的家具会显示在这里</p>}
+  </section>
   <section className="furniture-draft-section"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">DRAFTS</span><h3>待确认草稿 <span className="furniture-count">{drafts.length}</span></h3></div></div><div className="furniture-drafts">{drafts.map(value=><button className="btn" disabled={busy||!!jobId} key={value.id} onClick={()=>{if(dirty&&!window.confirm('放弃未保存修改并打开其他草稿？'))return;openDraft(value.id)}}>{value.properties.label||'未命名家具'} · {value.id.slice(0,8)}</button>)}</div></section>
  </section></div>;
 }

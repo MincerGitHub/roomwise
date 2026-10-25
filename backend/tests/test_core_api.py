@@ -28,7 +28,8 @@ def test_public_routes_schema_and_command_work():
     health = client.get("/health")
     assert health.status_code == 200
     assert health.json()["commandParser"] == "offline_restricted_chinese"
-    assert len(client.get("/catalog").json()["items"]) == 20
+    categories = {item["category"] for item in client.get("/catalog").json()["items"]}
+    assert len(categories) == 21 and "storage_box" in categories
     scene = client.get("/demo").json()
     assert client.post("/validate", json={"scene": scene}).status_code == 200
     edited = client.post("/command", json={"scene": scene, "text": "旧书桌向右移动20厘米"})

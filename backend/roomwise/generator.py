@@ -35,6 +35,7 @@ from .window_constraints import (
 )
 from .relative_constraints import evaluate_relative_position, relative_position_placements
 from .facing_constraints import facing_item_placements, evaluate_facing_preference
+from .supports import support_errors
 
 
 MAX_GENERATION_ITEMS = 32
@@ -776,7 +777,58 @@ def _fingerprint(scene):
     return tuple((i["id"], round(i["x"], 2), round(i["z"], 2), round(i.get("rotation", 0) % 360, 1)) for i in scene["items"])
 
 
+def _generate_supported_layouts(scene, mode, count, seed):
+    """Search floor furniture, then carry each box with its supporting surface."""
+    children = [item for item in scene["items"] if item.get("supportId")]
+    errors = support_errors(scene)
+    if errors:
+        return {"baseVersion": scene.get("version", 0), "candidates": [], "diagnostics": {"message": "请先修正箱子的台面承托关系。", "supportIssues": errors}}
+    child_ids = {item["id"] for item in children}
+    by_id = {item["id"]: item for item in scene["items"]}
+    base = deepcopy(scene)
+    base["items"] = [item for item in base["items"] if item["id"] not in child_ids]
+    for item in base["items"]:
+        if any(child.get("locked") and child["supportId"] == item["id"] for child in children):
+            item["locked"] = True
+    base["preferences"] = [pref for pref in base.get("preferences", []) if pref["itemId"] not in child_ids and pref.get("targetId") not in child_ids]
+    response = generate_layouts(base, mode, count, seed)
+    accepted = []
+    for candidate in response["candidates"]:
+        proposed = candidate["scene"]
+        parents = {item["id"]: item for item in proposed["items"]}
+        for item in parents.values():
+            item["locked"] = by_id[item["id"]].get("locked", False)
+        for original in children:
+            child = deepcopy(original)
+            before, after = by_id[child["supportId"]], parents[child["supportId"]]
+            if all(before.get(key, 0) == after.get(key, 0) for key in ("x", "z", "rotation")):
+                parents[child["id"]] = child
+                continue
+            angle, turn = math.radians(before.get("rotation", 0)), math.radians(after.get("rotation", 0))
+            dx, dz = child["x"] - before["x"], child["z"] - before["z"]
+            lx, lz = math.cos(angle) * dx - math.sin(angle) * dz, math.sin(angle) * dx + math.cos(angle) * dz
+            child.update(x=after["x"] + math.cos(turn) * lx + math.sin(turn) * lz,
+                         z=after["z"] - math.sin(turn) * lx + math.cos(turn) * lz,
+                         rotation=(child.get("rotation", 0) + after.get("rotation", 0) - before.get("rotation", 0)) % 360)
+            parents[child["id"]] = child
+        proposed["items"] = [parents[item["id"]] for item in scene["items"]]
+        proposed["preferences"] = deepcopy(scene.get("preferences", []))
+        assert_invariants(scene, proposed)
+        validation, requirements = validate_scene(proposed), evaluate_layout_requirements(proposed)
+        if not validation["valid"] or not requirements["satisfied"]:
+            continue
+        candidate.update(validation=validation, requirements=requirements,
+                         summary=f"保留全部 {len(scene['items'])} 件物品，收纳箱随承托家具一起移动；通过高度、台面和空间检查。")
+        accepted.append(candidate)
+    response["candidates"] = accepted
+    if not accepted:
+        response["diagnostics"]["message"] = "未找到同时满足台面承托、上方空间和布局要求的候选。"
+    return response
+
+
 def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
+    if len(scene["items"]) <= MAX_GENERATION_ITEMS and any(item.get("supportId") for item in scene["items"]):
+        return _generate_supported_layouts(scene, mode, count, seed)
     started = time.monotonic()
     rng = random.Random(seed)
     candidates = []

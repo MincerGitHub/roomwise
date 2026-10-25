@@ -11,6 +11,7 @@ import re
 from .catalog import suggest_items
 from .geometry import validate_scene
 from .schemas import Scene
+from .supports import reconcile_supports
 
 
 ALIASES = {
@@ -22,6 +23,7 @@ ALIASES = {
     "nightstand": ["床头柜"], "shelf": ["置物架"], "single_bed": ["单人床", "床"],
     "sofa": ["沙发"], "stool": ["凳子", "凳"], "table": ["餐桌", "桌子"],
     "tv_stand": ["电视柜"], "wardrobe": ["衣柜"], "rug": ["地毯"],
+    "storage_box": ["收纳箱", "箱子", "纸箱"],
 }
 
 
@@ -579,6 +581,10 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
         handled = True
     if not handled:
         return _reply(scene, "unsupported", "没有识别到支持的操作。")
+    try:
+        reconcile_supports(result, scene)
+    except ValueError as error:
+        return _reply(scene, "clarify", str(error))
     try:
         Scene.model_validate(result)
     except ValueError:

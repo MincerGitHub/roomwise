@@ -91,7 +91,7 @@ test('deleting furniture ignores a late reply when opening its revision',async({
  await expect(page.locator('.furniture-drafts button')).toHaveCount(0);
 });
 
-test('all twenty parameterized categories have exact bounds and compatible GLB output',async({page})=>{
+test('all parameterized categories including storage boxes have exact bounds and compatible GLB output',async({page})=>{
  await page.goto('/');
  const results=await page.evaluate(async()=>{
   const mesh=await import('/src/furnitureMesh.ts' as string);
@@ -110,7 +110,7 @@ test('all twenty parameterized categories have exact bounds and compatible GLB o
   }
   return results;
  });
- expect(results).toHaveLength(20);
+ expect(results).toHaveLength(21);expect(results.some(value=>value.category==='storage_box')).toBe(true);
  for(const result of results){expect(result.error,result.category).toBeLessThan(.00001);expect(result.rootScale).toEqual([1,1,1]);expect(result.magic).toBe(0x46546c67);expect(result.version).toBe(2);expect(result.hasInstanceId,result.category).toBe(false)}
 });
 

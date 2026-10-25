@@ -24,6 +24,7 @@ CATALOG = [
     {"category": "dressing_chair", "label": "梳妆椅", "width": .4, "depth": .4, "height": .75},
     {"category": "children_cabinet", "label": "儿童柜", "width": .7, "depth": .4, "height": 1.2},
     {"category": "rug", "label": "地毯", "width": 1.8, "depth": 1.3, "height": .02},
+    {"category": "storage_box", "label": "收纳箱", "width": .4, "depth": .3, "height": .3},
 ]
 
 

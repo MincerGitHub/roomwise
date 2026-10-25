@@ -13,6 +13,7 @@ import numpy as np
 from shapely.affinity import rotate, translate
 from shapely.geometry import Point, Polygon, box
 from shapely.ops import unary_union
+from .supports import elevation, separated_vertically, support_errors, top
 
 
 SEAT_CATEGORIES = {"chair", "dressing_chair", "stool"}
@@ -94,7 +95,7 @@ def cabinet_door_clearance_zone(item: dict) -> Polygon | None:
 
 def cabinet_door_clearance_conflicts(item: dict, other: dict) -> bool:
     """Whether ``other`` occupies the door use zone of ``item``."""
-    if item.get("id") == other.get("id") or other.get("category") == "rug":
+    if item.get("id") == other.get("id") or other.get("category") == "rug" or elevation(other) >= top(item) - EPSILON:
         return False
     clearance = cabinet_door_clearance_zone(item)
     return clearance is not None and clearance.intersection(footprint(other)).area > EPSILON
@@ -130,6 +131,8 @@ def overlap_kind(a: dict, b: dict, area: float) -> str:
     """
     if a["category"] == "rug" or b["category"] == "rug":
         return "floor_layer"
+    if separated_vertically(a, b):
+        return "vertical_layer"
     if a["category"] in SEAT_CATEGORIES and b["category"] in TABLE_CATEGORIES:
         seat, table = a, b
     elif b["category"] in SEAT_CATEGORIES and a["category"] in TABLE_CATEGORIES:
@@ -147,7 +150,7 @@ def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0)
     fp = footprint(item)
     if not room_polygon(room).buffer(EPSILON).covers(fp):
         return True
-    if item.get("height", 0) > room["height"] + EPSILON:
+    if top(item) > room["height"] + EPSILON:
         return True
     zone = door_zone(room)
     if zone is not None and item["category"] != "rug" and fp.intersection(zone).area > EPSILON:
@@ -157,7 +160,7 @@ def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0)
         inter = fp.intersection(other_fp).area
         if inter > EPSILON and overlap_kind(item, other, inter) == "collision":
             return True
-        if gap and item["category"] != "rug" and other["category"] != "rug" and inter <= EPSILON and fp.distance(other_fp) < gap:
+        if gap and not separated_vertically(item, other) and item["category"] != "rug" and other["category"] != "rug" and inter <= EPSILON and fp.distance(other_fp) < gap:
             return True
         if cabinet_door_clearance_conflicts(item, other) or cabinet_door_clearance_conflicts(other, item):
             return True
@@ -175,7 +178,7 @@ def accessibility(scene: dict, step: float = .18, radius: float = .15):
     if not door:
         return {"evaluated": False, "reachable": None, "unreachableItemIds": [], "gridStep": step, "walkingDiameter": 2 * radius, "reason": "未设置门，无法检查入口可达性"}
     shell = room_polygon(room).buffer(-radius)
-    solids = [footprint(i).buffer(radius, join_style=2) for i in scene["items"] if i["category"] != "rug"]
+    solids = [footprint(i).buffer(radius, join_style=2) for i in scene["items"] if i["category"] != "rug" and not i.get("supportId")]
     obstacle = unary_union(solids) if solids else Polygon()
     space = shell.difference(obstacle)
     minx, minz, maxx, maxz = room_polygon(room).bounds
@@ -224,7 +227,7 @@ def validate_scene(scene: dict, check_access: bool = True):
     room = scene["room"]
     shell = room_polygon(room)
     items = scene["items"]
-    issues = []
+    issues = support_errors(scene)
     polygons = {i["id"]: footprint(i) for i in items}
     collisions = out = door_count = cabinet_door_count = 0
     zone = door_zone(room)
@@ -233,7 +236,7 @@ def validate_scene(scene: dict, check_access: bool = True):
         if not shell.buffer(EPSILON).covers(fp):
             out += 1
             issues.append({"type": "out_of_bounds", "severity": "error", "itemIds": [item["id"]], "message": f"{item['label']}超出房间轮廓"})
-        if item["height"] > room["height"] + EPSILON:
+        if top(item) > room["height"] + EPSILON:
             issues.append({"type": "height", "severity": "error", "itemIds": [item["id"]], "message": f"{item['label']}高度超过层高"})
         if zone is not None and item["category"] != "rug" and fp.intersection(zone).area > EPSILON:
             door_count += 1
@@ -244,7 +247,7 @@ def validate_scene(scene: dict, check_access: bool = True):
             if area <= EPSILON:
                 continue
             kind = overlap_kind(a, b, area)
-            if kind == "floor_layer":
+            if kind in {"floor_layer", "vertical_layer"}:
                 continue
             if kind == "seat_tuck":
                 issues.append({"type": "seat_tuck", "severity": "info", "itemIds": [a["id"], b["id"]], "message": f"{a['label']}与{b['label']}有局部桌椅交叠，须确认实际高度及使用空间"})
@@ -273,7 +276,7 @@ def validate_scene(scene: dict, check_access: bool = True):
         "valid": not any(i["severity"] == "error" for i in issues),
         "issues": issues,
         "metrics": {"collisions": collisions, "outOfBounds": out, "doorConflicts": door_count, "cabinetDoorConflicts": cabinet_door_count, "reachable": access.get("reachable"), "checkedItems": len(items), "roomArea": round(shell.area, 3), "freeArea": round(free_area, 3), "accessibility": access},
-        "limitations": ["以确认后的二维占地和高度检查，未使用精细家具网格", f"带门柜体正面保留 {CABINET_DOOR_CLEARANCE:.2f} 米使用区，未模拟单扇柜门的精细转动轨迹", "局部桌椅交叠与地毯按类别例外处理", "通行检查为工程近似，不能代表建筑规范验收"],
+        "limitations": ["以确认后的矩形占地、离地高度和承托关系检查，未使用精细家具网格", f"带门柜体正面保留 {CABINET_DOOR_CLEARANCE:.2f} 米使用区，未模拟单扇柜门的精细转动轨迹", "台面承托按类别与完整占地检查，未推断实际材质承重", "局部桌椅交叠与地毯按类别例外处理", "通行检查为工程近似，不能代表建筑规范验收"],
     }
 
 

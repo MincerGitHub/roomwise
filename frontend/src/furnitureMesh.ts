@@ -58,6 +58,10 @@ export function createFurniture(item:Item,parameters?:FurnitureParameters):THREE
   for(const side of [-1,1])part(width*.045,height,depth,side*width*.4775,height/2,0);
   const shelves=params.shelfCount??4;
   for(let index=0;index<shelves;index++)part(width,height*.025,depth,0,(index+.5)*height/shelves,0);
+ }else if(category==='storage_box'){
+  part(width,height*.95,depth,0,height*.475,0);
+  part(width,height*.05,depth,0,height*.975,0,secondary);
+  part(width*.14,height*.012,depth,0,height*.998,0,secondary);
  }else if(category==='rug'){
   part(width,height,depth,0,height/2,0);
  }else{
@@ -115,6 +119,11 @@ function legacyFurniture(it:Item):THREE.Group{
   if(it.category==='armchair')for(const x of [-1,1])box(g,.10,h*.36,d,x*(w/2-.05),h*.47,0,colors.cream);
  }else if(it.category==='sofa'){
   box(g,w,.13,d,0,.09,0,colors.wood);box(g,w*.84,h*.38,d*.79,0,h*.32,d*.07,colors.sage);box(g,w,h*.66,.16,0,h*.62,-d/2+.08,colors.sage);for(const x of [-1,1])box(g,.14,h*.62,d,x*(w/2-.07),h*.47,0,colors.sage);
+ }else if(it.category==='storage_box'){
+  box(g,w,h*.95,d,0,h*.475,0,0xbc9568);
+  box(g,w,h*.05,d,0,h*.975,0,0xd7b88d);
+  box(g,w*.14,h*.004,d,0,h*.998,0,0xe6d3a8);
+  for(const side of [-1,1])box(g,w*.24,h*.09,d*.006,0,h*.66,side*d*.498,0x806346);
  }else if(it.category==='rug'){
   box(g,w,.012,d,0,.012,0,0xdacabd);for(let n=0;n<4;n++)box(g,w*.9,.003,.018,0,.022,(n-1.5)*d*.18,0xc7b5a3);
  }else if(['bookshelf','shelf'].includes(it.category)){

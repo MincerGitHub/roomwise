@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 CATEGORIES = (
     "armchair", "bookshelf", "cabinet", "chair", "children_cabinet", "coffee_table",
     "desk", "double_bed", "dressing_chair", "dressing_table", "kids_bed", "nightstand",
-    "shelf", "single_bed", "sofa", "stool", "table", "tv_stand", "wardrobe", "rug",
+    "shelf", "single_bed", "sofa", "stool", "table", "tv_stand", "wardrobe", "rug", "storage_box",
 )
 
 
@@ -138,6 +138,8 @@ class Item(DataModel):
     height: float = Field(gt=0.01, le=10)
     x: float = Field(default=0, ge=-100, le=200)
     z: float = Field(default=0, ge=-100, le=200)
+    y: float = Field(default=0, ge=0, le=20, exclude_if=lambda value: value == 0)
+    supportId: str | None = Field(default=None, min_length=1, max_length=100, exclude_if=lambda value: value is None)
     rotation: float = Field(default=0, ge=-36000, le=36000)
     locked: bool = False
     keep: bool = True

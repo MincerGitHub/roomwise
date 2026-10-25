@@ -4,7 +4,10 @@ import pytest
 from pydantic import ValidationError
 
 from roomwise.catalog import demo_scene
-from roomwise.geometry import assert_invariants, footprint, layout_quality, validate_scene
+from roomwise.geometry import (
+    assert_invariants, cabinet_door_clearance_conflicts, cabinet_door_clearance_zone,
+    footprint, layout_quality, placement_errors, validate_scene,
+)
 from roomwise.schemas import Scene
 
 
@@ -51,6 +54,52 @@ def test_accessibility_blocked_by_full_width_furniture():
     result = validate_scene(scene_with([barrier, bed]))
     assert result["metrics"]["reachable"] is False
     assert "bed" in result["metrics"]["accessibility"]["unreachableItemIds"]
+
+
+@pytest.mark.parametrize("rotation,point", [
+    (0, (2.5, 2.7)), (90, (3.2, 2.)),
+    (180, (2.5, 1.3)), (270, (1.8, 2.)),
+])
+def test_cabinet_door_clearance_zone_follows_front_rotation(rotation, point):
+    wardrobe = item(id="wardrobe", category="wardrobe", width=2., depth=.6, height=2.1,
+                     x=2.5, z=2., rotation=rotation)
+
+    zone = cabinet_door_clearance_zone(wardrobe)
+
+    assert zone is not None
+    assert zone.covers(__import__("shapely").geometry.Point(*point))
+
+
+def test_cabinet_door_clearance_rejects_a_blocking_nightstand_but_allows_side_neighbour():
+    wardrobe = item(id="wardrobe", label="衣柜", category="wardrobe", width=1.8, depth=.6, height=2.1,
+                     x=2.5, z=3.7, rotation=180.)
+    blocking = item(id="blocking-stand", label="床头柜", category="nightstand", width=.5, depth=.45,
+                    x=2.5, z=3.1)
+    side = item(id="side-stand", label="侧边床头柜", category="nightstand", width=.5, depth=.45,
+                x=3.75, z=3.1)
+
+    validation = validate_scene(scene_with([wardrobe, blocking]))
+
+    assert cabinet_door_clearance_conflicts(wardrobe, blocking)
+    assert placement_errors(blocking, scene_with([wardrobe])["room"], [wardrobe])
+    assert validation["valid"] is False
+    assert validation["metrics"]["cabinetDoorConflicts"] == 1
+    issue = next(issue for issue in validation["issues"] if issue["type"] == "cabinet_door_clearance")
+    assert issue["itemIds"] == ["blocking-stand", "wardrobe"]
+    assert "柜门前 0.70 米使用区" in issue["message"]
+    assert cabinet_door_clearance_conflicts(wardrobe, side) is False
+    assert placement_errors(side, scene_with([wardrobe])["room"], [wardrobe]) is False
+    assert validate_scene(scene_with([wardrobe, side]))["valid"] is True
+
+
+def test_confirmed_door_count_controls_custom_furniture_clearance():
+    cabinet = item(id="custom", category="desk", width=1.2, depth=.5, x=2.5, z=2.,
+                   furnitureSnapshot={"frontDirection": "positive_z", "parameters": {"doorCount": 2}})
+    blocker = item(id="blocker", category="nightstand", width=.4, depth=.4, x=2.5, z=2.6)
+
+    assert cabinet_door_clearance_conflicts(cabinet, blocker)
+    cabinet["furnitureSnapshot"]["parameters"]["doorCount"] = 0
+    assert cabinet_door_clearance_conflicts(cabinet, blocker) is False
 
 
 def test_invariants_reject_resize_drop_metadata_and_locks():

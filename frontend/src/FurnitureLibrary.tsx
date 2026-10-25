@@ -31,21 +31,24 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
  async function refresh(){const listing=await api<{assets:FurnitureAsset[];drafts:FurnitureDraft[]}>('/furniture');if(alive.current){setAssets(listing.assets);setDrafts(listing.drafts)}}
  useEffect(()=>{refresh().catch(error=>setMessage(String(error)));api<{enabled:boolean;message:string}>('/furniture/status').then(setStatus).catch(error=>setMessage(String(error)))},[]);
  useEffect(()=>{if(initialDraftId)openDraft(initialDraftId)},[initialDraftId]);
- function loadDraft(value:FurnitureDraft){setDraft(value);setProperties(completeFurnitureProperties(value.properties,catalog));setStyleText(value.properties.styleTags.join(','));setDirty(false);requestId.current=crypto.randomUUID();pendingPublish.current=null}
+ function loadDraft(value:FurnitureDraft){setDraft(value);setProperties(clone(value.properties));setStyleText(value.properties.styleTags.join(','));setChecks({...initialChecks});setDirty(false);requestId.current=crypto.randomUUID();pendingPublish.current=null}
+ function clearEditor(){setDraft(null);setProperties(null);setJob(null);setJobId(null);setDirty(false);setStyleText('');setChecks({...initialChecks});pendingPublish.current=null;requestId.current=crypto.randomUUID()}
  async function openDraft(identifier:string){
   if(inFlight.current)return;const generation=++openGeneration.current;setJobId(null);
-  try{const value=await api<FurnitureDraft>(`/furniture/drafts/${identifier}`);if(!alive.current||generation!==openGeneration.current)return;loadDraft(value);setMessage('');setJob(null);if(value.jobId)setJobId(value.jobId);else setJobId(null)}catch(error){setMessage(String(error))}
+  try{const value=await api<FurnitureDraft>(`/furniture/drafts/${identifier}`);if(!alive.current||generation!==openGeneration.current)return;loadDraft(value);setMessage('');setJob(null);if(value.jobId)setJobId(value.jobId);else setJobId(null)}catch(error){if(alive.current&&generation===openGeneration.current)setMessage(String(error))}
  }
  useEffect(()=>{
-  if(!jobId)return;let cancelled=false,timer:ReturnType<typeof setTimeout>;
+  if(!jobId||busy)return;let cancelled=false,timer:ReturnType<typeof setTimeout>;const generation=openGeneration.current;
+  const stale=()=>cancelled||!alive.current||generation!==openGeneration.current;
   const poll=async()=>{
-   try{const result=await api<FurnitureJob>(`/furniture/jobs/${jobId}`);if(cancelled||!alive.current)return;setJob(result);
+   try{const result=await api<FurnitureJob>(`/furniture/jobs/${jobId}`);if(stale())return;setJob(result);
+    if(result.errorCode==='draft_deleted'){clearEditor();setMessage('草稿已删除。');refresh().catch(()=>{});return}
     if(result.status==='complete'||result.status==='failed'){
-     const value=await api<FurnitureDraft>(`/furniture/drafts/${result.draftId}`);if(cancelled||!alive.current)return;loadDraft(value);setJobId(null);if(result.error)setMessage(result.error);refresh().catch(()=>{});
+     const value=await api<FurnitureDraft>(`/furniture/drafts/${result.draftId}`);if(stale())return;loadDraft(value);setJobId(null);if(result.error)setMessage(result.error);refresh().catch(()=>{});
     }else timer=setTimeout(poll,1200);
-   }catch(error){if(!cancelled&&alive.current){setMessage(`状态查询失败，草稿仍保留。${String(error)}`);timer=setTimeout(poll,3000)}}
+   }catch(error){if(!stale()){setMessage(`状态查询失败，草稿仍保留。${String(error)}`);timer=setTimeout(poll,3000)}}
   };poll();return()=>{cancelled=true;clearTimeout(timer)};
- },[jobId]);
+ },[jobId,busy]);
  function update(patch:Partial<FurnitureProperties>){
   if(!properties)return;let next={...properties,...patch,dimensionSources:{...properties.dimensionSources}};
   for(const key of ['width','depth','height'] as const){
@@ -85,6 +88,31 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
  })}
  async function retry(){if(!draft)return;await guarded(async()=>{if(!consent)throw new Error('请重新勾选同意云端发送与计费');const result=await api<{jobId:string}>(`/furniture/drafts/${draft.id}/retry`,{consent:true});setJob(null);setJobId(result.jobId)})}
  async function editAsset(asset:FurnitureAsset){await guarded(async()=>{const value=await api<FurnitureDraft>(`/furniture/${asset.id}/edit`,{});openGeneration.current++;loadDraft(value);setJob(null);setJobId(null);await refresh()})}
+ async function deleteAsset(asset:FurnitureAsset){
+  if(!window.confirm(`从家具库删除“${asset.snapshot.label}”？已加入房间和已保存方案中的家具会保留。`))return;
+  await guarded(async()=>{
+   openGeneration.current++;
+   try{await api(`/furniture/${asset.id}?expectedVersion=${asset.version}`,undefined,'DELETE')}catch(error){await refresh().catch(()=>{});throw error}
+   if(alive.current){
+    setAssets(previous=>previous.filter(value=>value.id!==asset.id));
+    setDrafts(previous=>previous.filter(value=>value.editingAssetId!==asset.id&&value.publishedAssetId!==asset.id));
+    if(draft?.editingAssetId===asset.id||draft?.publishedAssetId===asset.id){setDraft(null);setProperties(null);setJob(null);setJobId(null);setDirty(false);setChecks({...initialChecks});pendingPublish.current=null}
+    setMessage(`已从家具库删除“${asset.snapshot.label}”。已加入房间和已保存方案中的家具仍保留。`);
+   }
+   await refresh();
+  });
+ }
+ async function deleteDraft(value:FurnitureDraft){
+  const name=value.properties.label||'未命名家具';
+  if(!window.confirm(`删除草稿“${name} · ${value.id.slice(0,8)}”？该草稿中的未保存修改也会丢弃，已确认家具会保留。`))return;
+  await guarded(async()=>{
+   // Invalidate pending draft loads and job replies before sending the deletion.
+   openGeneration.current++;
+   try{await api(`/furniture/drafts/${value.id}?expectedVersion=${value.version}`,undefined,'DELETE')}catch(error){await refresh().catch(()=>{});throw error}
+   if(alive.current){setDrafts(previous=>previous.filter(entry=>entry.id!==value.id));if(draft?.id===value.id)clearEditor();setMessage(`草稿“${name}”已删除。`)}
+   await refresh();
+  });
+ }
  function selectFiles(selected:FileList|null){if(!selected)return;const values=Array.from(selected);if(values.length>3||values.some(file=>file.size>10*1024*1024||!(/\.(jpe?g|png|webp)$/i.test(file.name)))){setMessage('请选择 1—3 张 JPEG、PNG、WebP，每张不超过 10 MB。');return}setFiles(values);setMessage('')}
  return <div className="modal-backdrop furniture-backdrop"><section className="modal furniture-library" role="dialog" aria-modal="true" aria-labelledby="furniture-title">
   <div className="modal-heading"><div><span className="eyebrow">OWNED FURNITURE</span><h2 id="furniture-title">自有家具库 · 从图片添加</h2></div><button className="icon-btn" aria-label="关闭自有家具库" disabled={busy} onClick={()=>{if(dirty&&!window.confirm('有未保存的修改，确认关闭？原草稿仍保留。'))return;onClose()}}><X size={20}/></button></div>
@@ -117,7 +145,17 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
    })}</div>
    <div className="furniture-actions"><button className="btn" onClick={saveDraft}>保存草稿</button>{!draft.editingAssetId&&<button className="btn" disabled={!consent} onClick={retry}>同意计费并重新识别</button>}<button className="btn primary" disabled={!preview} onClick={publish}>确认并保存到家具库</button></div>
   </fieldset>}
-  <section className="furniture-saved"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">LIBRARY</span><h3>已确认家具 <span className="furniture-count">{assets.length}</span></h3></div><p>选择家具即可加入房间</p></div><div className="owned-furniture-grid">{assets.map(asset=><article key={asset.id} className="owned-furniture-card"><img src={asset.photoUrls[0]} alt={asset.snapshot.label}/><div className="owned-furniture-meta"><strong>{asset.snapshot.label}</strong><span>v{asset.version}</span></div><small>{asset.snapshot.width} × {asset.snapshot.depth} × {asset.snapshot.height} m</small><div className="furniture-actions"><button className="btn primary" aria-label="加入当前房间" disabled={busy||!!jobId} onClick={()=>onAdd(asset)}>加入房间</button><button className="btn" disabled={busy||!!jobId} onClick={()=>editAsset(asset)}>修改</button></div></article>)}</div>{!assets.length&&<p className="furniture-empty">保存后的家具会显示在这里</p>}</section>
-  <section className="furniture-draft-section"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">DRAFTS</span><h3>待确认草稿 <span className="furniture-count">{drafts.length}</span></h3></div></div><div className="furniture-drafts">{drafts.map(value=><button className="btn" disabled={busy||!!jobId} key={value.id} onClick={()=>{if(dirty&&!window.confirm('放弃未保存修改并打开其他草稿？'))return;openDraft(value.id)}}>{value.properties.label||'未命名家具'} · {value.id.slice(0,8)}</button>)}</div></section>
+  <section className="furniture-saved"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">LIBRARY</span><h3>已确认家具 <span className="furniture-count">{assets.length}</span></h3></div><p>选择家具即可加入房间</p></div>
+   <div className="owned-furniture-grid">{assets.map(asset=><article key={asset.id} className="owned-furniture-card">
+    <img src={asset.photoUrls[0]} alt={asset.snapshot.label}/><div className="owned-furniture-meta"><strong>{asset.snapshot.label}</strong><span>v{asset.version}</span></div><small>{asset.snapshot.width} × {asset.snapshot.depth} × {asset.snapshot.height} m</small>
+    <div className="furniture-actions"><button className="btn primary" aria-label="加入当前房间" disabled={busy||!!jobId} onClick={()=>onAdd(asset)}>加入房间</button><button className="btn" disabled={busy||!!jobId} onClick={()=>editAsset(asset)}>修改</button><button className="btn furniture-delete" aria-label={`删除${asset.snapshot.label}`} disabled={busy||!!jobId} onClick={()=>deleteAsset(asset)}>删除</button></div>
+   </article>)}</div>{!assets.length&&<p className="furniture-empty">保存后的家具会显示在这里</p>}
+  </section>
+  <section className="furniture-draft-section"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">DRAFTS</span><h3>待确认草稿 <span className="furniture-count">{drafts.length}</span></h3></div></div>
+   <div className="furniture-drafts">{drafts.map(value=><div className="furniture-draft" key={value.id}>
+    <button className="btn furniture-draft-open" disabled={busy||!!jobId} onClick={()=>{if(dirty&&!window.confirm('放弃未保存修改并打开其他草稿？'))return;openDraft(value.id)}}>{value.properties.label||'未命名家具'} · {value.id.slice(0,8)}</button>
+    <button className="btn furniture-delete" aria-label={`删除草稿${value.properties.label||'未命名家具'} · ${value.id.slice(0,8)}`} disabled={busy||!!jobId&&draft?.id!==value.id} onClick={()=>deleteDraft(draft?.id===value.id?draft:value)}>删除</button>
+   </div>)}</div>
+  </section>
  </section></div>;
 }

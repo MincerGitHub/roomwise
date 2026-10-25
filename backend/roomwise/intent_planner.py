@@ -24,7 +24,7 @@ APP_ROOT = Path(__file__).resolve().parents[2]
 LANGUAGE_ENV_KEYS = {"PROVIDER", "MODEL", "URL", "API_KEY", "RESPONSE_FORMAT"}
 OPERATION_NAMES = Literal[
     "near_wall", "near_window", "face_window", "min_move", "lock", "unlock",
-    "keep", "rotate", "move", "generate", "only_adjust", "undo", "bedside", "vanity_seating",
+    "keep", "rotate", "move", "generate", "only_adjust", "undo", "bedside", "vanity_seating", "relative_position", "face_item",
 ]
 
 
@@ -35,6 +35,7 @@ class IntentOperation(BaseModel):
     targetId: str | None = Field(default=None, max_length=100)
     wall: Literal["nearest", "north", "south", "west", "east"] | None = None
     side: Literal["left", "right", "either"] | None = None
+    direction: Literal["front", "back", "left", "right"] | None = None
     # Preference strength only. False means "尽量"; geometry still decides feasibility.
     required: bool | None = None
     # rotate is RELATIVE degrees; move is RELATIVE metres in room axes (+x right, +z back).
@@ -59,13 +60,17 @@ only_adjust只调整itemIds中的家具并锁定其余家具(不自行解锁)，
 bedside床头柜放床头边：itemIds必须是nightstand类别，targetId必须是真实的床家具ID
 (double_bed/single_bed/kids_bed)，side='left'左侧/'right'右侧/'either'任意侧。
 vanity_seating梳妆椅摆在梳妆镜/梳妆台前：itemIds必须是现有椅子类别，targetId必须是真实的dressing_table家具ID；椅子应面朝桌面。
+face_item让一件家具的正面朝向另一件现有家具：itemIds恰好一个，targetId必须是另一件实体家具ID；若目标未锁定，可先为它搜索可用摆位，再保持该候选中的目标位置并调整主体朝向。按家具声明的正面方向计算，与相机无关。
+relative_position把一件现有实体家具放在另一件实体家具前后左右：itemIds恰好一个，targetId必须是另一件现有实体家具ID，不支持地毯。
+direction必须是front前/back后/left左/right右，随目标家具的旋转变化，不随相机变化。普通家具前方是自身+z；床的前方是床头端(-z)，后方是床尾端(+z)。relative_position 的参照家具固定在指令输入的位置和朝向，不移动参照来满足关系。face_item 的目标若未锁定，可先为它搜索符合碰撞和柜门净空的可用位置，再固定该候选中的目标位置并调整主体朝向；目标若已锁定则保持原位。
+床头柜对床头或梳妆椅对梳妆台的专用关系继续使用bedside和vanity_seating。
 床头左右按站在床尾看向床头判断，不随相机变化。没有床或多床未指明目标时clarify。
 不要返回家具新坐标，不增删家具，不改变尺寸、颜色或材质。软装风格、朝向其他家具、成套换新、
 未支持的关系不能冒充执行；有任何无法表达的要求时整次clarify或unsupported且operations=[]。
 itemIds必须是scene中真实ID。单数类别有多件且未明确选择时clarify。用户说这个/它时可以参考selectedId。
-targetId用于near_window/face_window时必须是真实窗户ID，用于bedside时必须是真实床ID，用于vanity_seating时必须是真实梳妆台ID；
-多窗或多床未指定时clarify。wall只用于near_wall；side只用于bedside。
-required只用于near_wall/near_window/face_window/bedside/vanity_seating：明确要求为true，尽量/最好/优先为false。
+targetId用于near_window/face_window时必须是真实窗户ID，用于bedside时必须是真实床ID，用于vanity_seating时必须是真实梳妆台ID，用于relative_position/face_item时必须是另一件真实实体家具ID；
+多窗或多床未指定时clarify。wall只用于near_wall；side只用于bedside；direction只用于relative_position。
+required只用于near_wall/near_window/face_window/bedside/vanity_seating/relative_position/face_item：明确要求为true，尽量/最好/优先为false。
 无关字段用null。generate/undo的itemIds为空，其他操作itemIds至少一个。undo不能与其他操作混用。
 不能把否定要求翻译为肯定要求。only_adjust应在位置偏好操作之前，且不能包含已锁定家具。
 锁定家具只有用户明确同意解锁时才能加入unlock，且unlock必须在移动/旋转/靠墙/靠窗之前。
@@ -77,6 +82,8 @@ keep只表示保留这件家具的身份，不限制其位置。“保持原位�
 move的+x是房间右方，+z是房间后方，方向与相机无关；只说左一点但没有距离应clarify。
 多个子句必须完整解释；不要只执行支持的一半。布局偏好不证明空间可行，后续几何检查负责。
 例如“把书架贴到墙边去”对应near_wall，"桌子采光好一点"可解释为软near_window。
+“把床放在衣柜前面”是relative_position+direction=front，床为待摆家具、衣柜为固定参照；
+“把书桌放在床的右侧”是relative_position+direction=right，书桌为待摆家具、床为固定参照。
 “床头柜放床头的右侧”是bedside+side=right，只有一张床时可引用它；
 “把床头柜挪到床头左边”是bedside+side=left；“床头柜靠着床头”是bedside+side=either。
 用户要求无法确定时用简短中文message提问。你不具备未列出的执行能力。
@@ -200,7 +207,7 @@ def _scene_payload(scene, selected_id):
         "items": [{key: item[key] for key in (
             "id", "label", "category", "width", "depth", "height", "x", "z", "rotation", "locked", "keep",
         ) if key in item} for item in scene["items"]],
-        "preferences": [{key: preference[key] for key in ("kind", "itemId", "targetId", "wall", "side", "required") if key in preference}
+        "preferences": [{key: preference[key] for key in ("kind", "itemId", "targetId", "wall", "side", "direction", "required") if key in preference}
                         for preference in scene.get("preferences", [])],
         "selectedId": selected_id,
     }
@@ -302,13 +309,31 @@ def validate_plan_against_scene(plan: IntentPlan | dict, scene: dict):
                 raise ValueError("请明确椅子对应哪一张真实的梳妆台。")
             if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", op.targetId):
                 raise ValueError("梳妆台 ID 暂不能安全转换为文字指令。")
+        elif op.name == "face_item":
+            if len(op.itemIds) != 1 or items[op.itemIds[0]]["category"] == "rug":
+                raise ValueError("家具朝向只支持一件现有实体家具。")
+            if not op.targetId or op.targetId not in items or op.targetId in op.itemIds or items[op.targetId]["category"] == "rug":
+                raise ValueError("家具朝向需要另一件现有实体家具作为目标。")
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", op.targetId):
+                raise ValueError("目标家具 ID 暂不能安全转换为文字指令。")
+        elif op.name == "relative_position":
+            if len(op.itemIds) != 1 or items[op.itemIds[0]]["category"] == "rug":
+                raise ValueError("相对位置只支持一件现有实体家具。")
+            if not op.targetId or op.targetId not in items or op.targetId in op.itemIds:
+                raise ValueError("相对位置需要另一件现有家具作为参照。")
+            if items[op.targetId]["category"] == "rug" or op.direction not in ("front", "back", "left", "right"):
+                raise ValueError("相对位置参照必须是实体家具，并指定前后左右方向。")
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", op.targetId):
+                raise ValueError("参照家具 ID 暂不能安全转换为文字指令。")
         elif op.targetId is not None:
             raise ValueError("该操作不接受窗户目标。")
         if op.name != "near_wall" and op.wall is not None:
             raise ValueError("墙面只能用于靠墙操作。")
         if op.name != "bedside" and op.side is not None:
             raise ValueError("左右侧只能用于床头柜关系。")
-        if op.name not in ("near_wall", "near_window", "face_window", "bedside", "vanity_seating") and op.required is not None:
+        if op.name not in ("relative_position", "face_item") and op.direction is not None:
+            raise ValueError("direction 只能用于相对家具位置。")
+        if op.name not in ("near_wall", "near_window", "face_window", "bedside", "vanity_seating", "relative_position", "face_item") and op.required is not None:
             raise ValueError("该操作不接受布局偏好强度。")
         if op.name == "rotate":
             if op.angle is None or op.dx is not None or op.dz is not None:
@@ -331,11 +356,11 @@ def validate_plan_against_scene(plan: IntentPlan | dict, scene: dict):
                 locked[item_id] = False
             elif op.name == "lock":
                 locked[item_id] = True
-            elif op.name in ("near_wall", "near_window", "face_window", "bedside", "vanity_seating", "move", "rotate") and locked[item_id]:
+            elif op.name in ("near_wall", "near_window", "face_window", "face_item", "bedside", "vanity_seating", "relative_position", "move", "rotate") and locked[item_id]:
                 raise ValueError("涉及的家具已锁定；请明确解锁后再调整。")
-            if op.name in ("near_wall", "near_window", "face_window", "bedside", "vanity_seating"):
+            if op.name in ("near_wall", "near_window", "face_window", "face_item", "bedside", "vanity_seating", "relative_position"):
                 identity = (op.name, item_id)
-                target = (op.targetId, op.wall or "nearest", op.required is not False, op.side)
+                target = (op.targetId, op.wall or "nearest", op.required is not False, op.side, op.direction)
                 if identity in seen_preferences and seen_preferences[identity] != target:
                     raise ValueError("同一家具收到相互冲突的布局要求，请明确一个目标。")
                 seen_preferences[identity] = target
@@ -454,6 +479,11 @@ def compile_plan(plan: IntentPlan | dict, scene: dict):
                 clauses.append(f"{item_id}{prefix}放在{op.targetId}床头{side}")
             elif op.name == "vanity_seating":
                 clauses.append(f"{item_id}{prefix}放在{op.targetId}前")
+            elif op.name == "face_item":
+                clauses.append(f"{item_id}朝向{op.targetId}")
+            elif op.name == "relative_position":
+                relation = {"front": "前方", "back": "后方", "left": "左边", "right": "右边"}[op.direction]
+                clauses.append(f"{item_id}{prefix}放在{op.targetId}{relation}")
             elif op.name == "min_move":
                 clauses.append(f"{item_id}尽量少移动")
             elif op.name in ("lock", "unlock", "keep"):
@@ -485,8 +515,10 @@ def _position_lock_guard(plan: IntentPlan, text: str, scene: dict, selected_id):
     for op in plan.operations:
         if op.name == "only_adjust":
             implicitly_locked.update(item["id"] for item in scene["items"] if item["id"] not in op.itemIds)
+        elif op.name == "relative_position" and op.targetId:
+            implicitly_locked.add(op.targetId)
     forbidden = {item_id for op in plan.operations if op.name in (
-        "unlock", "move", "rotate", "near_wall", "near_window", "face_window", "bedside", "vanity_seating",
+        "unlock", "move", "rotate", "near_wall", "near_window", "face_window", "face_item", "bedside", "vanity_seating", "relative_position",
     ) for item_id in op.itemIds}
     for clause in re.split(r"[,，;；。]|同时|然后|但是|不过|但", text):
         if not fixed_phrase.search(clause) or re.search(r"尽量|最好|优先", clause):

@@ -1,8 +1,10 @@
 from copy import deepcopy
+from concurrent.futures import ThreadPoolExecutor
 import io
 import json
 from pathlib import Path
 import struct
+from threading import Event
 import uuid
 
 from fastapi.testclient import TestClient
@@ -214,6 +216,184 @@ def test_draft_and_asset_concurrency_guards(environment):
     second = service.edit_asset(asset["id"])
     service.publish(first["id"], PublishFurniture.model_validate(publication(first, service)))
     assert client.post(f"/api/furniture/drafts/{second['id']}/publish", json=publication(second, service)).status_code == 409
+
+
+def test_delete_confirmed_furniture_preserves_saved_scene_and_files(environment):
+    client, service = environment
+    draft = completed(environment)
+    body = publication(draft, service)
+    asset = client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=body).json()
+    scene = demo_scene()
+    scene["id"] = "deleted-library-asset-" + uuid.uuid4().hex
+    scene["items"][2].update(furnitureAssetId=asset["id"], furnitureSnapshot=asset["snapshot"],
+                              assetUrl=asset["assetUrl"], photoUrl=asset["photoUrls"][0])
+    assert client.post("/api/scenes/save", json={"scene": scene}).status_code == 200
+    model = service.uploads / "assets" / Path(asset["assetUrl"]).name
+    photo = service.uploads / "furniture" / draft["id"] / "photo_0.jpg"
+    files_before = {path: path.read_bytes() for path in (model, photo)}
+    revision = client.post(f"/api/furniture/{asset['id']}/edit", json={}).json()
+
+    response = client.delete(f"/api/furniture/{asset['id']}", params={"expectedVersion": asset["version"]})
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"id": asset["id"], "deleted": True}
+    assert client.get("/api/furniture").json() == {"assets": [], "drafts": []}
+    assert client.get(f"/api/furniture/{asset['id']}").status_code == 404
+    assert client.post(f"/api/furniture/{asset['id']}/edit", json={}).status_code == 404
+    assert client.get(f"/api/furniture/drafts/{revision['id']}").status_code == 404
+    loaded = client.get(f"/api/scenes/{scene['id']}").json()
+    assert loaded["items"][2]["furnitureSnapshot"] == asset["snapshot"]
+    assert loaded["items"][2]["assetUrl"] == asset["assetUrl"]
+    assert all(path.read_bytes() == data for path, data in files_before.items())
+    service.close()
+    restarted = FurnitureService(service.database, service.uploads, auto_run=False)
+    try:
+        assert restarted.listing() == {"assets": [], "drafts": []}
+        with pytest.raises(FurnitureError) as caught:
+            restarted.asset(asset["id"])
+        assert caught.value.status == 404
+    finally:
+        restarted.close()
+
+
+def test_delete_confirmed_furniture_guards_version_and_is_idempotent(environment):
+    client, service = environment
+    draft = completed(environment)
+    asset = client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=publication(draft, service)).json()
+    revision = service.edit_asset(asset["id"])
+    newer = service.publish(revision["id"], PublishFurniture.model_validate(publication(revision, service)))
+    endpoint = f"/api/furniture/{asset['id']}"
+
+    assert client.delete(endpoint).status_code == 422
+    assert client.delete(endpoint, params={"expectedVersion": 0}).status_code == 422
+    assert client.delete(endpoint, params={"expectedVersion": asset["version"]}).status_code == 409
+    assert client.get(endpoint).json()["version"] == newer["version"]
+    assert client.delete(endpoint, params={"expectedVersion": newer["version"]},
+                         headers={"Origin": "https://untrusted.example"}).status_code == 403
+    for _ in range(2):
+        response = client.delete(endpoint, params={"expectedVersion": newer["version"]})
+        assert response.status_code == 200
+        assert response.json() == {"id": asset["id"], "deleted": True}
+    assert client.delete(endpoint, params={"expectedVersion": asset["version"]}).status_code == 409
+    assert client.delete("/api/furniture/unknown", params={"expectedVersion": 1}).status_code == 404
+
+
+def test_deleted_asset_cannot_be_resurrected_by_revision_or_publication_replay(environment):
+    client, service = environment
+    draft = completed(environment)
+    first_request = publication(draft, service)
+    first_endpoint = f"/api/furniture/drafts/{draft['id']}/publish"
+    asset = client.post(first_endpoint, json=first_request).json()
+    published_revision = service.edit_asset(asset["id"])
+    revision_request = publication(published_revision, service)
+    revision_endpoint = f"/api/furniture/drafts/{published_revision['id']}/publish"
+    current = client.post(revision_endpoint, json=revision_request).json()
+    pending = service.edit_asset(asset["id"])
+    pending_request = publication(pending, service)
+    assert client.delete(f"/api/furniture/{asset['id']}", params={"expectedVersion": current["version"]}).status_code == 200
+
+    assert client.post(first_endpoint, json=first_request).status_code == 404
+    assert client.post(revision_endpoint, json=revision_request).status_code == 404
+    assert client.post(f"/api/furniture/drafts/{pending['id']}/publish", json=pending_request).status_code == 404
+    assert client.post(f"/api/furniture/drafts/{pending['id']}/save", json={
+        "expectedVersion": pending["version"], "properties": pending["properties"],
+    }).status_code == 404
+    assert client.get("/api/furniture").json() == {"assets": [], "drafts": []}
+    # All historical GLBs remain intact for scenes that hold earlier versions.
+    assert all((service.uploads / "assets" / Path(value["assetUrl"]).name).is_file()
+               for value in (asset, current))
+
+
+def test_delete_draft_is_persistent_and_blocks_save_retry_and_publish(environment):
+    client, service = environment
+    draft = completed(environment)
+    other = completed(environment)
+    endpoint = f"/api/furniture/drafts/{draft['id']}"
+    request = publication(draft, service)
+    for _ in range(2):
+        response = client.delete(endpoint, params={"expectedVersion": draft["version"]})
+        assert response.status_code == 200
+        assert response.json() == {"id": draft["id"], "deleted": True}
+    assert [body["id"] for body in service.listing()["drafts"]] == [other["id"]]
+    assert client.get(endpoint).status_code == 404
+    assert client.post(endpoint + "/retry", json={"consent": True}).status_code == 404
+    assert client.post(endpoint + "/save", json={"expectedVersion": draft["version"], "properties": draft["properties"]}).status_code == 404
+    assert client.post(endpoint + "/publish", json=request).status_code == 404
+    restarted = FurnitureService(service.database, service.uploads, auto_run=False)
+    try:
+        assert [body["id"] for body in restarted.listing()["drafts"]] == [other["id"]]
+    finally:
+        restarted.close()
+
+
+def test_delete_revision_draft_keeps_confirmed_asset_and_shared_files(environment):
+    client, service = environment
+    original = completed(environment)
+    body = publication(original, service)
+    asset = service.publish(original["id"], PublishFurniture.model_validate(body))
+    revision = service.edit_asset(asset["id"])
+    another_revision = service.edit_asset(asset["id"])
+    files_before = {path: path.read_bytes() for path in service.uploads.rglob("*") if path.is_file()}
+
+    assert client.delete(f"/api/furniture/drafts/{revision['id']}", params={"expectedVersion": revision["version"]}).status_code == 200
+    assert service.asset(asset["id"]) == asset
+    assert service.draft(another_revision["id"]) == another_revision
+    assert service.listing() == {"assets": [asset], "drafts": [another_revision]}
+    assert all(path.read_bytes() == content for path, content in files_before.items())
+    assert service.publish(original["id"], PublishFurniture.model_validate(body)) == asset
+
+
+def test_delete_draft_guards_version_published_state_and_origin(environment):
+    client, service = environment
+    draft = completed(environment)
+    endpoint = f"/api/furniture/drafts/{draft['id']}"
+    assert client.delete(endpoint).status_code == 422
+    assert client.delete(endpoint, params={"expectedVersion": 0}).status_code == 422
+    assert client.delete(endpoint, params={"expectedVersion": draft["version"] - 1}).status_code == 409
+    assert client.delete(endpoint, params={"expectedVersion": draft["version"]}, headers={"Origin": "https://untrusted.example"}).status_code == 403
+    assert client.delete("/api/furniture/drafts/missing", params={"expectedVersion": 1}).status_code == 404
+    assert service.draft(draft["id"]) == draft
+    saved = service.save(draft["id"], SaveFurnitureDraft(expectedVersion=draft["version"], properties=FurnitureProperties.model_validate(draft["properties"])))
+    assert client.delete(endpoint, params={"expectedVersion": draft["version"]}).status_code == 409
+    asset = service.publish(saved["id"], PublishFurniture.model_validate(publication(saved, service)))
+    published = service.draft(draft["id"])
+    assert client.delete(endpoint, params={"expectedVersion": published["version"]}).status_code == 409
+    assert service.asset(asset["id"]) == asset
+
+
+def test_delete_queued_draft_never_runs_recognition(environment):
+    client, service = environment
+    task = upload(client)
+    draft = service.draft(task["draftId"])
+    service.analyzer = lambda paths: pytest.fail("deleted queued draft must not send photos")
+    assert client.delete(f"/api/furniture/drafts/{draft['id']}", params={"expectedVersion": draft["version"]}).status_code == 200
+    service.process(task["jobId"])
+    assert service.job(task["jobId"])["errorCode"] == "draft_deleted"
+    assert service.listing() == {"assets": [], "drafts": []}
+
+
+def test_delete_processing_draft_discards_late_recognition_result(environment):
+    client, service = environment
+    started, release = Event(), Event()
+    def analyze(paths):
+        started.set()
+        assert release.wait(10)
+        return recognized(), {}
+    service.analyzer = analyze
+    task = upload(client)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        result = executor.submit(service.process, task["jobId"])
+        try:
+            assert started.wait(10)
+            draft = service.draft(task["draftId"])
+            assert service.job(task["jobId"])["status"] == "processing"
+            assert client.delete(f"/api/furniture/drafts/{draft['id']}", params={"expectedVersion": draft["version"]}).status_code == 200
+        finally:
+            release.set()
+        result.result(timeout=10)
+    assert service.job(task["jobId"])["errorCode"] == "draft_deleted"
+    assert service.listing() == {"assets": [], "drafts": []}
+    assert client.get(f"/api/furniture/drafts/{draft['id']}").status_code == 404
 
 
 def test_restart_marks_jobs_interrupted_without_auto_retry(environment):

@@ -5,7 +5,7 @@ import threading
 import uuid
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from .furniture import FurnitureError, FurnitureService, prepare_photos
@@ -114,6 +114,11 @@ def draft(draft_id: str):
     return invoke(service().draft, draft_id)
 
 
+@router.delete("/drafts/{draft_id}")
+def delete_draft(draft_id: str, expectedVersion: int = Query(..., ge=1)):
+    return invoke(service().delete_draft, draft_id, expectedVersion)
+
+
 @router.post("/drafts/{draft_id}/save")
 def save(draft_id: str, request: SaveFurnitureDraft):
     return invoke(service().save, draft_id, request)
@@ -137,5 +142,10 @@ def asset(asset_id: str):
 @router.post("/{asset_id}/edit")
 def edit(asset_id: str):
     return invoke(service().edit_asset, asset_id)
+
+
+@router.delete("/{asset_id}")
+def delete_asset(asset_id: str, expectedVersion: int = Query(..., ge=1)):
+    return invoke(service().delete_asset, asset_id, expectedVersion)
 
 

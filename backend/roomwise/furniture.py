@@ -103,7 +103,35 @@ class FurnitureService:
 
     def draft(self, identifier):
         with self.connect() as connection:
-            return self.get(connection, "furniture_drafts", identifier)
+            draft = self.active_draft(connection, identifier)
+            parent_id = draft.get("editingAssetId") or draft.get("publishedAssetId")
+            if parent_id:
+                self.active_asset(connection, parent_id)
+            return draft
+
+    def active_draft(self, connection, identifier):
+        draft = self.get(connection, "furniture_drafts", identifier)
+        if draft.get("deletedAt"):
+            raise FurnitureError(404, "草稿已删除")
+        return draft
+
+    def delete_draft(self, identifier, expected_version):
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            draft = self.get(connection, "furniture_drafts", identifier)
+            if draft["version"] != expected_version:
+                raise FurnitureError(409, "草稿版本已变化，请重新打开草稿后再删除。")
+            if draft.get("publishedAssetId"):
+                raise FurnitureError(409, "草稿已发布，请在已确认家具中操作。")
+            if not draft.get("deletedAt"):
+                timestamp = now()
+                draft.update(deletedAt=timestamp, updatedAt=timestamp)
+                self.put(connection, "furniture_drafts", draft)
+                if draft.get("jobId"):
+                    job = self.get(connection, "furniture_jobs", draft["jobId"])
+                    job.update(status="failed", errorCode="draft_deleted", error="草稿已删除。", updatedAt=timestamp)
+                    self.put(connection, "furniture_jobs", job)
+        return {"id": identifier, "deleted": True}
 
     def job(self, identifier):
         with self.connect() as connection:
@@ -111,13 +139,40 @@ class FurnitureService:
 
     def asset(self, identifier):
         with self.connect() as connection:
-            return self.get(connection, "furniture_assets", identifier)
+            return self.active_asset(connection, identifier)
+
+    def active_asset(self, connection, identifier):
+        asset = self.get(connection, "furniture_assets", identifier)
+        if asset.get("deletedAt"):
+            raise FurnitureError(404, "家具已从家具库删除")
+        return asset
+
+    def delete_asset(self, identifier, expected_version):
+        """Remove an asset from the library without breaking saved instances.
+
+        Asset snapshots and files may still be referenced by saved rooms or
+        earlier versions. Keep those immutable resources and a deletion marker
+        while disabling further edits, publication replay and library access.
+        """
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            asset = self.get(connection, "furniture_assets", identifier)
+            if asset["version"] != expected_version:
+                raise FurnitureError(409, "家具版本已变化，请刷新家具库后再删除。")
+            if not asset.get("deletedAt"):
+                asset.update(deletedAt=now(), updatedAt=now())
+                self.put(connection, "furniture_assets", asset)
+        return {"id": identifier, "deleted": True}
 
     def listing(self):
         with self.connect() as connection:
             assets = [json.loads(row["body"]) for row in connection.execute("SELECT body FROM furniture_assets")]
             drafts = [json.loads(row["body"]) for row in connection.execute("SELECT body FROM furniture_drafts")]
-        return {"assets": sorted(assets, key=lambda body: body["updatedAt"], reverse=True), "drafts": sorted([body for body in drafts if not body.get("publishedAssetId")], key=lambda body: body["updatedAt"], reverse=True)}
+        deleted_ids = {body["id"] for body in assets if body.get("deletedAt")}
+        return {"assets": sorted([body for body in assets if not body.get("deletedAt")], key=lambda body: body["updatedAt"], reverse=True),
+                "drafts": sorted([body for body in drafts if not body.get("publishedAssetId") and not body.get("deletedAt")
+                                  and body.get("editingAssetId") not in deleted_ids],
+                                 key=lambda body: body["updatedAt"], reverse=True)}
 
     def create(self, identifier: str, photo_urls: list[str]):
         draft = {"id": identifier, "version": 1, "photoUrls": photo_urls, "properties": FurnitureProperties().model_dump(), "recognition": None, "jobId": None, "updatedAt": now()}
@@ -128,7 +183,7 @@ class FurnitureService:
     def retry(self, identifier):
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            draft = self.get(connection, "furniture_drafts", identifier)
+            draft = self.active_draft(connection, identifier)
             if draft.get("publishedAssetId") or draft.get("editingAssetId"):
                 raise FurnitureError(409, "已发布家具的修订不再次调用识别；请使用图片新建草稿。")
             if draft.get("jobId"):
@@ -169,7 +224,7 @@ class FurnitureService:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self.get(connection, "furniture_drafts", draft["id"])
-            if current["jobId"] != identifier:
+            if current.get("deletedAt") or current["jobId"] != identifier:
                 return
             job["updatedAt"] = now()
             draft.update(version=current["version"] + 1, updatedAt=now())
@@ -177,6 +232,10 @@ class FurnitureService:
             self.put(connection, "furniture_drafts", draft)
 
     def editable(self, connection, draft, expected_version):
+        if draft.get("deletedAt"):
+            raise FurnitureError(404, "草稿已删除")
+        if draft.get("editingAssetId"):
+            self.active_asset(connection, draft["editingAssetId"])
         if draft["version"] != expected_version or draft.get("publishedAssetId"):
             raise FurnitureError(409, "草稿版本已变化或已发布，请重新打开。")
         if draft.get("jobId") and self.get(connection, "furniture_jobs", draft["jobId"])["status"] in {"queued", "processing"}:
@@ -203,12 +262,13 @@ class FurnitureService:
         return draft
 
     def edit_asset(self, identifier):
-        asset = self.asset(identifier)
-        draft = {
-            "id": uuid.uuid4().hex, "version": 1, "photoUrls": asset["photoUrls"], "properties": asset["properties"],
-            "recognition": None, "jobId": None, "editingAssetId": asset["id"], "baseAssetVersion": asset["version"], "updatedAt": now(),
-        }
         with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            asset = self.active_asset(connection, identifier)
+            draft = {
+                "id": uuid.uuid4().hex, "version": 1, "photoUrls": asset["photoUrls"], "properties": asset["properties"],
+                "recognition": None, "jobId": None, "editingAssetId": asset["id"], "baseAssetVersion": asset["version"], "updatedAt": now(),
+            }
             self.put(connection, "furniture_drafts", draft)
         return draft
 
@@ -219,7 +279,9 @@ class FurnitureService:
             if previous:
                 if previous["draft_id"] != identifier:
                     raise FurnitureError(409, "发布请求标识已用于其他草稿")
-                return json.loads(previous["body"])
+                publication = json.loads(previous["body"])
+                self.active_asset(connection, publication["id"])
+                return publication
             draft = self.get(connection, "furniture_drafts", identifier)
             self.editable(connection, draft, request.expectedVersion)
             properties = FurnitureProperties.model_validate(draft["properties"]).model_dump()
@@ -235,7 +297,7 @@ class FurnitureService:
             identifier_asset = draft.get("editingAssetId") or uuid.uuid4().hex
             version = 1
             if draft.get("editingAssetId"):
-                current_asset = self.get(connection, "furniture_assets", identifier_asset)
+                current_asset = self.active_asset(connection, identifier_asset)
                 if current_asset["version"] != draft["baseAssetVersion"]:
                     raise FurnitureError(409, "家具已被其他修订更新，请重新打开当前版本。")
                 version = current_asset["version"] + 1

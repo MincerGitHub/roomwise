@@ -14,6 +14,7 @@ from .bedside_constraints import bedside_assignments, bedside_placements, bed_pl
 
 from .geometry import (
     assert_invariants,
+    evaluate_vanity_preference,
     evaluate_vanity_seating,
     footprint,
     layout_quality,
@@ -32,6 +33,8 @@ from .window_constraints import (
     matching_wall_segments,
     matching_windows,
 )
+from .relative_constraints import evaluate_relative_position, relative_position_placements
+from .facing_constraints import facing_item_placements, evaluate_facing_preference
 
 
 MAX_GENERATION_ITEMS = 32
@@ -76,8 +79,10 @@ def _sanitize_model_output(original, proposed):
     if len(items) != len(original["items"]) or set(items) != {i["id"] for i in original["items"]}:
         raise ValueError("模型返回的家具列表不完整")
     result = deepcopy(original)
+    relative_targets = {preference.get("targetId") for preference in original.get("preferences", [])
+                        if preference.get("kind") == "relative_position"}
     for item in result["items"]:
-        if item.get("locked"):
+        if item.get("locked") or item["id"] in relative_targets:
             continue
         for key in ("x", "z", "rotation"):
             value = float(items[item["id"]][key])
@@ -111,6 +116,18 @@ def _location_cost(item, scene, original, placed, anchor_strength=0):
             check = evaluate_wall_preference(item, room, pref)
             cost += check["metrics"].get("distanceMeters", diag) * 3
             cost += check["metrics"].get("backAlignmentErrorDegrees", 180) / 60
+        elif pref["kind"] == "relative_position":
+            target = next((candidate for candidate in placed if candidate["id"] == pref.get("targetId")), None)
+            if target:
+                check = evaluate_relative_position(item, target, pref)
+                cost += max(0., check["metrics"].get("gapMeters", diag)) * 1.8
+                if not check["satisfied"]:
+                    cost += .5
+        elif pref["kind"] == "face_item":
+            target = next((candidate for candidate in placed if candidate["id"] == pref.get("targetId")), None)
+            if target:
+                check = evaluate_facing_preference(item, target, pref)
+                cost += check["metrics"].get("angularErrorDegrees", 180) / 60
     poly = footprint(item)
     if item["category"] in {"wardrobe", "double_bed", "single_bed", "kids_bed", "bookshelf", "cabinet", "desk", "sofa", "tv_stand"}:
         # A soft near-wall heuristic; no assumption that it is always desirable.
@@ -225,6 +242,23 @@ def _required_item_passes(item, room, preferences):
 
 def _dependent_placements(item, scene, original, placed, rng):
     """A nightstand follows its assigned bed's final transform, never a grid."""
+    relative = [preference for preference in scene.get("preferences", [])
+                if preference.get("kind") == "relative_position" and preference.get("itemId") == item["id"]]
+    if relative:
+        preference = relative[-1]
+        target = next((candidate for candidate in placed if candidate["id"] == preference.get("targetId")), None)
+        if target is not None:
+            yield from relative_position_placements(item, target, preference)
+        if not preference.get("required"):
+            yield from _placements(item, scene["room"], rng, scene.get("preferences", []))
+        return
+    facing = [preference for preference in scene.get("preferences", [])
+              if preference.get("kind") == "face_item" and preference.get("itemId") == item["id"]]
+    if facing:
+        target = next((candidate for candidate in placed if candidate["id"] == facing[-1].get("targetId")), None)
+        if target is not None:
+            yield from facing_item_placements(item, target, facing[-1])
+        return
     assignments = bedside_assignments(scene, original)
     assignment = assignments.get(item["id"])
     if assignment:
@@ -299,7 +333,13 @@ def _chair_pair_placements(chair, table, room, preference):
 
 def _place_remaining(result, original, placed, movable, rng, anchor_strength, budget):
     jitter = {i["id"]: rng.uniform(.85, 1.15) for i in movable}
-    movable.sort(key=lambda i: (i["category"] in ("nightstand", "rug"), i["category"] == "rug", -i["width"] * i["depth"] * jitter[i["id"]]))
+    facing_targets = {preference["targetId"] for preference in result.get("preferences", [])
+                      if preference.get("kind") == "face_item"}
+    facing_subjects = {preference["itemId"] for preference in result.get("preferences", [])
+                       if preference.get("kind") == "face_item"}
+    movable.sort(key=lambda i: (0 if i["id"] in facing_targets else 1 if i["id"] in facing_subjects else 2,
+                                i["category"] in ("nightstand", "rug"), i["category"] == "rug",
+                                -i["width"] * i["depth"] * jitter[i["id"]]))
     for item in movable:
         options = []
         preferences = result.get("preferences", [])
@@ -332,6 +372,26 @@ def _place_remaining(result, original, placed, movable, rng, anchor_strength, bu
 
 def _constraint_rule_candidate(original, rng, anchor_strength, budget):
     """Preserve unrelated items first; keep explicit window desk/chair grouping."""
+    reference_ids = {preference["targetId"] for preference in original.get("preferences", [])
+                     if preference["kind"] == "relative_position"}
+    if any(item["id"] in reference_ids and not item.get("locked") for item in original["items"]):
+        # Group generators also need to preserve references: a desk or vanity
+        # group may otherwise replace an already staged anchor. Reuse their
+        # locked-member paths inside the search without persisting a new lock.
+        search_scene = deepcopy(original)
+        for item in search_scene["items"]:
+            if item["id"] in reference_ids:
+                item["locked"] = True
+        candidate = _constraint_rule_candidate(search_scene, rng, anchor_strength, budget)
+        if candidate is None:
+            return None
+        result = deepcopy(original)
+        by_id = {item["id"]: item for item in candidate["items"]}
+        for item in result["items"]:
+            for key in ("x", "z", "rotation"):
+                item[key] = by_id[item["id"]][key]
+        assert_invariants(original, result)
+        return result
     room = original["room"]
     preferences = original.get("preferences", [])
     items = {item["id"]: item for item in original["items"]}
@@ -420,11 +480,16 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
     # window) sends us through the constraint-preserving branch.
     affected_ids = {p["itemId"] for p in preferences
                     if (p.get("required") and p["kind"] in EXPLICIT_SPATIAL_KINDS)
-                    or p["kind"] == "near_wall"} | used_chairs
+                    or p["kind"] in {"near_wall", "relative_position", "face_item"}} | used_chairs
+    # Facing a movable target may require moving it first. Once placed, its
+    # staged pose becomes the fixed reference used to orient the subject.
+    affected_ids.update(p["targetId"] for p in preferences if p["kind"] == "face_item")
     affected_ids.update(p["targetId"] for p in preferences if p["kind"] == "vanity_seating")
     for table, chair in vanity_groups:
         affected_ids.update((table["id"], chair["id"]))
     assignments = bedside_assignments(original)
+    relative_target_ids = {preference["targetId"] for preference in preferences
+                           if preference.get("kind") == "relative_position"}
     initial_relations = evaluate_bedside_groups(original)
     affected_ids.update(check["itemId"] for check in initial_relations["unsatisfied"])
     affected_ids.update(assignment["targetId"] for stand_id, assignment in assignments.items()
@@ -440,7 +505,14 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
         original shared budget rather than treating that as a reason to move
         an otherwise unobstructing shelf.
         """
-        pending = sorted(movable, key=lambda item: (item["category"] in ("nightstand", "rug"), item["category"] == "rug", -item["width"] * item["depth"]))
+        facing_targets = {preference["targetId"] for preference in original.get("preferences", [])
+                          if preference.get("kind") == "face_item"}
+        facing_subjects = {preference["itemId"] for preference in original.get("preferences", [])
+                           if preference.get("kind") == "face_item"}
+        pending = sorted(movable, key=lambda item: (
+            0 if item["id"] in facing_targets else 1 if item["id"] in facing_subjects else 2,
+            item["category"] in ("nightstand", "rug"), item["category"] == "rug",
+            -item["width"] * item["depth"]))
         nodes_left = 24
 
         def search(index, staged):
@@ -490,7 +562,9 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
 
     for preserve_others in (True, "keep_clear", False):
         result = deepcopy(original)
-        placed = [deepcopy(i) for i in original["items"] if i.get("locked") or (preserve_others is True and i["id"] not in affected_ids)]
+        placed = [deepcopy(i) for i in original["items"]
+                  if i.get("locked") or i["id"] in relative_target_ids
+                  or (preserve_others is True and i["id"] not in affected_ids)]
         # Keeping an already colliding original arrangement is not a successful local edit.
         if any(placement_errors(item, room, placed[:index], gap=0) for index, item in enumerate(placed)):
             continue
@@ -555,6 +629,9 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
                         chair_candidate = group[1]
                         if not _facing_table(chair_candidate, table_candidate):
                             continue
+                        if not evaluate_vanity_preference(chair_candidate, table_candidate,
+                                {"itemId": chair_candidate["id"], "targetId": table_candidate["id"]})["satisfied"]:
+                            continue
                         if (not _required_item_passes(chair_candidate, room, preferences)
                                 or placement_errors(chair_candidate, room, [*obstacles, table_candidate], gap=.025)):
                             continue
@@ -602,7 +679,8 @@ def _constraint_rule_candidate(original, rng, anchor_strength, budget):
 
 
 def rule_candidate(original: dict, rng: random.Random, anchor_strength=0, budget=None):
-    if any(p.get("required") and p["kind"] in EXPLICIT_SPATIAL_KINDS for p in original.get("preferences", [])):
+    if any((p.get("required") or p["kind"] in {"relative_position", "face_item"})
+           and p["kind"] in EXPLICIT_SPATIAL_KINDS for p in original.get("preferences", [])):
         return _constraint_rule_candidate(original, rng, anchor_strength, budget)
     from .layout_templates import _anchor_positions, _group_positions
 
@@ -704,9 +782,11 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
     candidates = []
     fingerprints = set()
     rejected = {"geometry": 0, "requirements": 0, "functionalRelations": 0, "placementFailed": 0, "model": 0}
-    budget = SearchBudget()
+    budget = None
     has_spatial_requirements = any(preference.get("required") and preference["kind"] in EXPLICIT_SPATIAL_KINDS
                                   for preference in scene.get("preferences", []))
+    has_relative_preferences = any(preference["kind"] in {"relative_position", "face_item"}
+                                   for preference in scene.get("preferences", []))
     # Keep arbitrary imports editable, but bound a single search request.
     if len(scene["items"]) > MAX_GENERATION_ITEMS:
         return {"baseVersion": scene.get("version", 0), "candidates": [], "diagnostics": {"message": f"单次自动布局最多支持{MAX_GENERATION_ITEMS}件家具，当前有{len(scene['items'])}件。请分房间或减少本次参与物品；系统未自动删除。", "generationItemLimit": MAX_GENERATION_ITEMS, "elapsedSeconds": 0}}
@@ -724,12 +804,22 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
     diagnostics["functionalRelations"] = evaluate_bedside_groups(scene, scene)
     locked_ids = {item["id"] for item in scene["items"] if item.get("locked")}
     item_ids = {item["id"] for item in scene["items"]}
-    blocked_requirements = [check for check in original_requirements["unsatisfied"]
-                            if ((check["itemId"] in locked_ids and
-                                 (check["kind"] not in ("bedside", "vanity_seating") or check.get("targetId") in locked_ids))
-                                or (check.get("targetId") not in item_ids if check["kind"] in ("bedside", "vanity_seating")
-                                    else not matching_wall_segments(scene["room"], {"wall": check.get("requestedWall")})
-                                    if check["kind"] == "near_wall" else not matching_windows(scene["room"], check)))]
+    def blocked_requirement(check):
+        kind = check["kind"]
+        item_id, target_id = check["itemId"], check.get("targetId")
+        if kind == "relative_position":
+            return item_id in locked_ids or target_id not in item_ids
+        if kind == "face_item":
+            return item_id in locked_ids or target_id not in item_ids
+        if kind in ("bedside", "vanity_seating"):
+            return (item_id in locked_ids and target_id in locked_ids) or target_id not in item_ids
+        if item_id in locked_ids:
+            return True
+        if kind == "near_wall":
+            return not matching_wall_segments(scene["room"], {"wall": check.get("requestedWall")})
+        return not matching_windows(scene["room"], check)
+
+    blocked_requirements = [check for check in original_requirements["unsatisfied"] if blocked_requirement(check)]
     if blocked_requirements:
         diagnostics["message"] = "未找到同时满足明确要求的布局：" + "；".join(check["message"] for check in blocked_requirements)
         if any(check["itemId"] in locked_ids for check in blocked_requirements):
@@ -738,6 +828,10 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
     if mode == "model" and not _available(status):
         diagnostics["message"] = "尚无可用训练模型。模型模式不会使用规则冒充模型结果；可选择规则模式。"
         return {"baseVersion": scene.get("version", 0), "candidates": [], "diagnostics": diagnostics}
+    # Validation and schema preprocessing are deterministic request overhead,
+    # not search. Start the placement budget only after those checks so a busy
+    # process cannot consume the entire candidate budget before trying a pose.
+    budget = SearchBudget()
 
     def accept(proposed, actual_method):
         if proposed is None:
@@ -799,7 +893,7 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
                 candidates[-1]["summary"] += "未提及的家具保持原位。"
         return True
 
-    if mode in ("rules", "hybrid") and not has_spatial_requirements:
+    if mode in ("rules", "hybrid") and not has_spatial_requirements and not has_relative_preferences:
         diagnostics["functionalTemplates"] = {"attempts": 0, "accepted": 0}
         for _ in range(min(count + 2, 5)):
             if len(candidates) >= count or not budget.take():
@@ -813,12 +907,13 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
                     "layoutNetwork": False, "geometricRepair": False, "functionalGroups": True}
                 candidates[-1]["summary"] += "本次按床与床头柜、桌椅等功能组搜索摆放，使用规则模板，未运行布局网络。"
 
-    if mode == "hybrid" and has_spatial_requirements:
+    if mode == "hybrid" and (has_spatial_requirements or has_relative_preferences):
         # The denoiser was trained on whole bedrooms, without window requests.
         # A local explicit edit must not first perturb unrelated furniture.
         diagnostics["explicitRequirementSearch"] = {"used": True, "layoutNetwork": False,
                                                      "reason": "明确空间要求使用优先保留未提及家具的约束搜索；未先运行全屋布局网络。"}
-    if mode in ("model", "hybrid") and len(candidates) < count and _available(status) and not (mode == "hybrid" and has_spatial_requirements):
+    if mode in ("model", "hybrid") and len(candidates) < count and _available(status) and not (
+            mode == "hybrid" and (has_spatial_requirements or has_relative_preferences)):
         module = importlib.import_module("roomwise.learning")
         for trial in range(min(count + 2, 5)):
             if not budget.take():
@@ -874,7 +969,7 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
             if proposed is None:
                 rejected["placementFailed"] += 1
                 continue
-            if accept(proposed, "rules") and has_spatial_requirements:
+            if accept(proposed, "rules") and (has_spatial_requirements or has_relative_preferences):
                 candidates[-1]["provenance"] = {"initialization": "user_scene", "layoutNetwork": False,
                                                  "geometricRepair": False, "constraintSearch": True}
                 candidates[-1]["summary"] += "本次使用空间约束搜索，包含所需的桌椅成组处理，未运行布局网络。"
@@ -885,7 +980,7 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
         diagnostics["message"] = f"已找到{len(candidates)}个通过检查的候选；分数只表示定义的布局偏好，不代表设计质量概率。"
         if mode == "hybrid" and not _available(status):
             diagnostics["message"] += "当前模型不可用，本次使用规则搜索。"
-        elif mode == "hybrid" and has_spatial_requirements:
+        elif mode == "hybrid" and (has_spatial_requirements or has_relative_preferences):
             diagnostics["message"] += "为保留未提及家具，本次使用局部空间约束搜索，未运行布局网络。"
     else:
         diagnostics["message"] = "当前条件下未找到通过检查的布局。系统未删除家具、修改尺寸或移动锁定物品；可解锁部分位置或调整家具清单。"

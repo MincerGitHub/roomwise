@@ -167,7 +167,7 @@ class Item(DataModel):
 
 
 class Preference(DataModel):
-    kind: Literal["near_window", "face_window", "near_wall", "bedside", "vanity_seating", "relative_position", "min_move"]
+    kind: Literal["near_window", "face_window", "face_item", "near_wall", "bedside", "vanity_seating", "relative_position", "min_move"]
     itemId: str = Field(min_length=1, max_length=100)
     targetId: str | None = Field(default=None, max_length=100)
     # Old saved scenes contain soft near-window preferences. Explicit commands
@@ -187,8 +187,8 @@ class Preference(DataModel):
             raise ValueError("只有靠墙要求可以指定墙体方向")
         if self.kind != "bedside" and self.side is not None:
             raise ValueError("只有床头柜关系可以指定床的左右侧")
-        if self.kind in ("bedside", "vanity_seating") and not self.targetId:
-            raise ValueError("床头柜或梳妆椅关系必须指定目标家具 ID")
+        if self.kind in ("bedside", "vanity_seating", "face_item") and not self.targetId:
+            raise ValueError("家具关系必须指定目标家具 ID")
         if self.kind == "relative_position":
             if not self.targetId or self.targetId == self.itemId or self.direction is None:
                 raise ValueError("相对位置需要另一件家具和前后左右方向")
@@ -212,6 +212,8 @@ class Scene(DataModel):
             raise ValueError("家具 id 必须唯一")
         relative_subjects = set()
         relative_targets = set()
+        facing_subjects = set()
+        facing_targets = set()
         for preference in self.preferences:
             if preference.itemId not in ids:
                 raise ValueError("偏好引用了不存在的家具")
@@ -236,9 +238,20 @@ class Scene(DataModel):
                     raise ValueError("同一件家具一次只能设置一个前后左右目标")
                 relative_subjects.add(preference.itemId)
                 relative_targets.add(preference.targetId)
+            elif preference.kind == "face_item":
+                subject = next(item for item in self.items if item.id == preference.itemId)
+                target = next((item for item in self.items if item.id == preference.targetId), None)
+                if subject.category == "rug" or not target or target.category == "rug":
+                    raise ValueError("朝向关系只支持实体家具，不包括地毯")
+                if preference.targetId == preference.itemId:
+                    raise ValueError("朝向目标不能是家具自身")
+                if preference.itemId in facing_subjects:
+                    raise ValueError("同一件家具一次只能指定一个朝向目标")
+                facing_subjects.add(preference.itemId)
+                facing_targets.add(preference.targetId)
             elif preference.targetId and preference.targetId not in {w.id for w in self.room.windows}:
                 raise ValueError("偏好引用了不存在的窗户")
-        if relative_subjects & relative_targets:
+        if (relative_subjects | facing_subjects) & (relative_targets | facing_targets):
             raise ValueError("相对位置的参照家具需要保持原位，不能同时作为待移动目标")
         return self
 

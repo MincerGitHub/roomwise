@@ -42,6 +42,38 @@ def test_bed_in_front_of_wardrobe_alias_maps_to_front():
     assert preference["direction"] == "front"
 
 
+def test_chair_facing_coffee_table_creates_a_facing_preference_without_moving_table():
+    scene = demo_scene()
+    chair = next(item for item in scene["items"] if item["id"] == "chair-1")
+    chair["label"] = "木质扶手椅"
+    chair["category"] = "armchair"
+    table = next(item for item in scene["items"] if item["id"] == "desk-1")
+    table["label"] = "茶几"
+    table["category"] = "coffee_table"
+    before = deepcopy(scene)
+
+    reply = service.interpret_command(scene, "木质扶手椅要朝向茶几")
+
+    assert reply["action"] == "generate", reply
+    assert reply["scene"]["preferences"][-1] == {
+        "kind": "face_item", "itemId": "chair-1", "targetId": "desk-1", "required": True,
+    }
+    assert scene == before
+
+
+def test_chair_facing_coffee_table_generates_a_checked_rotation():
+    scene = demo_scene()
+    chair = next(item for item in scene["items"] if item["id"] == "chair-1")
+    chair.update(label="木质扶手椅", category="armchair", x=1., z=1., rotation=0.)
+    table = next(item for item in scene["items"] if item["id"] == "desk-1")
+    table.update(label="茶几", category="coffee_table", x=4., z=4., rotation=0., locked=True)
+    reply = service.interpret_command(scene, "木质扶手椅朝向茶几")
+
+    assert reply["action"] == "generate", reply
+    result = service.apply_command(reply["scene"], "生成布局")
+    assert result["action"] == "generate"
+
+
 @pytest.mark.parametrize("text", [
     "床不要放在衣柜前面", "床别放在衣柜前面", "床不在衣柜前面",
     "不要把床放在衣柜前面", "把床旋转90度后放在衣柜前面",

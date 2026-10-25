@@ -81,6 +81,32 @@ test('the bed can stay left of the wardrobe while every generated nightstand cle
  }
 });
 
+test('a chair can face a coffee table through command, preview and apply',async({page})=>{
+ const faceScene={id:'face-item-ui',name:'朝向关系回归',version:0,room:{width:8,depth:8,height:2.7,polygon:null,door:null,windows:[]},items:[
+  {id:'chair-1',label:'木质扶手椅',category:'armchair',width:.8,depth:.8,height:.85,x:1,z:1,rotation:0,locked:false,keep:true,source:'brought'},
+  {id:'table-1',label:'茶几',category:'coffee_table',width:1.0,depth:.6,height:.42,x:4,z:4,rotation:0,locked:true,keep:true,source:'existing'},
+ ],preferences:[]};
+ await page.goto('/');
+ await page.locator('input[type="file"][accept=".json"]').setInputFiles({name:'face-item.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(faceScene))});
+ const response=page.waitForResponse(r=>r.url().endsWith('/api/generate')&&r.request().method()==='POST',{timeout:45000});
+ await page.getByLabel('输入修改要求').fill('木质扶手椅要朝向茶几');
+ await page.getByLabel('发送要求').click();
+ await expect(page.getByLabel('已识别的布局要求')).toContainText('正面朝向茶几');
+ const generated=await (await response).json();
+ expect(generated.candidates.length).toBeGreaterThan(0);
+ for(const candidate of generated.candidates){
+  expect(candidate.validation.valid).toBe(true);
+  const check=candidate.requirements.checks.find((value:{kind:string})=>value.kind==='face_item');
+  expect(check).toMatchObject({itemId:'chair-1',targetId:'table-1',satisfied:true});
+  const table=candidate.scene.items.find((item:{id:string})=>item.id==='table-1')!;
+  expect([table.x,table.z,table.rotation,table.locked]).toEqual([4,4,0,true]);
+ }
+ await page.getByLabel('预览方案 1').click();
+ await expect(page.locator('.preview-requirements')).toContainText('正面需朝向茶几');
+ await page.locator('.preview-banner .btn.primary').click();
+ await expect(page.locator('.preview-banner')).toHaveCount(0);
+});
+
 for(const relation of [
  {direction:'front',word:'前面',label:'前方',rotation:0,axis:'z',sign:1},
  {direction:'back',word:'后面',label:'后方',rotation:90,axis:'x',sign:-1},

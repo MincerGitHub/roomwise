@@ -9,6 +9,7 @@ from roomwise.generator import generate_layouts
 from roomwise.geometry import cabinet_door_clearance_conflicts, footprint
 from roomwise.intent_planner import _position_lock_guard, _scene_payload, compile_plan, validate_plan_against_scene
 from roomwise.relative_constraints import evaluate_relative_position, relative_position_placements
+from roomwise.facing_constraints import evaluate_facing_preference
 from roomwise.schemas import Scene
 
 
@@ -100,6 +101,25 @@ def test_fallback_room_bed_on_wardrobe_left_uses_edge_alignment():
     assert check["metrics"]["lateralOverlapMeters"] >= check["metrics"]["minLateralOverlapMeters"]
     assert [placed["wardrobe-1"][key] for key in ("x", "z", "rotation", "locked")] == [
         items["wardrobe-1"][key] for key in ("x", "z", "rotation", "locked")]
+
+
+def test_face_item_places_an_armchair_toward_a_locked_coffee_table():
+    scene = demo_scene()
+    scene["room"].update(width=8., depth=8., door=None, windows=[])
+    chair = _item("armchair", "chair", 1., 1.)
+    table = _item("coffee_table", "table", 4., 4., locked=True)
+    scene["items"] = [chair, table]
+    scene["preferences"] = [{"kind": "face_item", "itemId": "chair", "targetId": "table", "required": True}]
+
+    result = generate_layouts(scene, mode="rules", count=1, seed=11)
+
+    assert result["candidates"], result["diagnostics"]
+    candidate = result["candidates"][0]
+    placed = {item["id"]: item for item in candidate["scene"]["items"]}
+    check = next(value for value in candidate["requirements"]["checks"] if value["kind"] == "face_item")
+    assert check["satisfied"], check
+    assert evaluate_facing_preference(placed["chair"], placed["table"], scene["preferences"][0])["satisfied"]
+    assert [placed["table"][key] for key in ("x", "z", "rotation", "locked")] == [4., 4., 0., True]
 
 
 def test_relative_generation_never_returns_a_nightstand_in_front_of_the_wardrobe():

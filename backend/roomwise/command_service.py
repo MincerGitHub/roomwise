@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .commands import apply_command, is_bedside_only_command, is_global_wall_command, is_vanity_or_wall_exemption_command, is_relative_furniture_command
+from .commands import apply_command, is_bedside_only_command, is_global_wall_command, is_vanity_or_wall_exemption_command, is_relative_furniture_command, is_face_item_command
 from .intent_planner import language_status, plan_command
 
 
@@ -15,6 +15,8 @@ def interpret_command(scene: dict, text: str, selected_id: str | None = None):
     if is_bedside_only_command(text):
         return apply_command(scene, text, selected_id)
     if is_vanity_or_wall_exemption_command(text):
+        return apply_command(scene, text, selected_id)
+    if is_face_item_command(text):
         return apply_command(scene, text, selected_id)
     if is_relative_furniture_command(text):
         return apply_command(scene, text, selected_id)
@@ -47,7 +49,7 @@ def interpret_command(scene: dict, text: str, selected_id: str | None = None):
     operations = metadata["operations"]
     names = {operation.get("name") for operation in operations}
     if (executed.get("action") == "generate" and names & {"move", "rotate"}
-            and not names & {"generate", "near_wall", "near_window", "face_window", "bedside", "vanity_seating", "relative_position", "min_move"}):
+            and not names & {"generate", "near_wall", "near_window", "face_window", "face_item", "bedside", "vanity_seating", "relative_position", "min_move"}):
         # "Only move the desk 20cm right" is an exact edit. The historical
         # only-adjust command creates a generation intent, which must not turn
         # an explicit displacement into a new random placement.

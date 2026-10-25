@@ -213,6 +213,22 @@ def is_relative_furniture_command(text):
                                  and not _bedside_syntax(part) for part in clauses)
 
 
+def _face_item_syntax(clause):
+    return re.fullmatch(
+        r"(?:请帮我|帮我|请|让|把|将)?(?P<subject>.+?)(?:要|需要|希望)?(?:朝向|面向|面对|朝着)(?P<target>.+?)",
+        clause.strip(),
+    )
+
+
+def _face_reference(text):
+    return re.sub(r"(?:要|需要|希望)$", "", text.strip()).strip()
+
+
+def is_face_item_command(text):
+    clauses = [part.strip() for part in re.split(r"[,，;；。！？!?]|同时|然后", text) if part.strip()]
+    return bool(clauses) and any(_face_item_syntax(part) and not re.search(r"窗", part) for part in clauses)
+
+
 def is_global_wall_command(text):
     """Return whether *text* contains a deterministic furniture-group wall request.
 
@@ -416,6 +432,30 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
             request_generate = True
             handled = True
             continue
+        facing = _face_item_syntax(clause)
+        if facing and re.search(r"窗", facing["target"]):
+            facing = None
+        if facing:
+            subjects = _references(_face_reference(facing["subject"]), result["items"], selected_id)
+            targets = _references(_face_reference(facing["target"]), result["items"])
+            if len(subjects) != 1:
+                return _clarify(scene, subjects, "朝向要求中的家具")
+            if len(targets) != 1:
+                return _clarify(scene, targets, "朝向目标家具")
+            subject, target = subjects[0], targets[0]
+            if subject["id"] == target["id"]:
+                return _reply(scene, "clarify", "朝向目标不能是家具自身；本次未修改。")
+            if subject.get("locked"):
+                from .facing_constraints import evaluate_facing_preference
+                current = evaluate_facing_preference(subject, target, {"kind": "face_item", "itemId": subject["id"], "targetId": target["id"], "required": True})
+                if not current["satisfied"]:
+                    return _reply(scene, "clarify", f"{subject['label']}的朝向已锁定且当前未朝向{target['label']}；请先解锁。本次未修改。")
+            _add_preference(result, subject["id"], "face_item", target["id"], required=True)
+            changes.append({"itemId": subject["id"], "field": "preference", "value": "face_item", "targetId": target["id"],
+                            "required": True, "label": f"{subject['label']}朝向{target['label']}"})
+            request_generate = True
+            handled = True
+            continue
         if re.fullmatch(r"(?:其他|其余)(?:家具)?(?:都)?(?:不动|不要动|保持不动)", clause) and restriction:
             handled = True
             continue
@@ -546,13 +586,15 @@ def apply_command(scene: dict, text: str, selected_id: str | None = None):
     action = "generate" if request_generate else "edit"
     validation = validate_scene(result)
     message = "已更新布局条件，请生成候选后选择；现有家具身份与尺寸保持。" if request_generate else "已执行明确编辑；请检查提示，可随时撤销。"
-    window_changes = [c["label"] for c in changes if c.get("value") in ("near_window", "face_window", "near_wall", "bedside", "vanity_seating", "relative_position")]
+    window_changes = [c["label"] for c in changes if c.get("value") in ("near_window", "face_window", "face_item", "near_wall", "bedside", "vanity_seating", "relative_position")]
     if window_changes:
         message = "已识别：" + "；".join(window_changes) + "。" + message
     if any(change.get("value") == "bedside" for change in changes):
         message += "床头左右按站在床尾看向床头判断，与相机视角无关。"
     if any(change.get("value") == "relative_position" for change in changes):
         message += "前后左右按参照家具自身朝向判断；床的前后对应床头端和床尾端。参照家具保持原位。"
+    if any(change.get("value") == "face_item" for change in changes):
+        message += "朝向按家具正面与目标家具中心判断；参照家具保持原位。"
     if any(c["field"] in ("x", "z") for c in changes):
         message += "移动方向按房间坐标：右为+x，后为+z。"
     if not validation["valid"]:

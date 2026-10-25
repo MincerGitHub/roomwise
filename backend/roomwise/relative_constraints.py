@@ -89,10 +89,25 @@ def relative_position_placements(item, target, preference):
         half_axis_span = (item_max - item_min) / 2
         side_half_span = (side_max - side_min) / 2
         side_center_offset = (side_min + side_max) / 2
+        target_side_span = target_side_max - target_side_min
+        required_overlap = min(MIN_LATERAL_OVERLAP,
+                               min(target_side_span, side_max - side_min) * .25)
+        # Centre alignment alone can put a large subject behind a wall-mounted
+        # target.  Include both edge alignments that retain the required
+        # lateral projection overlap.  For example, a bed beside a north-wall
+        # wardrobe needs to extend toward the room, rather than share its
+        # centre along the wall.
+        edge_overlap = required_overlap + .02
+        side_centers = list(dict.fromkeys((
+            target_side_center + offset for offset in offsets
+        )))
+        side_centers.extend((
+            target_side_min + edge_overlap - side_half_span,
+            target_side_max - edge_overlap + side_half_span,
+        ))
         for gap in (.08, .18, .30, .45, .65, .90, 1.15, 1.40):
             axis_center = target_max + gap + half_axis_span if positive else target_min - gap - half_axis_span
-            for offset in offsets:
-                side_center = target_side_center + offset
+            for side_center in side_centers:
                 # Convert target-local projections back into room x/z axes.
                 center_axis = axis_center - (item_min + item_max) / 2
                 center_side = side_center - side_center_offset

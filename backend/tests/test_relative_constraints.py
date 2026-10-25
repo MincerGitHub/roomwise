@@ -67,6 +67,41 @@ def test_required_relation_keeps_target_fixed_and_generates_preview(target_locke
     assert placed[bed["id"]] != bed
 
 
+def test_fallback_room_bed_on_wardrobe_left_uses_edge_alignment():
+    """A wide bed beside the north-wall wardrobe must not require centring.
+
+    In the fallback room, the fixed wardrobe's left-side relationship is
+    feasible only when the bed shares a small part of the wardrobe's length
+    near an edge. A centred pose would extend through the north wall.
+    """
+    scene = demo_scene()
+    scene["room"].update(
+        width=5.2, depth=4.2,
+        door={"wall": "south", "offset": .45, "width": .9, "clearance": .9},
+    )
+    items = {item["id"]: item for item in scene["items"]}
+    items["bed-1"].update(x=3.8, z=2.4, rotation=0., locked=False)
+    items["wardrobe-1"].update(width=1.8, x=1.15, z=3.8, rotation=180., locked=True)
+    items["desk-1"].update(x=3.7, z=.55, rotation=0., locked=False)
+    items["chair-1"].update(width=.5, depth=.5, x=3.7, z=1.1, rotation=180., locked=False)
+    items["nightstand-1"].update(width=.5, depth=.45, x=2.6, z=2.8, rotation=0., locked=False)
+    scene["preferences"] = [{"kind": "relative_position", "itemId": "bed-1",
+                             "targetId": "wardrobe-1", "direction": "left", "required": True}]
+
+    result = generate_layouts(scene, mode="rules", count=1, seed=42)
+
+    assert result["candidates"], result["diagnostics"]
+    candidate = result["candidates"][0]
+    placed = {item["id"]: item for item in candidate["scene"]["items"]}
+    check = next(value for value in candidate["requirements"]["checks"]
+                 if value["kind"] == "relative_position")
+    assert candidate["validation"]["valid"]
+    assert check["satisfied"], check
+    assert check["metrics"]["lateralOverlapMeters"] >= check["metrics"]["minLateralOverlapMeters"]
+    assert [placed["wardrobe-1"][key] for key in ("x", "z", "rotation", "locked")] == [
+        items["wardrobe-1"][key] for key in ("x", "z", "rotation", "locked")]
+
+
 def test_locked_subject_cannot_satisfy_a_relative_position_by_moving():
     scene = demo_scene()
     scene["room"].update(width=6., depth=6., door=None, windows=[])

@@ -64,13 +64,16 @@ test('bedside request means head-right in bed coordinates and remains a preview 
  }
  await page.getByLabel('预览方案 1').click();
  await expect(page.locator('.preview-banner')).toBeVisible();
- await expect(page.locator('.preview-requirements')).toContainText('床侧间距');
- await expect(page.locator('.preview-requirements')).toContainText('床头位置偏差');
- await expect(page.locator('.preview-requirements')).toContainText(' m');
- await expect(page.locator('.preview-requirements')).not.toContainText('距窗');
- await expect(page.locator('.preview-requirements .unmet')).toHaveCount(0);
+ await expect(page.locator('main .preview-requirements, main .functional-relations')).toHaveCount(0);
+ await expect(page.locator('.preview-check-details')).toHaveCount(0);
+ await page.locator('.canvas-validation button').click();
+ await expect(page.locator('.preview-check-details')).toContainText('床侧间距');
+ await expect(page.locator('.preview-check-details')).toContainText('床头位置偏差');
+ await expect(page.locator('.preview-check-details')).toContainText(' m');
+ await expect(page.locator('.preview-check-details')).not.toContainText('距窗');
+ await expect(page.locator('.preview-check-details .unmet')).toHaveCount(0);
  await expect(page.locator('.header-actions .btn.primary')).toBeDisabled();
- await expect(page.getByLabel('家具搭配检查')).toContainText('不能只看是否靠近床');
+ await expect(page.getByLabel('家具搭配检查')).toContainText('床头柜');
  await page.getByRole('button',{name:'俯视',exact:true}).click();
  await expect(page.getByTestId('bed-head-marker')).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('bedside-right-preview.png'),fullPage:true});

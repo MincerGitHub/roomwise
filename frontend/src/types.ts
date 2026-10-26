@@ -18,7 +18,7 @@ export type CatalogItem={category:string;label:string;width:number;depth:number;
 export type RequirementCheck={kind:string;itemId:string;targetId?:string|null;side?:BedsideSide|null;direction?:'front'|'back'|'left'|'right'|null;actualSide?:'left'|'right';required:boolean;satisfied:boolean;blocking?:boolean;source?:'explicit'|'default';message:string;metrics?:Record<string,number|boolean|string|null>};
 export type RequirementResult={satisfied:boolean;checks:RequirementCheck[]};
 export type FunctionalRelations=RequirementResult&{unsatisfied?:RequirementCheck[];warnings?:RequirementCheck[];note?:string};
-export type Candidate={id:string;scene:Scene;validation:Validation;score:number;mode:string;summary:string;requirements?:RequirementResult;functionalRelations?:FunctionalRelations;quality?:{penalty:number;components:Record<string,number>;preferencePenalty:number}};
+export type Candidate={id:string;scene:Scene;validation:Validation;score:number;mode:string;summary:string;diversity?:{signature:string;differentFrom:string|null;reasons:string[]};requirements?:RequirementResult;functionalRelations?:FunctionalRelations;quality?:{penalty:number;components:Record<string,number>;preferencePenalty:number}};
 export type VideoJob={status:string;progress:number;frames:{id:string;url:string;timestamp:number;sharpness:number}[];candidates:{trackId:string;label:string;category:string;confidence:number;frameUrl:string;bbox:number[]}[];detector?:string;limitations?:string[];error?:string};
 export const sourceNames={brought:'搬来的旧家具',existing:'房内已有',new:'新增示意'};
 export function clone<T>(obj:T):T{return structuredClone(obj)}

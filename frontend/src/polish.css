@@ -144,6 +144,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .preview-banner .btn { min-height: 35px; border-radius: 10px; font-size: 12px; }
 .preview-requirements, .functional-relations { margin-top: 14px; padding: 16px 18px; border: 1px solid #e5e9dd; border-radius: 15px; background: #fff; }
 .functional-relations > p { font-size: 12px; line-height: 1.7; color: #798477; margin: 7px 0 12px; }
+.preview-check-details .functional-relations { padding: 0; border: 0; background: transparent; }
 .requirement-check { border-radius: 12px; font-size: 12px; line-height: 1.6; }
 .requirement-check strong { font-size: 12px; }
 .requirement-check small { font-size: 11px; }
@@ -477,10 +478,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .command-box button:active:not(:disabled) { transform: none !important; }
 }
 
-/* Candidate choices: keep only the name, status and one clear action. */
+/* Candidate choices: show the structural difference used to separate previews. */
 .candidate-card {
-  min-height: 82px;
-  align-items: center;
+  min-height: 98px;
+  align-items: flex-start;
   gap: 15px;
   padding: 15px 18px;
 }
@@ -493,9 +494,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   display: flex;
   flex: 1;
   min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 5px;
 }
 .candidate-overview h4 {
   font-size: 15px;
@@ -513,6 +514,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   font-size: 11px;
   line-height: 1.2;
   white-space: nowrap;
+}
+.candidate-difference {
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.55;
+  color: #71806b;
+  overflow-wrap: anywhere;
 }
 .candidate-status.needs-adjustment {
   border-color: rgba(231, 214, 189, .8);

@@ -59,8 +59,9 @@ test('bed in front of a locked wardrobe follows its local front and stays a prev
  }
  await page.getByLabel('预览方案 1').click();
  await expect(page.locator('.preview-banner')).toBeVisible();
- await expect(page.locator('.preview-requirements')).toContainText('前方');
- await expect(page.locator('.preview-requirements')).toContainText('家具间距上限');
+ await page.locator('.canvas-validation button').click();
+ await expect(page.locator('.preview-check-details')).toContainText('前方');
+ await expect(page.locator('.preview-check-details')).toContainText('家具间距上限');
  await expect(page.locator('.header-actions .btn.primary')).toBeDisabled();
  await page.locator('.preview-banner .btn.primary').click();
  await expect(page.locator('.preview-banner')).toHaveCount(0);
@@ -118,7 +119,8 @@ test('a chair can face a coffee table through command, preview and apply',async(
   expect([table.x,table.z,table.rotation,table.locked]).toEqual([4,4,0,true]);
  }
  await page.getByLabel('预览方案 1').click();
- await expect(page.locator('.preview-requirements')).toContainText('正面需朝向茶几');
+ await page.locator('.canvas-validation button').click();
+ await expect(page.locator('.preview-check-details')).toContainText('正面需朝向茶几');
  await page.locator('.preview-banner .btn.primary').click();
  await expect(page.locator('.preview-banner')).toHaveCount(0);
 });
@@ -189,7 +191,8 @@ for(const relation of [
   const original=await canvas.getAttribute('data-layout');
   await page.getByLabel('预览方案 1').click();
   await expect(page.locator('.preview-banner')).toBeVisible();
-  await expect(page.locator('.preview-requirements')).toContainText(
+  await page.locator('.canvas-validation button').click();
+  await expect(page.locator('.preview-check-details')).toContainText(
    relation.direction==='left'?'左侧':relation.direction==='right'?'右侧':relation.label,
   );
   await page.locator('.preview-banner').getByRole('button',{name:'退出预览'}).click();

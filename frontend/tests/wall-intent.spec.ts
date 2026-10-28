@@ -21,7 +21,8 @@ test('bookshelf wall instruction has a real execution path and independent accep
   expect(wall.metrics.backAlignmentErrorDegrees).toBeLessThanOrEqual(20);
  }
  await page.getByLabel('预览方案 1').click();
- await expect(page.locator('.preview-requirements')).toContainText('距墙');
- await expect(page.locator('.preview-requirements .unmet')).toHaveCount(0);
+ await page.locator('.canvas-validation button').click();
+ await expect(page.locator('.preview-check-details')).toContainText('距墙');
+ await expect(page.locator('.preview-check-details .unmet')).toHaveCount(0);
  await expect(page.locator('.header-actions .btn.primary')).toBeDisabled();
 });

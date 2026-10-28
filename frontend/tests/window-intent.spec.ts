@@ -31,9 +31,12 @@ test('window command is recognized and preview satisfies both requests without m
  const candidate=generated.candidates[0];
  await page.getByLabel('预览方案 1').click();
  await expect(page.locator('.preview-banner')).toBeVisible();
- await expect(page.locator('.preview-requirements')).toContainText('距窗');
- await expect(page.locator('.preview-requirements')).toContainText('朝向偏差');
- await expect(page.locator('.preview-requirements .requirement-check.unmet')).toHaveCount(0);
+ await expect(page.locator('main .preview-requirements, main .functional-relations')).toHaveCount(0);
+ await expect(page.locator('.preview-check-details')).toHaveCount(0);
+ await page.locator('.canvas-validation button').click();
+ await expect(page.locator('.preview-check-details')).toContainText('距窗');
+ await expect(page.locator('.preview-check-details')).toContainText('朝向偏差');
+ await expect(page.locator('.preview-check-details .requirement-check.unmet')).toHaveCount(0);
  await page.evaluate(()=>window.scrollTo(0,0));
  await page.screenshot({path:'../artifacts/interaction_checks/window_request_preview.png',fullPage:true});
  await page.locator('.view-switch button').nth(1).click();

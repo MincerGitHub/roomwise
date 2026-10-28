@@ -21,6 +21,11 @@ test('candidate preview is isolated until explicitly applied',async({page})=>{
  await page.locator('.generation-actions button.primary').click();
  const first=page.locator('.candidate-card').first();
  await expect(first).toBeVisible({timeout:40000});
+ const cards=page.locator('.candidate-card');
+ await expect(cards).toHaveCount(3);
+ const differences=await cards.locator('.candidate-difference').allTextContents();
+ expect(differences[0]).toBe('基准方案');
+ expect(differences.slice(1).some(text=>text.trim().length>0)).toBe(true);
  await first.locator('button').first().click();
  await expect(page.locator('.preview-banner')).toBeVisible();
  await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).not.toEqual(original);

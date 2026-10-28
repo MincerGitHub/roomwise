@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from copy import deepcopy
 from .layout_templates import functional_template
+from hashlib import sha1
 import importlib
+import json
 import math
 import random
 import time
 import uuid
 
 import numpy as np
+from shapely.geometry import LineString, Point
 
 from .bedside_constraints import bedside_assignments, bedside_placements, bed_placements_for_locked_stands, evaluate_bedside_groups, evaluate_bedside_preference
 
@@ -34,6 +37,7 @@ from .window_constraints import (
     matching_windows,
 )
 from .relative_constraints import evaluate_relative_position, relative_position_placements
+from .relative_constraints import target_axes
 from .facing_constraints import facing_item_placements, evaluate_facing_preference
 from .supports import support_errors
 
@@ -777,7 +781,194 @@ def _fingerprint(scene):
     return tuple((i["id"], round(i["x"], 2), round(i["z"], 2), round(i.get("rotation", 0) % 360, 1)) for i in scene["items"])
 
 
-def _generate_supported_layouts(scene, mode, count, seed):
+def _candidate_pool_size(count):
+    """Search beyond the requested preview count so selection can diversify."""
+    return min(10, max(count + 3, count * 2))
+
+
+def _diversity_features(scene):
+    """Return coarse, reviewable layout features independent of coordinate jitter."""
+    movable = [item for item in scene["items"] if not item.get("locked")]
+    if not movable:
+        return {}
+    room = scene["room"]
+    polygon = room_polygon(room)
+    vertices = list(polygon.exterior.coords)[:-1]
+    edges = [LineString((vertices[index], vertices[(index + 1) % len(vertices)]))
+             for index in range(len(vertices))]
+    wall_names = None
+    if len(vertices) == 4 and room.get("width") and room.get("depth"):
+        wall_names = []
+        for start, end in zip(vertices, [*vertices[1:], vertices[0]]):
+            dx, dz = end[0] - start[0], end[1] - start[1]
+            if abs(dx) < 1e-6:
+                wall_names.append("west" if abs(start[0]) < 1e-5 else "east" if abs(start[0] - room["width"]) < 1e-5 else "side")
+            elif abs(dz) < 1e-6:
+                wall_names.append("south" if abs(start[1]) < 1e-5 else "north" if abs(start[1] - room["depth"]) < 1e-5 else "side")
+            else:
+                wall_names.append("side")
+    items = sorted(scene["items"], key=lambda item: item["id"])
+    features = {}
+    for item in movable:
+        item_id = item["id"]
+        forward, _ = target_axes(item)
+        bearing = math.degrees(math.atan2(forward[0], forward[1])) % 360
+        features[("facing", item_id)] = round(bearing / 45) % 8
+        shape = footprint(item)
+        distances = [shape.distance(edge) for edge in edges]
+        nearest = min(distances)
+        wall_band = "touch" if nearest <= .08 else "near" if nearest <= .32 else "open"
+        near_edges = tuple(index for index, distance in enumerate(distances) if distance - nearest <= .08)
+        wall = (tuple((wall_names[index] if wall_names else f"edge-{index + 1}") for index in near_edges)
+                if wall_band != "open" else ())
+        vertex_distances = [shape.distance(Point(vertex)) for vertex in vertices]
+        corner_index = min(range(len(vertices)), key=vertex_distances.__getitem__)
+        corner = None
+        if vertex_distances[corner_index] <= .12:
+            if wall_names:
+                adjacent = (wall_names[(corner_index - 1) % len(wall_names)], wall_names[corner_index])
+                corner_names = {frozenset(("south", "west")): "西南角",
+                                frozenset(("south", "east")): "东南角",
+                                frozenset(("north", "east")): "东北角",
+                                frozenset(("north", "west")): "西北角"}
+                corner = corner_names.get(frozenset(adjacent), f"房间角落{corner_index + 1}")
+            else:
+                corner = f"房间角落{corner_index + 1}"
+        features[("anchor", item_id)] = (wall, wall_band, corner)
+
+    def projection(item, axis):
+        values = [x * axis[0] + z * axis[1] for x, z in footprint(item).exterior.coords]
+        return min(values), max(values)
+
+    direction_names = ("前方", "右前方", "右侧", "右后方", "后方", "左后方", "左侧", "左前方")
+
+    def relation_side(subject, target, forward, right):
+        subject_forward = projection(subject, forward)
+        target_forward = projection(target, forward)
+        subject_right = projection(subject, right)
+        target_right = projection(target, right)
+        forward_gap = max(subject_forward[0] - target_forward[1], target_forward[0] - subject_forward[1], 0.)
+        right_gap = max(subject_right[0] - target_right[1], target_right[0] - subject_right[1], 0.)
+        forward_overlap = forward_gap <= .01
+        right_overlap = right_gap <= .01
+        forward_offset = (sum(subject_forward) - sum(target_forward)) / 2
+        right_offset = (sum(subject_right) - sum(target_right)) / 2
+        actual_overlap = footprint(subject).intersection(footprint(target)).area > 1e-3
+        if actual_overlap:
+            return "重叠"
+        if forward_overlap and right_overlap:
+            angle = math.degrees(math.atan2(right_offset, forward_offset)) % 360
+            return direction_names[round(angle / 45) % 8]
+        if forward_overlap:
+            return "右侧" if right_offset > 0 else "左侧"
+        if right_overlap:
+            return "前方" if forward_offset > 0 else "后方"
+        # For diagonal separations, classify the gap direction instead of the
+        # centres, so a wide or rotated item cannot be assigned to the wrong side.
+        forward_sign = 1 if subject_forward[0] >= target_forward[1] else -1
+        right_sign = 1 if subject_right[0] >= target_right[1] else -1
+        diagonal = {(1, 1): 1, (1, -1): 7, (-1, 1): 3, (-1, -1): 5}
+        return direction_names[diagonal[(forward_sign, right_sign)]]
+
+    for index, subject in enumerate(items):
+        for target in items[index + 1:]:
+            if subject.get("locked") and target.get("locked"):
+                continue
+            forward, right = target_axes(target)
+            side = relation_side(subject, target, forward, right)
+            gap = footprint(subject).distance(footprint(target))
+            gap_band = ("overlap" if gap <= .025 else "very_near" if gap <= .10 else "near" if gap <= .30
+                        else "usable" if gap <= .60 else "wide" if gap <= 1.0 else "far")
+            features[("relation", subject["id"], target["id"])] = (side, gap_band)
+    return features
+
+
+def _signature_hash(features):
+    normalized = [[list(key), value] for key, value in sorted(features.items())]
+    payload = json.dumps(normalized, ensure_ascii=False, separators=(",", ":"))
+    return sha1(payload.encode("utf-8")).hexdigest()[:12]
+
+
+def _diversity_distance(first, second):
+    keys = first.keys() | second.keys()
+    return sum(first.get(key) != second.get(key) for key in keys)
+
+
+def _distinct_candidate_count(candidates):
+    return len({candidate.get("_diversity_hash") for candidate in candidates})
+
+
+def _candidate_search_full(candidates, requested_count, pool_limit, return_pool=False):
+    """Continue past coordinate variants until enough layouts differ structurally."""
+    if return_pool:
+        return len(candidates) >= min(24, pool_limit * 4)
+    return _distinct_candidate_count(candidates) >= requested_count
+
+
+def _diversity_reason(first, second, scene):
+    labels = {item["id"]: item["label"] for item in scene["items"]}
+    preferred = ["relation", "facing", "anchor"]
+    changed = []
+    for kind in preferred:
+        for key in sorted(first.keys() | second.keys()):
+            if key[0] != kind or first.get(key) == second.get(key):
+                continue
+            if kind == "relation":
+                side, gap_band = second[key]
+                gap_name = {"overlap": "重叠", "very_near": "紧凑", "near": "较近",
+                            "usable": "常用间距", "wide": "宽松", "far": "较远"}.get(gap_band, gap_band)
+                changed.append(f"{labels.get(key[1], key[1])}位于{labels.get(key[2], key[2])}{side}（{gap_name}）")
+            elif kind == "facing":
+                direction = ("北", "东北", "东", "东南", "南", "西南", "西", "西北")
+                changed.append(f"{labels.get(key[1], key[1])}朝向{direction[int(second[key]) % 8]}")
+            elif kind == "anchor":
+                walls, band, corner = second[key]
+                if corner is not None:
+                    changed.append(f"{labels.get(key[1], key[1])}位于{corner}")
+                elif walls:
+                    changed.append(f"{labels.get(key[1], key[1])}{'、'.join(walls)}墙（{band}）")
+                else:
+                    changed.append(f"{labels.get(key[1], key[1])}转为房间内侧")
+            if len(changed) >= 2:
+                return changed
+    return changed
+
+
+def _select_diverse(candidates, count, scene):
+    """Keep the strongest candidate first, then require a meaningful difference."""
+    if not candidates:
+        return []
+    for candidate in candidates:
+        candidate["_diversity_features"] = _diversity_features(candidate["scene"])
+        candidate["_diversity_hash"] = _signature_hash(candidate["_diversity_features"])
+    remaining = sorted(candidates, key=lambda candidate: candidate["score"], reverse=True)
+    selected = [remaining.pop(0)]
+    while remaining and len(selected) < count:
+        eligible = [candidate for candidate in remaining
+                    if all(candidate["_diversity_hash"] != chosen["_diversity_hash"] for chosen in selected)]
+        if not eligible:
+            break
+        next_candidate = max(eligible, key=lambda candidate: (
+            sum(_diversity_distance(candidate["_diversity_features"], chosen["_diversity_features"])
+                for chosen in selected), candidate["score"]))
+        previous = selected[-1]
+        reasons = _diversity_reason(previous["_diversity_features"], next_candidate["_diversity_features"], scene)
+        next_candidate["diversity"] = {"signature": next_candidate["_diversity_hash"],
+                                       "differentFrom": previous["id"], "reasons": reasons}
+        if reasons:
+            next_candidate["summary"] += "方案差异：" + "；".join(reasons) + "。"
+        selected.append(next_candidate)
+        remaining.remove(next_candidate)
+    if selected:
+        first = selected[0]
+        first["diversity"] = {"signature": first["_diversity_hash"], "differentFrom": None, "reasons": []}
+    for candidate in selected:
+        candidate.pop("_diversity_features", None)
+        candidate.pop("_diversity_hash", None)
+    return selected
+
+
+def _generate_supported_layouts(scene, mode, count, seed, pool_limit=None, return_pool=False):
     """Search floor furniture, then carry each box with its supporting surface."""
     children = [item for item in scene["items"] if item.get("supportId")]
     errors = support_errors(scene)
@@ -791,7 +982,9 @@ def _generate_supported_layouts(scene, mode, count, seed):
         if any(child.get("locked") and child["supportId"] == item["id"] for child in children):
             item["locked"] = True
     base["preferences"] = [pref for pref in base.get("preferences", []) if pref["itemId"] not in child_ids and pref.get("targetId") not in child_ids]
-    response = generate_layouts(base, mode, count, seed)
+    requested_count = count
+    pool_limit = pool_limit or _candidate_pool_size(count)
+    response = generate_layouts(base, mode, pool_limit, seed, _pool_limit=pool_limit, _return_candidate_pool=True)
     accepted = []
     for candidate in response["candidates"]:
         proposed = candidate["scene"]
@@ -820,15 +1013,37 @@ def _generate_supported_layouts(scene, mode, count, seed):
         candidate.update(validation=validation, requirements=requirements,
                          summary=f"保留全部 {len(scene['items'])} 件物品，收纳箱随承托家具一起移动；通过高度、台面和空间检查。")
         accepted.append(candidate)
-    response["candidates"] = accepted
+    if return_pool:
+        selected = accepted[:min(24, pool_limit * 4)]
+        distinct_count = len({_signature_hash(_diversity_features(candidate["scene"])) for candidate in selected})
+    else:
+        selected = _select_diverse(accepted, requested_count, scene)
+        distinct_count = len({candidate["diversity"]["signature"] for candidate in selected})
+    response["candidates"] = selected
+    selected = response["candidates"]
+    response["diversity"] = {"requestedCount": requested_count, "poolTarget": pool_limit, "poolCount": len(accepted),
+                             "distinctCount": distinct_count,
+                             "returnedCount": len(selected), "achieved": len(selected) >= requested_count}
+    template_diagnostics = response["diagnostics"].setdefault(
+        "functionalTemplates", {"attempts": 0, "accepted": 0, "poolAccepted": 0, "poolTarget": pool_limit})
+    template_diagnostics["accepted"] = sum(
+        candidate.get("provenance", {}).get("initialization") == "functional_group_template"
+        for candidate in selected)
     if not accepted:
         response["diagnostics"]["message"] = "未找到同时满足台面承托、上方空间和布局要求的候选。"
+    elif not return_pool:
+        response["diagnostics"]["message"] = f"经过台面承托与空间检查，找到{len(selected)}种位置关系、朝向或靠墙位置不同的方案。"
+        if len(selected) < requested_count:
+            response["diagnostics"]["message"] += "没有用相似方案补足数量。"
+    response["diagnostics"]["diversity"] = response["diversity"]
     return response
 
 
-def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
+def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limit=None, _return_candidate_pool=False):
+    requested_count = count
+    pool_limit = _pool_limit or _candidate_pool_size(count)
     if len(scene["items"]) <= MAX_GENERATION_ITEMS and any(item.get("supportId") for item in scene["items"]):
-        return _generate_supported_layouts(scene, mode, count, seed)
+        return _generate_supported_layouts(scene, mode, requested_count, seed, pool_limit, _return_candidate_pool)
     started = time.monotonic()
     rng = random.Random(seed)
     candidates = []
@@ -847,7 +1062,7 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
     locked_scene["items"] = [i for i in scene["items"] if i.get("locked")]
     locked_check = validate_scene(locked_scene, check_access=False)
     status = learning_status()
-    diagnostics = {"modelStatus": status, "seed": seed, "attempts": 0, "modelProposals": 0, "rawModelAccepted": 0, "repairedModelAccepted": 0, "rejected": rejected, "searchLimits": {"items": MAX_GENERATION_ITEMS, "seconds": SEARCH_SECONDS, "placementChecks": SEARCH_PLACEMENT_CHECKS}, "message": "", "limitations": ["候选必须通过独立占地、门口及近似可达性检查", "未找到候选不能证明所有数学可能性都无解；请调整条件后重试"]}
+    diagnostics = {"modelStatus": status, "seed": seed, "attempts": 0, "modelProposals": 0, "rawModelAccepted": 0, "repairedModelAccepted": 0, "rejected": rejected, "searchLimits": {"items": MAX_GENERATION_ITEMS, "seconds": SEARCH_SECONDS, "placementChecks": SEARCH_PLACEMENT_CHECKS}, "message": "", "limitations": ["候选必须通过独立占地、门口及近似可达性检查", "多样性按家具位置关系、朝向及房间锚点筛选", "未找到候选不能证明所有数学可能性都无解；请调整条件后重试"]}
     if not locked_check["valid"]:
         diagnostics.update(message="锁定家具本身存在越界、门口或相互碰撞。请先修正或明确解锁。", lockedIssues=locked_check["issues"])
         return {"baseVersion": scene.get("version", 0), "candidates": [], "diagnostics": diagnostics}
@@ -911,7 +1126,13 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
         fingerprint = _fingerprint(proposed)
         if fingerprint in fingerprints:
             return False
-        fingerprints.add(fingerprint)
+        diversity_features = _diversity_features(proposed)
+        diversity_hash = _signature_hash(diversity_features)
+        if not _return_candidate_pool and sum(candidate.get("_diversity_hash") == diversity_hash
+                                               for candidate in candidates) >= 2:
+            # Keep a couple of high-quality examples per arrangement while
+            # ensuring jitter variants cannot consume the bounded search pool.
+            return False
         quality = layout_quality(proposed)
         preferences = preference_penalty(proposed, scene)
         # A candidate must first pass hard geometry checks. This soft score
@@ -943,18 +1164,22 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
                 candidates[-1]["summary"] += "为完成布置，同时调整了未锁定的" + "、".join(item["label"] for item in other_moved) + "。"
             else:
                 candidates[-1]["summary"] += "未提及的家具保持原位。"
+        candidates[-1]["_diversity_features"] = diversity_features
+        candidates[-1]["_diversity_hash"] = diversity_hash
+        fingerprints.add(fingerprint)
         return True
 
     if mode in ("rules", "hybrid") and not has_spatial_requirements and not has_relative_preferences:
-        diagnostics["functionalTemplates"] = {"attempts": 0, "accepted": 0}
-        for _ in range(min(count + 2, 5)):
-            if len(candidates) >= count or not budget.take():
+        diagnostics["functionalTemplates"] = {"attempts": 0, "accepted": 0, "poolAccepted": 0, "poolTarget": pool_limit}
+        template_limit = min(24, pool_limit * (4 if _return_candidate_pool else 3))
+        for _ in range(min(template_limit + 2, 28)):
+            if _candidate_search_full(candidates, requested_count, pool_limit, _return_candidate_pool) or not budget.take():
                 break
             diagnostics["attempts"] += 1
             diagnostics["functionalTemplates"]["attempts"] += 1
             proposed = functional_template(scene, rng, budget)
             if accept(proposed, "rules"):
-                diagnostics["functionalTemplates"]["accepted"] += 1
+                diagnostics["functionalTemplates"]["poolAccepted"] += 1
                 candidates[-1]["provenance"] = {"initialization": "functional_group_template",
                     "layoutNetwork": False, "geometricRepair": False, "functionalGroups": True}
                 candidates[-1]["summary"] += "本次按床与床头柜、桌椅等功能组搜索摆放，使用规则模板，未运行布局网络。"
@@ -964,10 +1189,12 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
         # A local explicit edit must not first perturb unrelated furniture.
         diagnostics["explicitRequirementSearch"] = {"used": True, "layoutNetwork": False,
                                                      "reason": "明确空间要求使用优先保留未提及家具的约束搜索；未先运行全屋布局网络。"}
-    if mode in ("model", "hybrid") and len(candidates) < count and _available(status) and not (
+    needs_more_models = (not _candidate_search_full(candidates, requested_count, pool_limit, _return_candidate_pool)
+                         if mode == "model" else len(candidates) < requested_count)
+    if mode in ("model", "hybrid") and needs_more_models and _available(status) and not (
             mode == "hybrid" and (has_spatial_requirements or has_relative_preferences)):
         module = importlib.import_module("roomwise.learning")
-        for trial in range(min(count + 2, 5)):
+        for trial in range(min(pool_limit + 2, 5)):
             if not budget.take():
                 break
             diagnostics["attempts"] += 1
@@ -1009,12 +1236,12 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
             except Exception as exc:
                 rejected["model"] += 1
                 diagnostics["modelError"] = f"{type(exc).__name__}: {str(exc)[:180]}"
-            if len(candidates) >= count:
+            if _candidate_search_full(candidates, requested_count, pool_limit, _return_candidate_pool):
                 break
-    if mode in ("rules", "hybrid"):
-        attempts = max(10, min(28, count * 8))
+    if mode in ("rules", "hybrid") and not _candidate_search_full(candidates, requested_count, pool_limit, _return_candidate_pool):
+        attempts = max(10, min(36, pool_limit * 6))
         for _ in range(attempts):
-            if len(candidates) >= count or not budget.take():
+            if _candidate_search_full(candidates, requested_count, pool_limit, _return_candidate_pool) or not budget.take():
                 break
             diagnostics["attempts"] += 1
             proposed = rule_candidate(scene, rng, budget=budget)
@@ -1028,6 +1255,7 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
     if not candidates and mode != "model" and original_check["valid"]:
         accept(deepcopy(scene), "current")
     candidates.sort(key=lambda c: c["score"], reverse=True)
+    pool_count = len(candidates)
     if candidates:
         diagnostics["message"] = f"已找到{len(candidates)}个通过检查的候选；分数只表示定义的布局偏好，不代表设计质量概率。"
         if mode == "hybrid" and not _available(status):
@@ -1038,8 +1266,34 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42):
         diagnostics["message"] = "当前条件下未找到通过检查的布局。系统未删除家具、修改尺寸或移动锁定物品；可解锁部分位置或调整家具清单。"
         if any(preference.get("required") for preference in scene.get("preferences", [])):
             diagnostics["message"] = "当前搜索预算内未找到同时满足明确要求与占地、入口检查的布局。未返回违反靠墙、靠窗或朝向要求的替代方案；请检查目标位置空间、锁定家具，或调整要求。"
+    if "functionalTemplates" not in diagnostics:
+        diagnostics["functionalTemplates"] = {"attempts": 0, "accepted": 0, "poolAccepted": 0, "poolTarget": pool_limit}
+    if _return_candidate_pool:
+        selected = candidates[:min(24, pool_limit * 4)]
+        distinct_count = _distinct_candidate_count(selected)
+        for candidate in selected:
+            candidate.pop("_diversity_features", None)
+            candidate.pop("_diversity_hash", None)
+    else:
+        selected = _select_diverse(candidates, requested_count, scene)
+        distinct_count = len({candidate["diversity"]["signature"] for candidate in selected})
+    diagnostics["functionalTemplates"]["accepted"] = sum(
+        candidate.get("provenance", {}).get("initialization") == "functional_group_template"
+        for candidate in selected)
+    diagnostics["diversity"] = {"requestedCount": requested_count, "poolTarget": pool_limit,
+                                 "poolCount": pool_count, "distinctCount": distinct_count,
+                                 "returnedCount": len(selected), "achieved": len(selected) >= requested_count}
+    if candidates and not _return_candidate_pool:
+        details = []
+        if mode == "hybrid" and not _available(status):
+            details.append("本次使用规则搜索")
+        elif mode == "hybrid" and (has_spatial_requirements or has_relative_preferences):
+            details.append("本次使用局部空间约束搜索，未运行布局网络")
+        diagnostics["message"] = f"找到{len(selected)}种位置关系、朝向或靠墙位置不同的可行方案。" + ("" if not details else " " + "；".join(details) + "。")
+        if len(selected) < requested_count:
+            diagnostics["message"] += "没有用相似方案补足数量。"
     diagnostics["elapsedSeconds"] = round(time.monotonic() - started, 3)
     diagnostics["searchBudgetExhausted"] = budget.exhausted
     if budget.exhausted:
         diagnostics["message"] += "已达到搜索预算；这不表示数学上不存在可行布局。"
-    return {"baseVersion": scene.get("version", 0), "candidates": candidates[:count], "diagnostics": diagnostics}
+    return {"baseVersion": scene.get("version", 0), "candidates": selected, "diagnostics": diagnostics}

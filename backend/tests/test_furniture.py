@@ -17,6 +17,7 @@ from roomwise import furniture_api, furniture_vision, main
 from roomwise.catalog import demo_scene
 from roomwise.catalog import CATALOG
 from roomwise.furniture import FurnitureError, FurnitureService
+from roomwise.furniture_reconstruction import validate_generated_glb
 from roomwise.furniture_schemas import FurnitureProperties, FurnitureRecognition, PublishFurniture, SaveFurnitureDraft
 from roomwise.furniture_vision import VisionError, recognition_schema, recognize_furniture, vision_status
 from roomwise.generator import _sanitize_model_output
@@ -76,15 +77,22 @@ def model_url(service):
     directory = service.uploads / "assets"
     directory.mkdir(exist_ok=True)
     name = uuid.uuid4().hex + ".glb"
-    metadata = json.dumps({"asset": {"version": "2.0"}}).encode()
+    geometry = struct.pack("<12f12H", 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 2, 0, 2, 3, 0, 3, 1, 1, 3, 2)
+    metadata = json.dumps({"asset": {"version": "2.0"}, "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]}], "buffers": [{"byteLength": len(geometry)}], "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": 48}, {"buffer": 0, "byteOffset": 48, "byteLength": 24}], "accessors": [{"bufferView": 0, "componentType": 5126, "count": 4, "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 1]}, {"bufferView": 1, "componentType": 5123, "count": 12, "type": "SCALAR"}], "nodes": [{"mesh": 0}], "scenes": [{"nodes": [0]}], "scene": 0}).encode()
     metadata += b" " * (-len(metadata) % 4)
-    binary = struct.pack("<4sII", b"glTF", 2, 20 + len(metadata)) + struct.pack("<II", len(metadata), 0x4E4F534A) + metadata
+    binary = struct.pack("<4sII", b"glTF", 2, 28 + len(metadata) + len(geometry)) + struct.pack("<II", len(metadata), 0x4E4F534A) + metadata + struct.pack("<II", len(geometry), 0x004E4942) + geometry
     (directory / name).write_bytes(binary)
     return "/uploads/assets/" + name
 
 
 def publication(draft, service, **overrides):
-    body = {"requestId": uuid.uuid4().hex, "expectedVersion": draft["version"], "assetUrl": model_url(service),
+    url = draft.get("modelUrl") or model_url(service)
+    if not draft.get("modelUrl"):
+        with service.connect() as connection:
+            stored = service.get(connection, "furniture_drafts", draft["id"])
+            stored["modelUrl"] = url
+            service.put(connection, "furniture_drafts", stored)
+    body = {"requestId": uuid.uuid4().hex, "expectedVersion": draft["version"], "assetUrl": url,
             "confirmations": dict.fromkeys(("category", "label", "dimensions", "direction", "structure"), True)}
     body.update(overrides)
     return body
@@ -152,6 +160,67 @@ def test_publish_requires_confirmation_complete_dimensions_and_glb(environment):
     response = client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=publication(saved, service))
     assert response.status_code == 400
     assert service.listing()["assets"] == []
+
+
+def test_three_view_local_reconstruction_uses_generated_mesh_for_publication(environment):
+    client, service = environment
+    task = client.post("/api/furniture/analyze", data={"localOnly": "true"}, files=[
+        ("files", (f"view-{index}.jpg", photo_bytes(), "image/jpeg")) for index in range(3)
+    ]).json()
+    assert task["jobId"] is None
+    draft = service.draft(task["draftId"])
+    assert draft["recognition"] is None
+
+    def reconstruct_three_views(photos, output):
+        assert len(photos) == 3
+        assert all(photo.is_file() for photo in photos)
+        reference = service.uploads / "assets" / Path(model_url(service)).name
+        output.write_bytes(reference.read_bytes())
+        validate_generated_glb(output)
+        return "/uploads/assets/" + output.name
+
+    service.reconstructor = reconstruct_three_views
+    started = client.post(f"/api/furniture/drafts/{draft['id']}/reconstruct").json()
+    assert client.post(f"/api/furniture/drafts/{draft['id']}/reconstruct").status_code == 409
+    service.process_reconstruction(started["jobId"])
+    result = client.get(f"/api/furniture/reconstruction-jobs/{started['jobId']}").json()
+    assert result["status"] == "complete"
+    generated = service.draft(draft["id"])
+    assert generated["modelUrl"] == result["modelUrl"]
+    assert (service.uploads / "assets" / Path(generated["modelUrl"]).name).is_file()
+    with pytest.raises(FurnitureError):
+        service.publish(generated["id"], PublishFurniture.model_validate(publication(generated, service, assetUrl="/uploads/assets/" + "0" * 32 + ".glb")))
+    saved = service.save(generated["id"], SaveFurnitureDraft(expectedVersion=generated["version"], properties=recognized()["properties"]))
+    asset = service.publish(saved["id"], PublishFurniture.model_validate(publication(saved, service)))
+    assert asset["assetUrl"] == generated["modelUrl"]
+
+
+def test_failed_reconstruction_keeps_draft_unpublished_and_allows_retry(environment):
+    client, service = environment
+    task = client.post("/api/furniture/analyze", data={"localOnly": "true"}, files=[
+        ("files", (f"view-{index}.jpg", photo_bytes(), "image/jpeg")) for index in range(3)
+    ]).json()
+    service.reconstructor = lambda photos, output: "/uploads/assets/" + output.name
+    first = service.start_reconstruction(task["draftId"])
+    service.process_reconstruction(first["jobId"])
+    assert service.reconstruction_job(first["jobId"])["status"] == "failed"
+    assert service.draft(task["draftId"])["modelUrl"] is None
+    assert service.listing()["assets"] == []
+    second = service.start_reconstruction(task["draftId"])
+    assert second["jobId"] != first["jobId"]
+
+
+def test_delete_running_reconstruction_never_restores_draft(environment):
+    client, service = environment
+    task = client.post("/api/furniture/analyze", data={"localOnly": "true"}, files=[
+        ("files", (f"view-{index}.jpg", photo_bytes(), "image/jpeg")) for index in range(3)
+    ]).json()
+    started = service.start_reconstruction(task["draftId"])
+    draft = service.draft(task["draftId"])
+    service.delete_draft(task["draftId"], draft["version"])
+    assert service.reconstruction_job(started["jobId"])["status"] == "failed"
+    service.process_reconstruction(started["jobId"])
+    assert service.listing()["drafts"] == []
 
 
 @pytest.mark.parametrize("flag,value", [("sameObject", False), ("multipleObjects", True), ("viewConflict", True), ("needsCrop", True)])

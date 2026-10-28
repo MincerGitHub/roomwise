@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from .furniture import FurnitureError, FurnitureService, prepare_photos
 from .furniture_schemas import PublishFurniture, RetryFurniture, SaveFurnitureDraft
 from .furniture_vision import vision_status
+from .furniture_reconstruction import reconstruction_status
 from .storage import runtime_directory
 
 
@@ -56,14 +57,14 @@ def invoke(operation, *arguments):
 
 @router.get("/status")
 def status():
-    return vision_status()
+    return {**vision_status(), "reconstruction": reconstruction_status()}
 
 
 @router.post("/analyze")
-async def analyze(files: list[UploadFile] = File(...), consent: bool = Form(False)):
+async def analyze(files: list[UploadFile] = File(...), consent: bool = Form(False), localOnly: bool = Form(False)):
     directory = None
     try:
-        if not consent:
+        if not consent and not localOnly:
             raise HTTPException(400, "必须先明确同意向视觉服务发送所选图片及可能的计费")
         if not 1 <= len(files) <= 3:
             raise HTTPException(400, "每件家具需要 1—3 张图片")
@@ -84,7 +85,7 @@ async def analyze(files: list[UploadFile] = File(...), consent: bool = Form(Fals
             if not size:
                 raise HTTPException(400, "图片不能为空")
         photo_urls = await run_in_threadpool(prepare_photos, directory, len(files))
-        return invoke(target.create, identifier, photo_urls)
+        return invoke(target.create_local if localOnly else target.create, identifier, photo_urls)
     except (HTTPException, FurnitureError) as exc:
         if directory and directory.is_dir():
             for path in directory.iterdir():
@@ -109,6 +110,11 @@ def job(job_id: str):
     return invoke(service().job, job_id)
 
 
+@router.get("/reconstruction-jobs/{job_id}")
+def reconstruction_job(job_id: str):
+    return invoke(service().reconstruction_job, job_id)
+
+
 @router.get("/drafts/{draft_id}")
 def draft(draft_id: str):
     return invoke(service().draft, draft_id)
@@ -127,6 +133,11 @@ def save(draft_id: str, request: SaveFurnitureDraft):
 @router.post("/drafts/{draft_id}/retry")
 def retry(draft_id: str, request: RetryFurniture):
     return invoke(service().retry, draft_id)
+
+
+@router.post("/drafts/{draft_id}/reconstruct")
+def reconstruct(draft_id: str):
+    return invoke(service().start_reconstruction, draft_id)
 
 
 @router.post("/drafts/{draft_id}/publish")

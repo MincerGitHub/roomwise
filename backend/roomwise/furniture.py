@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
+import struct
 import uuid
 import warnings
 
@@ -15,6 +16,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from .catalog import CATALOG
 from .furniture_schemas import FurnitureProperties, PublishFurniture, SaveFurnitureDraft
 from .furniture_vision import VisionError, recognize_furniture
+from .furniture_reconstruction import ReconstructionError, reconstruct, validate_generated_glb
 from .schemas import FurnitureSnapshot
 
 
@@ -60,17 +62,20 @@ def prepare_photos(directory: Path, count: int):
 
 
 class FurnitureService:
-    def __init__(self, database: Path, uploads: Path, *, analyzer=recognize_furniture, auto_run=True):
+    def __init__(self, database: Path, uploads: Path, *, analyzer=recognize_furniture, reconstructor=reconstruct, auto_run=True):
         self.database = Path(database)
         self.uploads = Path(uploads)
         self.database.parent.mkdir(parents=True, exist_ok=True)
         (self.uploads / "furniture").mkdir(parents=True, exist_ok=True)
         self.analyzer = analyzer
+        self.reconstructor = reconstructor
         self.auto_run = auto_run
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="furniture-vision")
+        self.reconstruction_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="furniture-reconstruction")
         with self.connect() as connection:
             connection.execute("CREATE TABLE IF NOT EXISTS furniture_drafts (id TEXT PRIMARY KEY, body TEXT NOT NULL)")
             connection.execute("CREATE TABLE IF NOT EXISTS furniture_jobs (id TEXT PRIMARY KEY, body TEXT NOT NULL)")
+            connection.execute("CREATE TABLE IF NOT EXISTS furniture_reconstruction_jobs (id TEXT PRIMARY KEY, body TEXT NOT NULL)")
             connection.execute("CREATE TABLE IF NOT EXISTS furniture_assets (id TEXT PRIMARY KEY, body TEXT NOT NULL)")
             connection.execute("CREATE TABLE IF NOT EXISTS furniture_publications (request_id TEXT PRIMARY KEY, draft_id TEXT NOT NULL, body TEXT NOT NULL)")
             for row in connection.execute("SELECT id,body FROM furniture_jobs").fetchall():
@@ -78,9 +83,15 @@ class FurnitureService:
                 if job["status"] in {"queued", "processing"}:
                     job.update(status="failed", errorCode="interrupted", error="上次识别被中断；草稿已保留，需手动重试。", updatedAt=now())
                     self.put(connection, "furniture_jobs", job)
+            for row in connection.execute("SELECT id,body FROM furniture_reconstruction_jobs").fetchall():
+                job = json.loads(row["body"])
+                if job["status"] in {"queued", "processing"}:
+                    job.update(status="failed", error="Reconstruction was interrupted; retry from the draft.", updatedAt=now())
+                    self.put(connection, "furniture_reconstruction_jobs", job)
 
     def close(self):
         self.executor.shutdown(wait=True, cancel_futures=True)
+        self.reconstruction_executor.shutdown(wait=True, cancel_futures=True)
 
     @contextmanager
     def connect(self):
@@ -131,11 +142,75 @@ class FurnitureService:
                     job = self.get(connection, "furniture_jobs", draft["jobId"])
                     job.update(status="failed", errorCode="draft_deleted", error="草稿已删除。", updatedAt=timestamp)
                     self.put(connection, "furniture_jobs", job)
+                if draft.get("reconstructionJobId"):
+                    job = self.get(connection, "furniture_reconstruction_jobs", draft["reconstructionJobId"])
+                    job.update(status="failed", error="草稿已删除。", updatedAt=timestamp)
+                    self.put(connection, "furniture_reconstruction_jobs", job)
         return {"id": identifier, "deleted": True}
 
     def job(self, identifier):
         with self.connect() as connection:
             return self.get(connection, "furniture_jobs", identifier)
+
+    def reconstruction_job(self, identifier):
+        with self.connect() as connection:
+            return self.get(connection, "furniture_reconstruction_jobs", identifier)
+
+    def start_reconstruction(self, identifier):
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            draft = self.active_draft(connection, identifier)
+            if draft.get("publishedAssetId") or draft.get("editingAssetId") or len(draft["photoUrls"]) != 3:
+                raise FurnitureError(400, "Reconstruction requires a new draft with front, right-side and top photos.")
+            if draft.get("reconstructionJobId"):
+                previous = self.get(connection, "furniture_reconstruction_jobs", draft["reconstructionJobId"])
+                if previous["status"] in {"queued", "processing"}:
+                    raise FurnitureError(409, "Reconstruction is already running.")
+            if draft.get("jobId") and self.get(connection, "furniture_jobs", draft["jobId"])["status"] in {"queued", "processing"}:
+                raise FurnitureError(409, "Wait for property recognition before reconstructing.")
+            job = {"id": uuid.uuid4().hex, "draftId": identifier, "status": "queued", "error": None, "updatedAt": now()}
+            draft.update(reconstructionJobId=job["id"], modelUrl=None, version=draft["version"] + 1, updatedAt=now())
+            self.put(connection, "furniture_reconstruction_jobs", job)
+            self.put(connection, "furniture_drafts", draft)
+        if self.auto_run:
+            self.reconstruction_executor.submit(self.process_reconstruction, job["id"])
+        return {"jobId": job["id"], "draftId": identifier}
+
+    def process_reconstruction(self, identifier):
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            job = self.get(connection, "furniture_reconstruction_jobs", identifier)
+            if job["status"] != "queued":
+                return
+            job.update(status="processing", updatedAt=now())
+            self.put(connection, "furniture_reconstruction_jobs", job)
+            draft = self.active_draft(connection, job["draftId"])
+        directory_id = Path(draft["photoUrls"][0]).parent.name
+        photos = [self.uploads / "furniture" / directory_id / f"photo_{index}.jpg" for index in range(3)]
+        output_dir = self.uploads / "assets"
+        output_dir.mkdir(exist_ok=True)
+        output = output_dir / f"{uuid.uuid4().hex}.glb"
+        try:
+            url = self.reconstructor(photos, output)
+            validate_generated_glb(output)
+            job.update(status="complete", modelUrl=url)
+        except (ReconstructionError, OSError, ValueError) as exc:
+            output.unlink(missing_ok=True)
+            job.update(status="failed", error=str(exc))
+        except Exception:
+            output.unlink(missing_ok=True)
+            job.update(status="failed", error="Reconstruction failed; verify InstantMesh and retry.")
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            current = self.get(connection, "furniture_drafts", draft["id"])
+            if current.get("deletedAt") or current.get("reconstructionJobId") != identifier:
+                output.unlink(missing_ok=True)
+                return
+            if job["status"] == "complete":
+                current.update(modelUrl=job["modelUrl"], version=current["version"] + 1, updatedAt=now())
+                self.put(connection, "furniture_drafts", current)
+            job["updatedAt"] = now()
+            self.put(connection, "furniture_reconstruction_jobs", job)
 
     def asset(self, identifier):
         with self.connect() as connection:
@@ -174,10 +249,14 @@ class FurnitureService:
                                   and body.get("editingAssetId") not in deleted_ids],
                                  key=lambda body: body["updatedAt"], reverse=True)}
 
-    def create(self, identifier: str, photo_urls: list[str]):
-        draft = {"id": identifier, "version": 1, "photoUrls": photo_urls, "properties": FurnitureProperties().model_dump(), "recognition": None, "jobId": None, "updatedAt": now()}
+    def create_local(self, identifier: str, photo_urls: list[str]):
+        draft = {"id": identifier, "version": 1, "photoUrls": photo_urls, "properties": FurnitureProperties().model_dump(), "recognition": None, "jobId": None, "modelUrl": None, "reconstructionJobId": None, "updatedAt": now()}
         with self.connect() as connection:
             self.put(connection, "furniture_drafts", draft)
+        return {"draftId": identifier, "jobId": None}
+
+    def create(self, identifier: str, photo_urls: list[str]):
+        self.create_local(identifier, photo_urls)
         return self.retry(identifier)
 
     def retry(self, identifier):
@@ -227,9 +306,11 @@ class FurnitureService:
             if current.get("deletedAt") or current["jobId"] != identifier:
                 return
             job["updatedAt"] = now()
-            draft.update(version=current["version"] + 1, updatedAt=now())
+            current.update(version=current["version"] + 1, updatedAt=now())
+            if job["status"] == "complete":
+                current.update(recognition=result, properties=result["properties"])
             self.put(connection, "furniture_jobs", job)
-            self.put(connection, "furniture_drafts", draft)
+            self.put(connection, "furniture_drafts", current)
 
     def editable(self, connection, draft, expected_version):
         if draft.get("deletedAt"):
@@ -240,6 +321,8 @@ class FurnitureService:
             raise FurnitureError(409, "草稿版本已变化或已发布，请重新打开。")
         if draft.get("jobId") and self.get(connection, "furniture_jobs", draft["jobId"])["status"] in {"queued", "processing"}:
             raise FurnitureError(409, "请等待识别完成后再修改草稿")
+        if draft.get("reconstructionJobId") and self.get(connection, "furniture_reconstruction_jobs", draft["reconstructionJobId"])["status"] in {"queued", "processing"}:
+            raise FurnitureError(409, "请等待模型重建完成后再修改草稿")
 
     def save(self, identifier, request: SaveFurnitureDraft):
         with self.connect() as connection:
@@ -267,7 +350,7 @@ class FurnitureService:
             asset = self.active_asset(connection, identifier)
             draft = {
                 "id": uuid.uuid4().hex, "version": 1, "photoUrls": asset["photoUrls"], "properties": asset["properties"],
-                "recognition": None, "jobId": None, "editingAssetId": asset["id"], "baseAssetVersion": asset["version"], "updatedAt": now(),
+                "recognition": None, "jobId": None, "modelUrl": asset["assetUrl"], "editingAssetId": asset["id"], "baseAssetVersion": asset["version"], "updatedAt": now(),
             }
             self.put(connection, "furniture_drafts", draft)
         return draft
@@ -292,8 +375,12 @@ class FurnitureService:
             expected_direction = "negative_z" if "bed" in properties["category"] else "positive_z"
             if properties["frontDirection"] != expected_direction:
                 raise FurnitureError(400, "床头须为局部 -z，其余家具正面须为局部 +z，请核对方向。")
-            if not (self.uploads / "assets" / Path(request.assetUrl).name).is_file():
-                raise FurnitureError(400, "请先通过资产接口上传已导出的 GLB")
+            if not draft.get("modelUrl") or request.assetUrl != draft["modelUrl"]:
+                raise FurnitureError(400, "请先重建家具网格，再发布到家具库。")
+            try:
+                validate_generated_glb(self.uploads / "assets" / Path(request.assetUrl).name)
+            except (ReconstructionError, OSError, ValueError, struct.error, json.JSONDecodeError):
+                raise FurnitureError(400, "重建模型无效，请重新生成。") from None
             identifier_asset = draft.get("editingAssetId") or uuid.uuid4().hex
             version = 1
             if draft.get("editingAssetId"):

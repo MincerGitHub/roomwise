@@ -16,9 +16,11 @@ Roomwise 是一个本地运行的单房间家具布局原型。用户输入房�
 - 离线解析有限中文指令，可选接入 DeepSeek 理解更多表达；最终仍限于已实现的动作和几何检查。
 - 支持“书架靠墙”“桌子靠窗，椅子面朝窗户方向”“床头柜放床头的右侧”“床放在衣柜前面”等要求，分别显示识别结果与位置验收。
 - 上传视频、抽取画面并为椅子、沙发、床、餐桌生成待确认候选。
-- 从 1—3 张图片或拼接三视图识别自有家具，确认后生成参数化近似三维，保存到独立家具库并跨房间复用。视觉识别仅向用户指定的第三方网关 `api.tokenlab.pro` 请求 `gpt-6-sol` / `high`（Responses 协议），默认关闭；该域名不是 OpenAI 官方域名。不与 DeepSeek 文字配置混用，不自动切换模型或服务；失败保留草稿。图片质量不阻止人工入库，缺失尺寸使用标明来源的类别模板，点击最终保存按钮即可确认。
+- 上传同一件家具的正面、右侧、顶面三张图片，经本地 InstantMesh 重建为带顶点色的 GLB 网格，确认尺寸和朝向后存入家具库并跨房间复用。视觉属性识别仍可选：勾选同意时才向第三方网关 `api.tokenlab.pro` 请求 `gpt-6-sol` / `high`，否则只在本机建模和手动补全属性。重建失败保留草稿，不会把参数模板当成实物模型发布。
 
-自有家具的配置、拍摄、尺寸核对、真实识别验证与回归操作见 [自有家具图片导入指南](docs/自有家具图片导入指南.md)。照片估计尺寸不是实测尺寸，近似模型不等同于实物精细重建。
+InstantMesh 的 Python 3.10/CUDA 环境应独立于应用的 `roomwise` 环境，默认寻找同一 Miniconda 根目录下 `envs/instantmesh/python.exe`；其他路径可设置 `ROOMWISE_INSTANTMESH_PYTHON` 与 `ROOMWISE_INSTANTMESH_ROOT`。项目克隆位于上级目录 `InstantMesh`；Windows 已验证的环境为 Python 3.10、PyTorch 2.1.0+cu121、torchvision 0.16.0+cu121、`accelerate==0.21.0`、`huggingface-hub==0.17.3`、`diffusers==0.20.2`、`transformers==4.34.1`、`setuptools==81.0.0`，其余推理依赖安装 `InstantMesh/requirements.txt` 中的 Python 包，跳过 `bitsandbytes`、`nvdiffrast`，另安装 `xatlas`、`onnxruntime`。首次运行会下载权重到 `InstantMesh/ckpts`。网络受限时可设置 `HF_ENDPOINT=https://hf-mirror.com`。本地使用顶点色导出，不依赖 `nvdiffrast` 的纹理烘焙；原始 InstantMesh 权重和上游依赖的使用条件仍应分别核对。本机 RTX 4060 8 GB 显存已完成实测推理。
+
+三视图要求单件物体、背景简洁、拍摄距离接近；顶面图中正面朝画面下方。本实现先由 Zero123++ 从正面补全六视图，再用正面、右侧、顶面实拍图覆盖相应视角并输入 InstantMesh。三视图不保证精确几何或尺寸，发布前请检查预览和输入真实宽深高。自有家具的属性配置与旧版回归见 [自有家具图片导入指南](docs/自有家具图片导入指南.md)。
 
 已确认家具的卡片支持加入房间、修改和删除。删除前会确认名称；删除后该家具及其修订草稿不再显示在家具库中，已经加入房间或保存到方案中的家具仍保留，引用的照片和模型也继续可用。
 

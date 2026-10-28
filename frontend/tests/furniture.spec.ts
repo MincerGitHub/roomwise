@@ -1,16 +1,18 @@
 import {test,expect,type Route} from '@playwright/test';
+import {fileURLToPath} from 'node:url';
 
 const photo={name:'owned-chair.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64')};
 
 test('manual furniture publication, independent instances and library deletion preserve saved rooms',async({page})=>{
+ test.setTimeout(480000);
  await page.goto('/');
  await page.getByRole('button',{name:'自有家具库',exact:true}).click();
  const dialog=page.getByRole('dialog');
- await expect(dialog.getByRole('button',{name:'上传并识别家具'})).toBeDisabled();
- await dialog.getByLabel('选择家具图片').setInputFiles(photo);
- await dialog.locator('.furniture-upload input[type=checkbox]').check();
- await dialog.getByRole('button',{name:'上传并识别家具'}).click();
- await expect(dialog.getByText('视觉服务未启用或配置不完整；未发送图片。', {exact:false})).toBeVisible({timeout:15000});
+ await expect(dialog.getByRole('button',{name:'上传并重建家具'})).toBeDisabled();
+ await dialog.getByLabel('选择家具图片').setInputFiles(['front','side','top'].map(view=>fileURLToPath(new URL(`../../../data/photos/chair/${view}_view.jpg`,import.meta.url))));
+ await expect(dialog.getByText('本地重建已就绪')).toBeVisible({timeout:60000});
+ await dialog.getByRole('button',{name:'上传并重建家具'}).click();
+ await expect(dialog.getByText('已载入 InstantMesh 重建网格',{exact:false})).toBeVisible({timeout:360000});
  await expect(dialog.getByRole('button',{name:'确认并保存到家具库'})).toBeDisabled();
  const name=`浏览器测试自有椅-${Date.now()}`;
  await dialog.getByLabel('家具名称',{exact:true}).fill(name);
@@ -18,7 +20,7 @@ test('manual furniture publication, independent instances and library deletion p
  await dialog.getByLabel('家具宽（米）').fill('0.8');
  await expect(dialog.getByLabel('家具深（米）')).toHaveValue('0.8');
  await expect(dialog.getByLabel('家具高（米）')).toHaveValue('0.85');
- const preview=dialog.getByLabel('家具参数化三维预览');
+ const preview=dialog.getByLabel('家具三维预览');
  await expect(preview.locator('canvas')).toBeVisible();
  await expect.poll(async()=>{const bounds=JSON.parse((await preview.getAttribute('data-bounds'))!);return Math.abs(bounds.width-.8)+Math.abs(bounds.depth-.8)+Math.abs(bounds.height-.85)+Math.abs(bounds.minY)}).toBeLessThan(.00001);
  await expect(dialog.locator('.furniture-confirmations input')).toHaveCount(0);
@@ -185,26 +187,27 @@ test('legacy library model uses independent scene IDs for selection drag rotatio
  await expect.poll(async()=>(await layout()).find(item=>item[0]===second[0])![1]).not.toBe(restored[1]);
 });
 
-test('unconsented upload makes no model submission and crop stays local',async({page})=>{
+test('incomplete three-view upload makes no model submission and crop stays local',async({page})=>{
  let calls=0;await page.route('**/api/furniture/analyze',route=>{calls++;return route.abort()});
  await page.goto('/');await page.getByRole('button',{name:'从图片生成家具',exact:true}).click();
  await expect(page.getByLabel('我同意将所选图片发送到第三方网关 api.tokenlab.pro（非 OpenAI 官方域名），请求 gpt-6-sol / high 进行识别，可能产生服务费用。服务关闭时仅保存在本机。')).toBeVisible();
  await page.getByLabel('选择家具图片').setInputFiles(photo);
- await expect(page.getByRole('button',{name:'上传并识别家具'})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'上传并重建家具'})).toBeDisabled();
  const surface=page.locator('.crop-surface');const bounds=(await surface.boundingBox())!;
  await page.mouse.move(bounds.x+2,bounds.y+2);await page.mouse.down();await page.mouse.move(bounds.x+bounds.width*.8,bounds.y+bounds.height*.8);await page.mouse.up();
  await expect(page.getByRole('button',{name:'使用框选区域'})).toBeEnabled();
  await page.getByRole('button',{name:'使用框选区域'}).click();expect(calls).toBe(0);
 });
 
-for(const missing of [false,true])test(`uncertain images publish in one click with ${missing?'missing':'recognized'} dimensions`,async({page})=>{
+for(const missing of [false,true])test(`uncertain images require mesh with ${missing?'missing':'recognized'} dimensions`,async({page})=>{
  const parameters={primaryColor:'#789167',secondaryColor:null,material:'fabric',hasBack:true,hasArms:true,hasLegs:true,drawerCount:null,doorCount:null,shelfCount:null,seatCount:null,seatHeightRatio:.5};
  const properties={label:missing?null:'模型识别的扶手椅',category:'armchair',subtype:'软包椅',width:missing?null:.8,depth:missing?null:.7,height:missing?null:.9,dimensionSources:{width:missing?'unknown':'estimated',depth:missing?'unknown':'estimated',height:missing?'unknown':'annotation'},evidence:{width:'估计',depth:'估计',height:'900 mm'},parameters,styleTags:['简约'],frontDirection:missing?null:'positive_z'};
  const recognition={properties,views:[{imageIndex:0,view:'composite',description:'拼接视图'}],sameObject:false,multipleObjects:true,viewConflict:true,needsCrop:true,warnings:['视图可能来自不同家具'],uncertainFields:['尺寸冲突']};
- const draft={id:'mock-draft',version:2,photoUrls:['/mock-photo.png'],properties,recognition,jobId:'mock-job',updatedAt:'2026-10-23'};
+ const draft={id:'mock-draft',version:2,photoUrls:['/mock-photo.png'],properties,recognition,jobId:'mock-job',reconstructionJobId:null as string|null,modelUrl:null as string|null,updatedAt:'2026-10-23'};
  let submissions=0,publications=0;
  let asset:Record<string,unknown>|null=null;
- await page.route('**/api/assets',route=>route.fulfill({json:{url:'/uploads/assets/mock-furniture.glb'}}));
+ let modelBinary=Buffer.alloc(0);
+ await page.route('**/uploads/assets/mock-furniture.glb',route=>route.fulfill({body:modelBinary,contentType:'model/gltf-binary'}));
  await page.route(/\/api\/furniture(?:\/|$)/,async route=>{
   const path=new URL(route.request().url()).pathname;
   if(path.endsWith('/save')){
@@ -216,16 +219,25 @@ for(const missing of [false,true])test(`uncertain images publish in one click wi
    asset={id:'mock-asset',version:1,properties:draft.properties,photoUrls:draft.photoUrls,assetUrl:request.assetUrl,snapshot:{...draft.properties,version:1,photoUrls:draft.photoUrls,dimensionsConfirmed:true}};
    publications++;
   }
-  const body=path.endsWith('/status')?{enabled:true,message:'模拟视觉服务，不进行付费调用'}:path.endsWith('/analyze')?{draftId:draft.id,jobId:draft.jobId}:path.includes('/jobs/')?{id:draft.jobId,draftId:draft.id,status:'complete',error:null,errorCode:null}:path.endsWith('/publish')?asset:path.includes('/drafts/')?draft:{assets:asset?[asset]:[],drafts:asset?[]:[draft]};
+  if(path.endsWith('/reconstruct')){draft.reconstructionJobId='mock-mesh-job';draft.modelUrl='/uploads/assets/mock-furniture.glb'}
+  const body=path.endsWith('/status')?{enabled:true,message:'模拟视觉服务',reconstruction:{enabled:true,message:'模拟本地网格重建'}}:path.endsWith('/analyze')?{draftId:draft.id,jobId:draft.jobId}:path.endsWith('/reconstruct')?{draftId:draft.id,jobId:'mock-mesh-job'}:path.includes('/reconstruction-jobs/')?{id:'mock-mesh-job',draftId:draft.id,status:'complete',error:null,modelUrl:draft.modelUrl}:path.includes('/jobs/')?{id:draft.jobId,draftId:draft.id,status:'complete',error:null,errorCode:null}:path.endsWith('/publish')?asset:path.includes('/drafts/')?draft:{assets:asset?[asset]:[],drafts:asset?[]:[draft]};
   if(path.endsWith('/analyze'))submissions++;
   await route.fulfill({json:body});
  });
- await page.goto('/');await page.getByRole('button',{name:'自有家具库',exact:true}).click();
- await page.getByLabel('选择家具图片').setInputFiles([photo,{...photo,name:'side.png'},{...photo,name:'back.png'}]);
- await page.locator('.furniture-upload input[type=checkbox]').check();await page.getByRole('button',{name:'上传并识别家具'}).click();
+ await page.goto('/');
+ modelBinary=Buffer.from(await page.evaluate(async()=>{
+  const THREE=await import('/node_modules/.vite/deps/three.js' as string);
+  const {GLTFExporter}=await import('/node_modules/three/examples/jsm/exporters/GLTFExporter.js' as string);
+  const geometry=new THREE.BoxGeometry(1,1,1),material=new THREE.MeshStandardMaterial({color:0x987654});
+  const binary=await new GLTFExporter().parseAsync(new THREE.Mesh(geometry,material),{binary:true});
+  geometry.dispose();material.dispose();
+  return Array.from(new Uint8Array(binary));
+ }));
+ await page.getByRole('button',{name:'自有家具库',exact:true}).click();
+ await page.getByLabel('选择家具图片').setInputFiles([photo,{...photo,name:'side.png'},{...photo,name:'top.png'}]);
+ await page.locator('.furniture-upload input[type=checkbox]').check();await page.getByRole('button',{name:'上传并重建家具'}).click();
  await expect(page.getByLabel('家具名称',{exact:true})).toHaveValue(missing?'扶手椅':properties.label!);
  await expect(page.getByLabel('家具宽（米）')).toHaveValue(missing?'0.75':'0.8');
- await expect(page.getByRole('alert')).toHaveCount(0);
  await expect(page.locator('.furniture-confirmations input')).toHaveCount(0);
  await expect(page.getByText('视图可能来自不同家具')).not.toBeVisible();
  await expect(page.getByRole('button',{name:'确认并保存到家具库'})).toBeEnabled();

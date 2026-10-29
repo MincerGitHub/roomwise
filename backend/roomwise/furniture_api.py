@@ -66,8 +66,8 @@ async def analyze(files: list[UploadFile] = File(...), consent: bool = Form(Fals
     try:
         if not consent and not localOnly:
             raise HTTPException(400, "必须先明确同意向视觉服务发送所选图片及可能的计费")
-        if not 1 <= len(files) <= 3:
-            raise HTTPException(400, "每件家具需要 1—3 张图片")
+        if len(files) != 1:
+            raise HTTPException(400, "每件家具需要一张斜视图")
         if any(Path(file.filename or "").suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"} for file in files):
             raise HTTPException(415, "仅接受 JPEG、PNG、WebP")
         target = service()

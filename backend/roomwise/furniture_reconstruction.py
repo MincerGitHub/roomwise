@@ -157,8 +157,8 @@ def validate_generated_glb(path: Path):
 
 
 def reconstruct(photos: list[Path], output: Path):
-    if len(photos) != 3 or any(not photo.is_file() for photo in photos):
-        raise ReconstructionError("请上传同一件家具的正面、右侧、顶面三张照片。")
+    if len(photos) != 1 or not photos[0].is_file():
+        raise ReconstructionError("请上传一张家具斜视图。")
     status = reconstruction_status()
     if not status["enabled"]:
         raise ReconstructionError(status["message"])

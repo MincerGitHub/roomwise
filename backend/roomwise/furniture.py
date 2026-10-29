@@ -162,8 +162,8 @@ class FurnitureService:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             draft = self.active_draft(connection, identifier)
-            if draft.get("publishedAssetId") or draft.get("editingAssetId") or len(draft["photoUrls"]) != 3:
-                raise FurnitureError(400, "Reconstruction requires a new draft with front, right-side and top photos.")
+            if draft.get("publishedAssetId") or draft.get("editingAssetId") or not draft["photoUrls"]:
+                raise FurnitureError(400, "Reconstruction requires a draft with a furniture photo.")
             if draft.get("reconstructionJobId"):
                 previous = self.get(connection, "furniture_reconstruction_jobs", draft["reconstructionJobId"])
                 if previous["status"] in {"queued", "processing"}:
@@ -188,7 +188,7 @@ class FurnitureService:
             self.put(connection, "furniture_reconstruction_jobs", job)
             draft = self.active_draft(connection, job["draftId"])
         directory_id = Path(draft["photoUrls"][0]).parent.name
-        photos = [self.uploads / "furniture" / directory_id / f"photo_{index}.jpg" for index in range(3)]
+        photos = [self.uploads / "furniture" / directory_id / "photo_0.jpg"]
         output_dir = self.uploads / "assets"
         output_dir.mkdir(exist_ok=True)
         output = output_dir / f"{uuid.uuid4().hex}.glb"

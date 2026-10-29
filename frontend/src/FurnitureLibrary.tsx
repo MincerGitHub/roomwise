@@ -74,7 +74,7 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
  function updateParameter(key:keyof FurnitureParameters,value:unknown){if(properties)update({parameters:{...properties.parameters,[key]:value}})}
  async function guarded(operation:()=>Promise<void>){if(inFlight.current)return;inFlight.current=true;setBusy(true);setMessage('');try{await operation()}catch(error){if(alive.current)setMessage(error instanceof Error?error.message:String(error))}finally{inFlight.current=false;if(alive.current)setBusy(false)}}
  async function submit(){await guarded(async()=>{
-  if(files.length!==3)throw new Error('请按正面、右侧、顶面的顺序上传三张图片');
+  if(files.length!==1)throw new Error('请上传一张家具斜视图');
   const form=new FormData();files.forEach(file=>form.append('files',file));if(consent)form.append('consent','true');else form.append('localOnly','true');
   const result=await multipart<{draftId:string;jobId:string|null}>('/furniture/analyze',form);openGeneration.current++;
   const value=await api<FurnitureDraft>(`/furniture/drafts/${result.draftId}`);if(!alive.current)return;loadDraft(value);setJob(null);setJobId(result.jobId);setFiles([]);await refresh();
@@ -126,15 +126,15 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
    await refresh();
   });
  }
- function selectFiles(selected:FileList|null){if(!selected)return;const values=Array.from(selected);if(values.length>3||values.some(file=>file.size>10*1024*1024||!(/\.(jpe?g|png|webp)$/i.test(file.name)))){setMessage('请选择 1—3 张 JPEG、PNG、WebP，每张不超过 10 MB。');return}setFiles(values);setMessage('')}
+ function selectFiles(selected:FileList|null){if(!selected)return;const values=Array.from(selected);if(values.length!==1||values.some(file=>file.size>10*1024*1024||!(/\.(jpe?g|png|webp)$/i.test(file.name)))){setMessage('请选择一张 JPEG、PNG、WebP 斜视图，不超过 10 MB。');return}setFiles(values);setMessage('')}
  return <div className="modal-backdrop furniture-backdrop"><section className="modal furniture-library" role="dialog" aria-modal="true" aria-labelledby="furniture-title">
   <div className="modal-heading"><div><span className="eyebrow">OWNED FURNITURE</span><h2 id="furniture-title">自有家具库 · 从图片添加</h2></div><button className="icon-btn" aria-label="关闭自有家具库" disabled={busy} onClick={()=>{if(dirty&&!window.confirm('有未保存的修改，确认关闭？原草稿仍保留。'))return;onClose()}}><X size={20}/></button></div>
-  <p className="furniture-intro">同一件家具：正面、右侧、顶面各一张。</p>
+  <p className="furniture-intro">上传一张完整家具的斜视图，由 Zero123++ 生成六视角，再由 InstantMesh 重建三维网格。</p>
   <div className={`furniture-service ${status?.reconstruction?.enabled?'ready':'offline'}`} role="status"><span className="furniture-service-dot"/><div><strong>{status?.reconstruction?.enabled?'本地重建已就绪':'本地重建不可用'}</strong>{status&&!status.reconstruction.enabled&&<span>{status.reconstruction.message}</span>}</div></div>
-  <fieldset disabled={busy||!!jobId||!!reconstructionJobId} className="furniture-upload"><legend>1. 选择照片</legend><input aria-label="选择家具图片" type="file" multiple accept=".jpg,.jpeg,.png,.webp" onChange={event=>{selectFiles(event.target.files);event.target.value=''}}/><p className="furniture-upload-note">按正面 → 右侧 → 顶面顺序选择；顶面图正面朝下。JPG、PNG、WebP，单张不超过 10 MB。</p>
+  <fieldset disabled={busy||!!jobId||!!reconstructionJobId} className="furniture-upload"><legend>1. 选择照片</legend><input aria-label="选择家具图片" type="file" accept=".jpg,.jpeg,.png,.webp" onChange={event=>{selectFiles(event.target.files);event.target.value=''}}/><p className="furniture-upload-note">拍摄正面偏 30°～45°、略微俯视的完整家具，背景尽量简单。JPG、PNG、WebP，单张不超过 10 MB。</p>
    <div className="furniture-crops">{files.map((file,index)=><FurnitureCrop key={index} file={file} index={index} onChange={replacement=>setFiles(previous=>previous.map((value,position)=>position===index?replacement:value))}/>)}</div>
    <label className="furniture-check furniture-consent" aria-label="我同意将所选图片发送到第三方网关 api.tokenlab.pro（非 OpenAI 官方域名），请求 gpt-6-sol / high 进行识别，可能产生服务费用。服务关闭时仅保存在本机。"><input type="checkbox" checked={consent} onChange={event=>setConsent(event.target.checked)}/><span>我同意将照片发送到第三方网关 <strong>api.tokenlab.pro</strong>（非 OpenAI 官方域名）进行识别，可能产生费用。</span></label>
-   <button className="btn primary" disabled={files.length!==3||!status?.reconstruction?.enabled} onClick={submit}>上传并重建家具</button>
+   <button className="btn primary" disabled={files.length!==1||!status?.reconstruction?.enabled} onClick={submit}>上传并重建家具</button>
   </fieldset>
   {message&&<p className="furniture-message" role="status">{message}</p>}
   {jobId&&<p role="status">{job?.status==='processing'?'正在识别属性…':'属性识别排队中…'}</p>}

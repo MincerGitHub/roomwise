@@ -16,7 +16,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from .catalog import CATALOG
 from .furniture_schemas import FurnitureProperties, PublishFurniture, SaveFurnitureDraft
 from .furniture_vision import VisionError, recognize_furniture
-from .furniture_reconstruction import ReconstructionError, reconstruct, validate_generated_glb
+from .furniture_reconstruction import ReconstructionError, close_reconstruction_worker, reconstruct, validate_generated_glb
 from .schemas import FurnitureSnapshot
 
 
@@ -92,6 +92,8 @@ class FurnitureService:
     def close(self):
         self.executor.shutdown(wait=True, cancel_futures=True)
         self.reconstruction_executor.shutdown(wait=True, cancel_futures=True)
+        if self.reconstructor is reconstruct:
+            close_reconstruction_worker()
 
     @contextmanager
     def connect(self):

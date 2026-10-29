@@ -4,6 +4,7 @@ import io
 import json
 from pathlib import Path
 import struct
+import sys
 from threading import Event
 import uuid
 
@@ -13,11 +14,11 @@ from PIL import Image
 from pydantic import ValidationError
 import pytest
 
-from roomwise import furniture_api, furniture_vision, main
+from roomwise import furniture_api, furniture_reconstruction, furniture_vision, main
 from roomwise.catalog import demo_scene
 from roomwise.catalog import CATALOG
 from roomwise.furniture import FurnitureError, FurnitureService
-from roomwise.furniture_reconstruction import validate_generated_glb
+from roomwise.furniture_reconstruction import InstantMeshWorker, validate_generated_glb
 from roomwise.furniture_schemas import FurnitureProperties, FurnitureRecognition, PublishFurniture, SaveFurnitureDraft
 from roomwise.furniture_vision import VisionError, recognition_schema, recognize_furniture, vision_status
 from roomwise.generator import _sanitize_model_output
@@ -83,6 +84,63 @@ def model_url(service):
     binary = struct.pack("<4sII", b"glTF", 2, 28 + len(metadata) + len(geometry)) + struct.pack("<II", len(metadata), 0x4E4F534A) + metadata + struct.pack("<II", len(geometry), 0x004E4942) + geometry
     (directory / name).write_bytes(binary)
     return "/uploads/assets/" + name
+
+
+def test_persistent_reconstruction_worker_reuses_process_and_closes(tmp_path):
+    (tmp_path / "roomwise_worker.py").write_text(
+        "import json,os,sys\n"
+        "print(json.dumps({'ready': True, 'pid': os.getpid()}), flush=True)\n"
+        "for line in sys.stdin:\n"
+        "    task=json.loads(line)\n"
+        "    if task.get('shutdown'): break\n"
+        "    print(json.dumps({'ok': True, 'pid': os.getpid()}), flush=True)\n",
+        encoding="utf-8",
+    )
+    worker = InstantMeshWorker(tmp_path, Path(sys.executable))
+    try:
+        first = worker.request([], tmp_path / "first.glb")
+        second = worker.request([], tmp_path / "second.glb")
+        assert first["pid"] == second["pid"] == worker.process.pid
+        process = worker.process
+    finally:
+        worker.stop()
+    assert process.poll() is not None
+
+
+def test_persistent_reconstruction_worker_recovers_after_exit(tmp_path):
+    (tmp_path / "roomwise_worker.py").write_text(
+        "import json,os,sys\n"
+        "print(json.dumps({'ready': True}), flush=True)\n"
+        "for line in sys.stdin:\n"
+        "    task=json.loads(line)\n"
+        "    if task.get('shutdown'): break\n"
+        "    print(json.dumps({'ok': True, 'pid': os.getpid()}), flush=True)\n",
+        encoding="utf-8",
+    )
+    worker = InstantMeshWorker(tmp_path, Path(sys.executable))
+    try:
+        first = worker.request([], tmp_path / "first.glb")
+        worker.process.kill()
+        worker.process.wait(timeout=5)
+        second = worker.request([], tmp_path / "second.glb")
+        assert first["pid"] != second["pid"] == worker.process.pid
+    finally:
+        worker.stop()
+
+
+def test_furniture_service_closes_persistent_worker(tmp_path, monkeypatch):
+    class Worker:
+        stopped = False
+
+        def stop(self):
+            self.stopped = True
+
+    worker = Worker()
+    monkeypatch.setattr(furniture_reconstruction, "_worker", worker)
+    service = FurnitureService(tmp_path / "worker.sqlite3", tmp_path / "uploads", auto_run=False)
+    service.close()
+    assert worker.stopped
+    assert furniture_reconstruction._worker is None
 
 
 def publication(draft, service, **overrides):

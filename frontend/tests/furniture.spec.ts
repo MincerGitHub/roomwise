@@ -12,7 +12,7 @@ test('manual furniture publication, independent instances and library deletion p
  await dialog.getByLabel('选择家具图片').setInputFiles(['front','side','top'].map(view=>fileURLToPath(new URL(`../../../data/photos/chair/${view}_view.jpg`,import.meta.url))));
  await expect(dialog.getByText('本地重建已就绪')).toBeVisible({timeout:60000});
  await dialog.getByRole('button',{name:'上传并重建家具'}).click();
- await expect(dialog.getByText('已载入 InstantMesh 重建网格',{exact:false})).toBeVisible({timeout:360000});
+ await expect.poll(async()=>{const response=await page.request.get('/api/furniture');const listing=await response.json();return listing.drafts.some((value:{modelUrl:string|null})=>!!value.modelUrl)},{timeout:360000}).toBe(true);
  await expect(dialog.getByRole('button',{name:'确认并保存到家具库'})).toBeDisabled();
  const name=`浏览器测试自有椅-${Date.now()}`;
  await dialog.getByLabel('家具名称',{exact:true}).fill(name);

@@ -54,6 +54,19 @@ class InstantMeshWorker:
         environment = os.environ.copy()
         environment.setdefault("HF_HOME", str(self.root / "ckpts" / "huggingface"))
         environment.setdefault("U2NET_HOME", str(self.root / "ckpts" / "u2net"))
+        cache = Path(environment["HF_HOME"]) / "hub"
+        cached_models = (
+            ("TencentARC--InstantMesh", "diffusion_pytorch_model.bin"),
+            ("TencentARC--InstantMesh", "instant_mesh_base.ckpt"),
+            ("sudo-ai--zero123plus-v1.2", "model_index.json"),
+            ("facebook--dino-vitb16", "pytorch_model.bin"),
+        )
+        if (Path(environment["U2NET_HOME"]) / "u2net.onnx").is_file() and all(
+            any(path.is_file() and path.stat().st_size > 0 for path in
+                (cache / f"models--{repo}" / "snapshots").glob(f"*/{filename}"))
+            for repo, filename in cached_models
+        ):
+            environment.setdefault("HF_HUB_OFFLINE", "1")
         environment["PYTHONIOENCODING"] = "utf-8"
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         process = subprocess.Popen(
@@ -74,7 +87,7 @@ class InstantMeshWorker:
             raise ReconstructionError("InstantMesh 常驻进程启动超时，请检查 GPU 和模型权重。") from exc
         if not response.get("ready"):
             self.stop()
-            raise ReconstructionError("InstantMesh 常驻进程启动失败，请检查 GPU 和模型权重。")
+            raise ReconstructionError("InstantMesh 常驻进程启动失败：" + "；".join(list(self.stderr_tail)[-3:])[-500:])
 
     def _read_stdout(self, process, responses):
         try:
@@ -106,9 +119,9 @@ class InstantMeshWorker:
             diagnostic = str(response.get("error", "")) + "\n" + "\n".join(self.stderr_tail)
             if "out of memory" in diagnostic.lower():
                 raise ReconstructionError("GPU 显存不足，关闭其他 GPU 程序后重试。")
-            if "connection" in diagnostic.lower() or "timed out" in diagnostic.lower():
+            if ("connection" in diagnostic.lower() or "timed out" in diagnostic.lower()) and "huggingface" in diagnostic.lower():
                 raise ReconstructionError("模型权重下载失败；检查网络或设置 HF_ENDPOINT 后重试。")
-            raise ReconstructionError("InstantMesh 重建失败，请检查依赖、CUDA 显存和模型权重。")
+            raise ReconstructionError("InstantMesh 重建失败：" + str(response.get("error") or "请检查进程日志。")[:300])
         return response
 
     def stop(self):

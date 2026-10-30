@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import type {Item} from './types';
-import {createFurniture,disposeFurniture} from './furnitureMesh';
+import {createFurniture,displayFurnitureVertexColors,disposeFurniture} from './furnitureMesh';
 
 export default function FurniturePreview({item,onModelLoaded}:{item:Item|null;onModelLoaded?:(loaded:boolean)=>void}){
  const host=useRef<HTMLDivElement>(null);const [error,setError]=useState('');
@@ -18,7 +18,7 @@ export default function FurniturePreview({item,onModelLoaded}:{item:Item|null;on
   onModelLoaded?.(false);
   if(item.assetUrl)new GLTFLoader().load(item.assetUrl,glb=>{
    if(disposed){disposeFurniture(glb.scene);return}
-   const mesh=glb.scene,bounds=new THREE.Box3().setFromObject(mesh),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());
+   const mesh=glb.scene;displayFurnitureVertexColors(mesh);const bounds=new THREE.Box3().setFromObject(mesh),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());
    if(Math.min(size.x,size.y,size.z)<.0001){setError('网格为空。');disposeFurniture(mesh);return}
    mesh.position.set(-center.x,-bounds.min.y,-center.z);const wrapper=new THREE.Group();wrapper.add(mesh);
    wrapper.scale.set(item.width/size.x,item.height/size.y,item.depth/size.z);

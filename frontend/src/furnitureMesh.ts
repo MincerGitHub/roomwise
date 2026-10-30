@@ -27,6 +27,27 @@ export function disposeFurniture(group:THREE.Object3D){
  group.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];materials.forEach(material=>material.dispose())}});
 }
 
+export function displayFurnitureVertexColors(group:THREE.Object3D){
+ group.traverse(object=>{
+  if(!(object instanceof THREE.Mesh)||!object.geometry.hasAttribute('color'))return;
+  const materials=Array.isArray(object.material)?object.material:[object.material];
+  if(materials.length!==1||!(materials[0] instanceof THREE.MeshStandardMaterial)||materials[0].map)return;
+  const attribute=object.geometry.getAttribute('color');
+  const converted=new Float32Array(attribute.count*attribute.itemSize);
+  const color=new THREE.Color();
+  for(let index=0;index<attribute.count;index++){
+   color.setRGB(attribute.getX(index),attribute.getY(index),attribute.getZ(index),THREE.SRGBColorSpace);
+   const offset=index*attribute.itemSize;
+   converted[offset]=color.r;converted[offset+1]=color.g;converted[offset+2]=color.b;
+   if(attribute.itemSize===4)converted[offset+3]=attribute.getW(index);
+  }
+  object.geometry.setAttribute('color',new THREE.Float32BufferAttribute(converted,attribute.itemSize));
+  object.material=new THREE.MeshBasicMaterial({vertexColors:true,toneMapped:false,transparent:materials[0].transparent,opacity:materials[0].opacity,side:materials[0].side});
+  materials[0].dispose();
+  object.receiveShadow=false;
+ });
+}
+
 export function createFurniture(item:Item,parameters?:FurnitureParameters):THREE.Group{
  const params=parameters||item.furnitureSnapshot?.parameters;
  if(!params)return legacyFurniture(item);

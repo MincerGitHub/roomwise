@@ -21,7 +21,7 @@ Roomwise 是一个本地运行的单房间家具布局原型。用户输入房�
 
 InstantMesh 的 Python 3.10/CUDA 环境应独立于应用的 `roomwise` 环境，默认寻找同一 Miniconda 根目录下 `envs/instantmesh/python.exe`；其他路径可设置 `ROOMWISE_INSTANTMESH_PYTHON` 与 `ROOMWISE_INSTANTMESH_ROOT`。项目克隆位于上级目录 `InstantMesh`；Windows 已验证的环境为 Python 3.10、PyTorch 2.1.0+cu121、torchvision 0.16.0+cu121、`accelerate==0.21.0`、`huggingface-hub==0.17.3`、`diffusers==0.20.2`、`transformers==4.34.1`、`setuptools==81.0.0`，其余推理依赖安装 `InstantMesh/requirements.txt` 中的 Python 包，跳过 `bitsandbytes`、`nvdiffrast`，另安装 `xatlas`、`onnxruntime`。首次运行会下载权重到 `InstantMesh/ckpts`。网络受限时可设置 `HF_ENDPOINT=https://hf-mirror.com`。本地使用顶点色导出，不依赖 `nvdiffrast` 的纹理烘焙；原始 InstantMesh 权重和上游依赖的使用条件仍应分别核对。本机 RTX 4060 8 GB 显存已完成实测推理。
 
-三视图要求单件物体、背景简洁、拍摄距离接近；顶面图中正面朝画面下方。本实现先由 Zero123++ 从正面补全六视图，再用正面、右侧、顶面实拍图覆盖相应视角并输入 InstantMesh。三视图不保证精确几何或尺寸，发布前请检查预览和输入真实宽深高。自有家具的属性配置与旧版回归见 [自有家具图片导入指南](docs/自有家具图片导入指南.md)。
+三视图要求单件物体、背景简洁、拍摄距离接近；顶面图中正面朝画面下方。本实现先由 Zero123++ 从正面补全六视图，再用正面、右侧、顶面实拍图覆盖相应视角并输入 InstantMesh。GLB 保留模型预测的原始顶点颜色；家具库预览及房间中的自有家具按顶点颜色显示，避免场景光照和色调映射压暗照片颜色。三视图不保证精确几何或尺寸，发布前请检查预览和输入真实宽深高。自有家具的属性配置与旧版回归见 [自有家具图片导入指南](docs/自有家具图片导入指南.md)。
 
 已确认家具的卡片支持加入房间、修改和删除。删除前会确认名称；删除后该家具及其修订草稿不再显示在家具库中，已经加入房间或保存到方案中的家具仍保留，引用的照片和模型也继续可用。
 

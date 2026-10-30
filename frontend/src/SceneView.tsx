@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {createFurniture as furniture,box} from './furnitureMesh';
+import {createFurniture as furniture,displayFurnitureVertexColors,box} from './furnitureMesh';
 import type {Item,Scene,Validation} from './types';
 import {baseY,reconcileSupports,surfacePlacement,type Placement} from './surfacePlacement';
 
@@ -74,7 +74,7 @@ export default function SceneView(props:Props){
   const rt=runtime.current;if(!rt)return;dispose(rt.itemsGroup);rt.itemsGroup.clear();rt.groups.clear();const loader=new GLTFLoader();let cancelled=false;
   props.scene.items.forEach(it=>{
    const g=furniture(it);g.position.set(it.x,baseY(it),it.z);g.rotation.y=THREE.MathUtils.degToRad(it.rotation);rt.itemsGroup.add(g);rt.groups.set(it.id,g);
-   if(it.assetUrl)loader.load(it.assetUrl,glb=>{if(cancelled){dispose(glb.scene);return}const a=glb.scene;const b=new THREE.Box3().setFromObject(a),s=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());if(Math.min(s.x,s.y,s.z)<.0001){dispose(a);return}a.position.set(-c.x,-b.min.y,-c.z);const wrapper=new THREE.Group();wrapper.add(a);wrapper.scale.set(it.width/s.x,it.height/s.y,it.depth/s.z);wrapper.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true}});dispose(g);g.clear();g.add(wrapper)},undefined,()=>{/* Keep procedural fallback on unreadable asset. */});
+   if(it.assetUrl)loader.load(it.assetUrl,glb=>{if(cancelled){dispose(glb.scene);return}const a=glb.scene;if(it.furnitureSnapshot)displayFurnitureVertexColors(a);const b=new THREE.Box3().setFromObject(a),s=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());if(Math.min(s.x,s.y,s.z)<.0001){dispose(a);return}a.position.set(-c.x,-b.min.y,-c.z);const wrapper=new THREE.Group();wrapper.add(a);wrapper.scale.set(it.width/s.x,it.height/s.y,it.depth/s.z);wrapper.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;if(!(o.material instanceof THREE.MeshBasicMaterial))o.receiveShadow=true}});dispose(g);g.clear();g.add(wrapper)},undefined,()=>{/* Keep procedural fallback on unreadable asset. */});
   });return()=>{cancelled=true};
  },[props.scene.items]);
  useEffect(()=>{const rt=runtime.current;if(!rt)return;dispose(rt.highlight);rt.highlight.clear();const bad=new Set(props.validation?.issues.filter(x=>x.severity==='error').flatMap(x=>x.itemIds||[])||[]);for(const it of props.scene.items){if(it.id!==props.selectedId&&!bad.has(it.id))continue;const geo=new THREE.EdgesGeometry(new THREE.BoxGeometry(it.width+.05,Math.max(.045,it.height+.05),it.depth+.05));const lines=new THREE.LineSegments(geo,new THREE.LineBasicMaterial({color:bad.has(it.id)?0xc6604c:0x478371}));lines.userData={itemId:it.id,height:it.height};lines.position.set(it.x,baseY(it)+it.height/2,it.z);lines.rotation.y=THREE.MathUtils.degToRad(it.rotation);rt.highlight.add(lines)}for(const preference of props.scene.preferences){if(preference.kind!=='face_window')continue;const it=props.scene.items.find(item=>item.id===preference.itemId);if(!it)continue;const angle=THREE.MathUtils.degToRad(it.rotation),direction=new THREE.Vector3(Math.sin(angle),0,Math.cos(angle));const arrow=new THREE.ArrowHelper(direction,new THREE.Vector3(it.x,Math.max(.12,it.height+.1),it.z),Math.max(.55,it.depth*.85),0x386a8d,.14,.09);rt.highlight.add(arrow)}},[props.scene.items,props.scene.preferences,props.selectedId,props.validation]);

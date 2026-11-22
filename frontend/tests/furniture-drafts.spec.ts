@@ -46,6 +46,20 @@ test('draft deletion can be cancelled and persists without changing another draf
  await expect(page.locator('.furniture-draft').filter({hasText:other.id.slice(0,8)})).toBeVisible();
 });
 
+test('reopening a finished draft waits for its job state before enabling edits',async({page})=>{
+ const draft=await createDraft(page,'已有失败记录的草稿');let pending:Route|undefined;
+ await page.route(`**/api/furniture/jobs/${draft.jobId}`,route=>{pending=route});
+ await page.goto('/');await page.getByRole('button',{name:'自有家具库',exact:true}).click();
+ await page.locator('.furniture-draft').filter({hasText:draft.id.slice(0,8)}).locator('.furniture-draft-open').click();
+ await expect.poll(()=>!!pending).toBe(true);
+ const label=page.getByRole('dialog').getByLabel('家具名称',{exact:true});
+ await expect(label).toHaveCount(0);
+ await pending!.fulfill({json:{id:draft.jobId,draftId:draft.id,status:'failed',error:'已结束的识别',errorCode:'provider_disabled'}});
+ await expect(label).toHaveValue(draft.properties.label);await expect(label).toBeEnabled();
+ await label.fill('保留未保存的编辑');
+ await expect(label).toHaveValue('保留未保存的编辑');
+});
+
 test('a pending draft reply cannot reopen an editor after deletion',async({page})=>{
  const draft=await createDraft(page,'延迟加载的草稿');
  let pending:Route|undefined;

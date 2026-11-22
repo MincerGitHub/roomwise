@@ -47,7 +47,7 @@ def _matrix(node):
     return result
 
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=16)
 def _triangles_from_glb_cached(path_string: str, modified_ns: int, size: int) -> np.ndarray:
     return _triangles_from_glb(Path(path_string))
 
@@ -99,12 +99,12 @@ def _triangles_from_glb(path: Path) -> np.ndarray:
 
 
 def _box_triangles(part):
-    min_x, min_z, max_x, max_z = part["shape"].bounds
+    outline = np.asarray(part["shape"].exterior.coords, dtype=np.float64)[:4]
     low, high = part["low"], part["high"]
-    vertices = np.asarray([
-        [min_x, low, min_z], [max_x, low, min_z], [max_x, low, max_z], [min_x, low, max_z],
-        [min_x, high, min_z], [max_x, high, min_z], [max_x, high, max_z], [min_x, high, max_z],
-    ], dtype=np.float64)
+    vertices = np.empty((8, 3), dtype=np.float64)
+    vertices[:4, 0], vertices[:4, 2] = outline[:, 0], outline[:, 1]
+    vertices[4:, 0], vertices[4:, 2] = outline[:, 0], outline[:, 1]
+    vertices[:4, 1], vertices[4:, 1] = low, high
     faces = np.asarray([[0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6],
                         [0, 4, 5], [0, 5, 1], [1, 5, 6], [1, 6, 2],
                         [2, 6, 7], [2, 7, 3], [3, 7, 4], [3, 4, 0]])
@@ -120,7 +120,7 @@ def _asset_path(asset_url: str | None, uploads_root: Path) -> Path | None:
     return path if path == root or root in path.parents else None
 
 
-@lru_cache(maxsize=8192)
+@lru_cache(maxsize=32)
 def _transformed_mesh_cached(path_string: str, modified_ns: int, size: int,
                             width: float, depth: float, height: float,
                             x: float, z: float, rotation: float, y: float) -> np.ndarray:
@@ -165,6 +165,34 @@ def _sat_intersects(left, right):
     return True
 
 
+def _triangle_pairs_intersect(left, right):
+    """Vectorized SAT for corresponding triangle pairs, including coplanar ones."""
+    if not len(left):
+        return False
+    edges_left = np.roll(left, -1, axis=1) - left
+    edges_right = np.roll(right, -1, axis=1) - right
+    normal_left = np.cross(edges_left[:, 0], edges_left[:, 1])
+    normal_right = np.cross(edges_right[:, 0], edges_right[:, 1])
+    axes = np.concatenate([
+        normal_left[:, None], normal_right[:, None],
+        np.cross(edges_left[:, :, None], edges_right[:, None, :]).reshape(-1, 9, 3),
+        np.cross(normal_left[:, None], edges_left),
+        np.cross(normal_right[:, None], edges_right),
+    ], axis=1)
+    lengths = np.linalg.norm(axes, axis=2)
+    # Axis magnitude depends on triangle area; use a numerical zero here,
+    # then apply the metre tolerance only after normalization.
+    valid = lengths > 1e-15
+    axes = axes / np.where(valid, lengths, 1.)[:, :, None]
+    first = np.einsum('nvc,nac->nav', left, axes)
+    second = np.einsum('nvc,nac->nav', right, axes)
+    separate = ((first.max(axis=2) < second.min(axis=2) - EPSILON)
+                | (second.max(axis=2) < first.min(axis=2) - EPSILON)) & valid
+    nondegenerate = ((np.linalg.norm(normal_left, axis=1) > 1e-15)
+                     & (np.linalg.norm(normal_right, axis=1) > 1e-15))
+    return bool(np.any(~separate.any(axis=1) & nondegenerate))
+
+
 def _ray_intersects_triangle(origin, direction, triangle):
     edge_a, edge_b = triangle[1] - triangle[0], triangle[2] - triangle[0]
     cross = np.cross(direction, edge_b)
@@ -186,12 +214,26 @@ def _ray_intersects_triangle(origin, direction, triangle):
 def _point_inside_mesh(point, triangles):
     direction = np.asarray([1.0, .371, .173], dtype=np.float64)
     direction /= np.linalg.norm(direction)
-    return sum(_ray_intersects_triangle(point, direction, triangle) for triangle in triangles) % 2 == 1
+    edge_a, edge_b = triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]
+    cross = np.cross(direction, edge_b)
+    determinant = np.einsum('ij,ij->i', edge_a, cross)
+    valid = np.abs(determinant) >= EPSILON
+    inverse = np.divide(1., determinant, out=np.zeros_like(determinant), where=valid)
+    offset = point - triangles[:, 0]
+    u = np.einsum('ij,ij->i', offset, cross) * inverse
+    cross_offset = np.cross(offset, edge_a)
+    v = (cross_offset @ direction) * inverse
+    distance = np.einsum('ij,ij->i', edge_b, cross_offset) * inverse
+    hits = np.sort(distance[valid & (u >= -EPSILON) & (v >= -EPSILON)
+                            & (u + v <= 1 + EPSILON) & (distance > EPSILON)])
+    # A ray through a shared edge hits two triangles on the same surface.
+    crossings = int(bool(len(hits))) + int(np.count_nonzero(np.diff(hits) > EPSILON))
+    return crossings % 2 == 1
 
 
 _BVH_CACHE = {}
 _BVH_LEAF = 16
-_BVH_CACHE_LIMIT = 128
+_BVH_CACHE_LIMIT = 16
 
 
 def _build_bvh(mesh):
@@ -235,6 +277,11 @@ def _aabb_overlap(left, right):
 
 
 def _mesh_intersects(left, right):
+    left_min, left_max = left.min(axis=1), left.max(axis=1)
+    right_min, right_max = right.min(axis=1), right.max(axis=1)
+    if not _aabb_overlap((left_min.min(axis=0), left_max.max(axis=0)),
+                         (right_min.min(axis=0), right_max.max(axis=0))):
+        return False
     left_nodes, left_root = _mesh_bvh(left)
     right_nodes, right_root = _mesh_bvh(right)
     stack = [(left_root, right_root)]
@@ -245,10 +292,11 @@ def _mesh_intersects(left, right):
             continue
         left_triangles, right_triangles = left_node[2], right_node[2]
         if left_triangles is not None and right_triangles is not None:
-            for first in left_triangles:
-                for second in right_triangles:
-                    if _sat_intersects(left[first], right[second]):
-                        return True
+            overlap = (np.all(left_max[left_triangles, None] >= right_min[right_triangles] - EPSILON, axis=2)
+                       & np.all(right_max[right_triangles] >= left_min[left_triangles, None] - EPSILON, axis=2))
+            first, second = np.nonzero(overlap)
+            if _triangle_pairs_intersect(left[left_triangles[first]], right[right_triangles[second]]):
+                return True
             continue
         if left_triangles is not None:
             stack.extend((left_index, child) for child in right_node[3:5] if child is not None)
@@ -257,8 +305,6 @@ def _mesh_intersects(left, right):
         else:
             stack.extend((left_child, right_child) for left_child in left_node[3:5] if left_child is not None for right_child in right_node[3:5] if right_child is not None)
     if len(left) and len(right):
-        left_min, left_max = left.min(axis=1), left.max(axis=1)
-        right_min, right_max = right.min(axis=1), right.max(axis=1)
         left_inside = np.all(left_min[0] > right_min.min(axis=0) + EPSILON) and np.all(left_max[0] < right_max.max(axis=0) - EPSILON)
         right_inside = np.all(right_min[0] > left_min.min(axis=0) + EPSILON) and np.all(right_max[0] < left_max.max(axis=0) - EPSILON)
         if (left_inside and _point_inside_mesh(left[0, 0], right)) or (right_inside and _point_inside_mesh(right[0, 0], left)):

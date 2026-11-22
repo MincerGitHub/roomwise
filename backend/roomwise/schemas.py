@@ -111,7 +111,7 @@ class FurnitureSnapshot(DataModel):
     dimensionsConfirmed: Literal[True]
     parameters: FurnitureParameters = Field(default_factory=FurnitureParameters)
     dimensionSources: DimensionSources = Field(default_factory=DimensionSources)
-    photoUrls: list[str] = Field(min_length=1, max_length=3)
+    photoUrls: list[str] = Field(max_length=3)
     frontDirection: Literal["positive_z", "negative_z"]
     subtype: str | None = Field(default=None, max_length=100)
     styleTags: list[str] = Field(default_factory=list, max_length=10)

@@ -8,7 +8,7 @@ from __future__ import annotations
 from copy import deepcopy
 import math
 
-from .geometry import assert_invariants, footprint, placement_errors, validate_scene
+from .geometry import assert_invariants, footprint, search_placement_errors as placement_errors, validate_scene
 from .window_constraints import evaluate_layout_requirements, evaluate_wall_preference
 from .bedside_constraints import bedside_assignments, bedside_placements, bed_placements_for_locked_stands, evaluate_bedside_groups
 

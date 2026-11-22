@@ -99,9 +99,11 @@ def test_persistent_reconstruction_worker_reuses_process_and_closes(tmp_path):
     worker = InstantMeshWorker(tmp_path, Path(sys.executable))
     try:
         first = worker.request([], tmp_path / "first.glb")
+        first_process = worker.process
         second = worker.request([], tmp_path / "second.glb")
-        assert first["pid"] == second["pid"] == worker.process.pid
-        process = worker.process
+        assert first["pid"] == second["pid"]
+        assert first_process is worker.process
+        process = first_process
     finally:
         worker.stop()
     assert process.poll() is not None
@@ -120,10 +122,14 @@ def test_persistent_reconstruction_worker_recovers_after_exit(tmp_path):
     worker = InstantMeshWorker(tmp_path, Path(sys.executable))
     try:
         first = worker.request([], tmp_path / "first.glb")
-        worker.process.kill()
-        worker.process.wait(timeout=5)
+        exited_process = worker.process
+        exited_process.kill()
+        exited_process.wait(timeout=5)
         second = worker.request([], tmp_path / "second.glb")
-        assert first["pid"] != second["pid"] == worker.process.pid
+        restarted_process = worker.process
+        third = worker.request([], tmp_path / "third.glb")
+        assert first["pid"] != second["pid"] == third["pid"]
+        assert exited_process is not restarted_process is worker.process
     finally:
         worker.stop()
 
@@ -141,6 +147,24 @@ def test_furniture_service_closes_persistent_worker(tmp_path, monkeypatch):
     service.close()
     assert worker.stopped
     assert furniture_reconstruction._worker is None
+
+
+def test_existing_cuda_worker_does_not_require_directml_adapter(tmp_path, monkeypatch):
+    (tmp_path/'configs').mkdir();(tmp_path/'configs/instant-mesh-base.yaml').write_text('model_config: {}')
+    (tmp_path/'run.py').write_text('# existing upstream CUDA runner')
+    (tmp_path/'roomwise_worker.py').write_text('# existing Roomwise CUDA worker')
+    monkeypatch.setenv('ROOMWISE_INSTANTMESH_ROOT',str(tmp_path))
+    monkeypatch.setattr(furniture_reconstruction,'reconstruction_python',lambda:Path(sys.executable))
+    monkeypatch.setattr(furniture_reconstruction,'_worker',None)
+    commands=[]
+    def probe(command,**kwargs):
+        commands.append(command)
+        return type('Result',(),{'returncode':0})()
+    monkeypatch.setattr(furniture_reconstruction.subprocess,'run',probe)
+    assert furniture_reconstruction.reconstruction_status()['enabled']
+    assert commands and 'from device import' not in commands[0][-1]
+    (tmp_path/'roomwise_worker.py').unlink()
+    assert not furniture_reconstruction.reconstruction_status()['enabled']
 
 
 def publication(draft, service, **overrides):
@@ -251,6 +275,113 @@ def test_three_view_local_reconstruction_uses_generated_mesh_for_publication(env
     saved = service.save(generated["id"], SaveFurnitureDraft(expectedVersion=generated["version"], properties=recognized()["properties"]))
     asset = service.publish(saved["id"], PublishFurniture.model_validate(publication(saved, service)))
     assert asset["assetUrl"] == generated["modelUrl"]
+
+
+def test_single_image_local_reconstruction_keeps_one_source_and_publishes_generated_mesh(environment):
+    client, service = environment
+    response = client.post('/api/furniture/analyze', data={'localOnly': 'true'},
+                           files=[('files', ('chair.jpg', photo_bytes(), 'image/jpeg'))])
+    assert response.status_code == 200
+    task = response.json()
+    assert task['jobId'] is None
+    reference = service.uploads / 'assets' / Path(model_url(service)).name
+    seen = []
+    def reconstruct_single(photos, output):
+        seen.extend(photos)
+        assert len(photos) == 1 and photos[0].is_file()
+        output.write_bytes(reference.read_bytes())
+        return '/uploads/assets/' + output.name
+    service.reconstructor = reconstruct_single
+    job = service.start_reconstruction(task['draftId'])
+    service.process_reconstruction(job['jobId'])
+    assert len(seen) == 1
+    draft = service.draft(task['draftId'])
+    assert len(draft['photoUrls']) == 1 and draft['modelUrl']
+    properties = FurnitureProperties.model_validate(recognized()['properties'])
+    draft = service.save(draft['id'], SaveFurnitureDraft(expectedVersion=draft['version'], properties=properties))
+    asset = service.publish(draft['id'], PublishFurniture.model_validate(publication(draft, service, assetUrl=draft['modelUrl'])))
+    assert asset['assetUrl'] == draft['modelUrl'] and asset['photoUrls'] == draft['photoUrls']
+
+
+def test_imported_glb_has_no_inference_jobs_and_requires_property_review(environment):
+    client, service = environment
+    response = client.post('/api/furniture/import-model', json={
+        'assetUrl': model_url(service), 'label': 'GitHub办公椅', 'sourceNote': 'GitHub Release 2026-11-22',
+    })
+    assert response.status_code == 200
+    draft = response.json()
+    assert draft['jobId'] is None and draft['reconstructionJobId'] is None
+    assert draft['photoUrls'] == [] and draft['properties']['width'] is None
+    assert draft['properties']['dimensionSources']['width'] == 'unknown'
+    assert service.listing()['assets'] == []
+    premature = client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=publication(draft, service))
+    assert premature.status_code == 400
+    properties = FurnitureProperties.model_validate(recognized()['properties'])
+    draft = service.save(draft['id'], SaveFurnitureDraft(expectedVersion=draft['version'], properties=properties))
+    payload = publication(draft, service)
+    first = client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=payload)
+    repeated = client.post(f"/api/furniture/drafts/{draft['id']}/publish", json=payload)
+    assert first.status_code == repeated.status_code == 200
+    assert first.json() == repeated.json()
+    asset = first.json()
+    assert asset['assetUrl'] == draft['modelUrl'] and asset['modelSource'] == draft['modelSource']
+    scene = demo_scene()
+    scene['preferences'] = []
+    template = scene['items'][0]
+    scene['items'] = [{**template, 'category':asset['snapshot']['category'],
+                       'width':asset['snapshot']['width'], 'depth':asset['snapshot']['depth'], 'height':asset['snapshot']['height'],
+                       'furnitureAssetId':asset['id'], 'furnitureSnapshot':asset['snapshot'], 'assetUrl':asset['assetUrl']}]
+    canonical = Scene.model_validate(scene).model_dump()
+    saved = main.store.save(canonical)
+    assert main.store.get(saved['id'])['items'][0]['assetUrl'] == asset['assetUrl']
+    revision = service.edit_asset(asset['id'])
+    assert revision['modelSource'] == asset['modelSource']
+
+
+@pytest.mark.parametrize('url', ['https://example.com/chair.glb', '/uploads/assets/../../private.glb', '/uploads/assets/not-a-model.glb'])
+def test_imported_glb_rejects_nonlocal_or_invalid_asset_paths(environment, url):
+    client, service = environment
+    assert client.post('/api/furniture/import-model', json={'assetUrl':url}).status_code == 422
+    assert service.listing() == {'assets':[], 'drafts':[]}
+
+
+def test_imported_glb_rejects_missing_and_empty_mesh_without_creating_draft(environment):
+    client, service = environment
+    url = '/uploads/assets/' + 'a'*32 + '.glb'
+    assert client.post('/api/furniture/import-model', json={'assetUrl':url}).status_code == 400
+    path = service.uploads / 'assets' / Path(url).name
+    path.parent.mkdir(exist_ok=True);path.write_bytes(b'not a mesh')
+    assert client.post('/api/furniture/import-model', json={'assetUrl':url}).status_code == 400
+    assert service.listing() == {'assets':[], 'drafts':[]}
+
+
+def test_two_image_draft_is_rejected_before_any_reconstruction(environment):
+    client, service = environment
+    task = client.post('/api/furniture/analyze', data={'localOnly': 'true'}, files=[
+        ('files', (f'view-{i}.jpg', photo_bytes(), 'image/jpeg')) for i in range(2)
+    ]).json()
+    response = client.post(f"/api/furniture/drafts/{task['draftId']}/reconstruct")
+    assert response.status_code == 400
+    assert service.draft(task['draftId'])['reconstructionJobId'] is None
+
+
+@pytest.mark.parametrize('count', [1, 3])
+def test_one_shot_reconstruction_passes_only_the_supplied_views(tmp_path, monkeypatch, count):
+    photos = [tmp_path / f'{i}.jpg' for i in range(count)]
+    for path in photos:path.write_bytes(photo_bytes())
+    output = tmp_path / 'uploads/assets/output.glb'
+    output.parent.mkdir(parents=True)
+    calls = []
+    monkeypatch.setenv('ROOMWISE_INSTANTMESH_ROOT', str(tmp_path))
+    monkeypatch.setattr(furniture_reconstruction, 'reconstruction_status', lambda: {'enabled': True})
+    monkeypatch.setattr(furniture_reconstruction, 'validate_generated_glb', lambda p: None)
+    def run(command, **kwargs):
+        calls.append(command)
+        return type('Result', (), {'returncode': 0})()
+    monkeypatch.setattr(furniture_reconstruction.subprocess, 'run', run)
+    assert furniture_reconstruction.reconstruct(photos, output).endswith('output.glb')
+    assert ('--side_image' in calls[0]) == (count == 3)
+    assert ('--top_image' in calls[0]) == (count == 3)
 
 
 def test_failed_reconstruction_keeps_draft_unpublished_and_allows_retry(environment):

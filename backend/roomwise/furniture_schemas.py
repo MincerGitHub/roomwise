@@ -101,6 +101,12 @@ class SaveFurnitureDraft(DataModel):
     properties: FurnitureProperties
 
 
+class ImportFurnitureModel(DataModel):
+    assetUrl: str = Field(pattern=r"^/uploads/assets/[a-f0-9]{32}\.glb$")
+    label: str | None = Field(default=None, min_length=1, max_length=100)
+    sourceNote: str = Field(default="", max_length=1000)
+
+
 class FurnitureConfirmations(DataModel):
     category: Literal[True]
     label: Literal[True]

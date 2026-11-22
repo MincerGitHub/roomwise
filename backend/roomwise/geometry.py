@@ -48,9 +48,9 @@ def _collision_part(item: dict, width: float, depth: float, center_x: float,
                     center_z: float, low_y: float, high_y: float, label: str) -> dict:
     """Build one local rectangular collision part and transform it to room space."""
     shape = box(-width / 2, -depth / 2, width / 2, depth / 2)
+    shape = translate(shape, xoff=center_x, yoff=center_z)
     shape = rotate(shape, -float(item.get("rotation", 0)), origin=(0, 0))
-    shape = translate(shape, xoff=float(item.get("x", 0)) + center_x,
-                      yoff=float(item.get("z", 0)) + center_z)
+    shape = translate(shape, xoff=float(item.get("x", 0)), yoff=float(item.get("z", 0)))
     elevation_value = elevation(item)
     return {"shape": shape, "low": elevation_value + low_y,
             "high": elevation_value + high_y, "label": label}
@@ -256,8 +256,8 @@ def overlap_kind(a: dict, b: dict, area: float) -> str:
     return "collision"
 
 
-def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0):
-    """Fast hard checks used by the generator; excludes accessibility."""
+def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0, *, conservative_mesh: bool = False):
+    """Placement checks without accessibility; exact mesh collision by default."""
     fp = footprint(item)
     if not room_polygon(room).buffer(EPSILON).covers(fp):
         return True
@@ -271,13 +271,23 @@ def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0)
         inter = fp.intersection(other_fp).area
         kind = overlap_kind(item, other, inter) if inter > EPSILON else ""
         mesh_backed = _mesh_asset_declared(item) or _mesh_asset_declared(other)
-        if inter > EPSILON and (kind == "collision" or (kind == "seat_tuck" and mesh_backed)) and detailed_collision_area(item, other) > EPSILON:
-            return True
+        if inter > EPSILON and (kind == "collision" or (kind == "seat_tuck" and mesh_backed)):
+            if (conservative_mesh and mesh_backed) or detailed_collision_area(item, other) > EPSILON:
+                return True
         if gap and not separated_vertically(item, other) and item["category"] != "rug" and other["category"] != "rug" and inter <= EPSILON and fp.distance(other_fp) < gap:
             return True
         if cabinet_door_clearance_conflicts(item, other) or cabinet_door_clearance_conflicts(other, item):
             return True
     return False
+
+
+def search_placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0):
+    """Conservative GLB footprint screening for the many tentative search poses.
+
+    This only rejects additional overlapping proposals; final acceptance still
+    calls validate_scene with original GLBs. Source items and metadata stay intact.
+    """
+    return placement_errors(item, room, placed, gap, conservative_mesh=True)
 
 
 def accessibility(scene: dict, step: float = .18, radius: float = .15):

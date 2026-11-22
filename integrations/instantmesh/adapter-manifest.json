@@ -1,0 +1,30 @@
+{
+  "upstream": "https://github.com/TencentARC/InstantMesh",
+  "base_commit": "08822c52fdc399b93ea00e4fa9e596344ed52ccc",
+  "modified_files": {
+    "run.py": {
+      "before_sha256": "11411e0d9163605531bb428a6edd2700ce22c6ef10568233fb0cf1abd6f50195",
+      "after_sha256": "0f65c254b32321b95c9a353323052e6f34570ffb658dbe4d363f43bb4895428e"
+    },
+    "src/models/geometry/render/neural_render.py": {
+      "before_sha256": "f45b64d2b78309f5a0ef1ff5130231e6abdc4e09fb4d4b20e032439fa29403f1",
+      "after_sha256": "69fe0f0c7385e9fe9ff263426824e936bd14d2ee673207f8454b342a2b839e0c"
+    },
+    "src/models/geometry/rep_3d/flexicubes_geometry.py": {
+      "before_sha256": "57769652b3bbdb27b8eb236aff0766c177b137b9b63a73cd38ad833ecb9755a3",
+      "after_sha256": "5e53378e4f7a59a06aeafdc08c8bbe9719af9d55e38446671b91da59e680fb5e"
+    },
+    "src/models/lrm_mesh.py": {
+      "before_sha256": "add3bec9fe4886e695ddf4d7a2e815f12d8f651681ada65be8a06a067c3cf355",
+      "after_sha256": "d612c0a54479b9b84bf1a5d185facc6f419999db7f8b7bedaeeddd04d5a509ed"
+    },
+    "src/utils/mesh_util.py": {
+      "before_sha256": "b252e766a879c9e4a6aba80ce82f1283d55f507ea310b6e838e5fcdcdb80541f",
+      "after_sha256": "b87cc30132d4953b1618824f85f78de7f7be5f8360f34a841927232e26862347"
+    }
+  },
+  "new_files": {
+    "device.py": "73c6c95a4b998ef6a5e3aebc75b2f61112e3261f9e7b59e00bede556c012b3b0",
+    "requirements-directml.txt": "cb73c8c702eff43aecc95b367d45487d74f29ab62bb7d9034d31b53b19d82f14"
+  }
+}

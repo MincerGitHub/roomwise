@@ -541,3 +541,22 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .candidate-status { padding: 4px 8px; font-size: 10px; }
   .candidate-card .preview-action { min-height: 34px; padding: 7px 9px; font-size: 11px; }
 }
+ .context-menu-dismiss { position: fixed; inset: 0; z-index: 120; background: transparent; cursor: default; }
+ .furniture-context-menu { position: fixed; z-index: 121; width: 164px; padding: 5px; border: 1px solid #dfe5da; border-radius: 7px; background: #fff; box-shadow: 0 8px 24px rgba(30,45,35,.18); }
+ .furniture-context-menu button { display: flex; width: 100%; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 4px; background: transparent; text-align: left; font-size: 12px; }
+ .furniture-context-menu button:hover { background: #f0f4ec; }
+ .furniture-context-menu button.danger { color: #a34e42; }
+ .inspector-fold { margin-top: 18px; border: 1px solid #dce5d8; border-radius: 8px; padding: 0 10px; background: #f7f9f4; }
+ .inspector-fold summary { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; list-style: none; padding: 7px 4px; font-size: 12px; }
+ .inspector-fold summary::-webkit-details-marker { display: none; }
+ .inspector-fold summary::after { content: none; }
+ .inspector-fold summary strong { font-weight: 650; color: #344d3d; }
+ .inspector-fold summary span { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 5px 8px; border: 1px solid #d6e1d1; border-radius: 5px; background: #fff; color: #46674e; font-size: 10px; font-weight: 600; white-space: nowrap; }
+ .inspector-fold summary span svg { transition: transform .16s ease; }
+ .inspector-fold[open] summary span svg { transform: rotate(180deg); }
+ .inspector-fold[open] summary { border-bottom: 1px solid #e3e9df; margin-bottom: 12px; }
+ .inspector-fold:not([open]) summary span { background: #e9f0e5; border-color: #c7d6c0; color: #365d43; }
+ .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+ .danger-action { border-color: #d6a69d; color: #98483e; }
+ .danger-action:hover { background: #fff3f0; }
+ .delete-confirm-modal { max-width: 440px; }

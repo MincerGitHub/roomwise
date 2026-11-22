@@ -1,0 +1,125 @@
+/* Keep the canvas and its hit targets clear; only workbench controls use glass. */
+.app-shell {
+  --ink: #252634;
+  --muted: #55586b;
+  --accent: #504a8c;
+  --green: var(--accent);
+  --studio-green: var(--accent);
+  --studio-ink: var(--ink);
+  --soft: #dddde6;
+  --line: #bfbfcf;
+  --glass-fill: rgb(217 219 233 / 54%);
+  --glass-edge: rgb(255 255 255 / 70%);
+  --glass-shadow: inset 0 1px 0 #ffffffac, 0 6px 20px #28443d13;
+  background: linear-gradient(112deg, #bdc5d8 0%, #ccd0e2 18%, #d9d8e2 38%, #e1cbc9 58%, #d8cfdc 80%, #b4c6d6 100%);
+  background-attachment: fixed;
+  background-size: 180% 100%;
+  animation: roomwise-daylight 32s ease-in-out infinite alternate;
+}
+.app-shell .workspace { background: transparent; }
+.app-shell .main-panel { background: transparent; }
+.app-shell .app-header {
+  --glass-fill: linear-gradient(108deg, #282a34ed, #393943e5 55%, #483e50e6);
+}
+.app-shell .tabs.tool-rail {
+  --glass-fill: linear-gradient(175deg, #34343fe8, #41404bdd 65%, #484452e3);
+}
+.app-shell .tabs.tool-rail button:is(.active, :hover) { color: white; background: #ffffff26; border-radius: 8px; }
+.app-shell .sidebar { --glass-fill: linear-gradient(135deg, #cfd3e566, #e3dee691); }
+.app-shell .items-list .item-card { border-radius: 8px; margin-block: 2px; }
+.app-shell .items-list .item-card.selected { background: #ffffff80; box-shadow: inset 3px 0 var(--accent); }
+.app-shell .canvas-header { background: linear-gradient(115deg,#ffffff45,#ffffff18); }
+.app-shell .main-panel > :is(.generation-bar, .identified-requirements, .conversation) {
+  background: linear-gradient(110deg, #cacee366, #e5dce785) !important;
+  border-color: #ffffff85 !important;
+}
+.app-shell .generation-actions select { background: #ffffff80 !important; border-color: #ffffffd9 !important; border-radius: 8px !important; }
+.app-shell .viewport :is(.view-switch, .canvas-tools, .selected-label) { border-radius: 10px; }
+.app-shell .viewport .view-switch button { border-radius: 7px; }
+.app-shell .viewport .view-switch button.active { background: #284c53; }
+.app-shell .main-panel .generation-actions .primary { background: #285c5b; border-radius: 8px; color: white; }
+.app-shell :is(.app-header, .tool-rail, .sidebar, .canvas-tools, .canvas-room-meta, .selected-label, .modal, .furniture-context-menu, .view-switch, .generation-actions select) {
+  background: var(--glass-fill);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(32px) saturate(125%);
+  backdrop-filter: blur(32px) saturate(125%);
+}
+.app-shell :is(.modal, .furniture-context-menu) { --glass-fill: rgb(221 222 234 / 94%); }
+.app-shell .modal-backdrop { background: rgb(34 32 45 / 38%); }
+.app-shell .tool-rail button.active { background: #daebe2; color: #214d38; }
+.app-shell .sidebar-footer { background: rgb(211 213 225 / 64%); }
+.app-shell .canvas-tools button:not(:hover):not(.active) { background-color: transparent; }
+.app-shell :is(.field select, .generation-actions select) option { background: #fff; color: #283b33; }
+.app-shell :is(button, select, input, textarea, a):focus-visible { outline: 2px solid #51469c; outline-offset: 2px; }
+@keyframes roomwise-daylight { to { background-position: 100% 50%; } }
+
+.app-shell :is(.furniture-import-entry, .furniture-service, .furniture-evidence, .note-card, .support-inspector-note, .inspector-fold, .suggest-box, .owned-furniture-card, .surface-snap-hint) {
+  background: rgb(204 205 222 / 56%);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.app-shell :is(.furniture-import-entry p, .furniture-library legend, .field, .panel-context, .item-card-text small) { color: var(--muted); }
+.app-shell .field :is(input:not([type=color]), select, textarea),
+.app-shell .furniture-library .modal-heading,
+.app-shell .command-box { background: rgb(231 231 239 / 76%) !important; border-color: var(--line); color: var(--ink); }
+.app-shell .furniture-check input { accent-color: var(--accent); }
+.app-shell .crop-selection { border-color: var(--accent); background: rgb(116 102 183 / 20%); }
+.app-shell .candidate-card.active { background: rgb(163 156 201 / 30%) !important; }
+.app-shell .brand-mark { background: #535260; }
+
+/* The menu dismissal layer is an invisible hit target, not a visible control. */
+.app-shell :is(button:not(.context-menu-dismiss), [role=button], summary),
+.app-shell input[type=file]::file-selector-button {
+  --button-fill: rgb(255 255 255 / 15%);
+  --button-shine: rgb(255 255 255 / 38%);
+  --button-ink: #303046;
+  /* Older workbench rules force solid backgrounds and square prompt chips. */
+  background: linear-gradient(154deg, var(--button-shine), transparent 48%, rgb(127 191 209 / 12%)), var(--button-fill) !important;
+  border: 1px solid rgb(255 255 255 / 35%) !important;
+  border-radius: 8px !important;
+  color: var(--button-ink) !important;
+  box-shadow: inset 0 1px 0 #ffffff87, inset 0 -1px 0 #294d6321, 0 2px 6px #183b4929;
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+  backdrop-filter: blur(12px) saturate(135%);
+}
+.app-shell :is(.header-actions, .tool-rail) button { --button-ink: white; }
+.app-shell :is(button.btn.primary, .command-box button, .view-switch button.active, .tool-rail button.active) {
+  --button-ink: white;
+  --button-fill: rgb(61 58 117 / 88%);
+}
+.app-shell :is(button.danger-action, button.danger, button.furniture-delete) { --button-ink: #912d39; }
+.app-shell :is(button.item-card.selected, button.toggle.on, button[aria-pressed=true]:not(.active)) {
+  --button-fill: rgb(126 119 178 / 32%);
+  --button-ink: #302e53;
+}
+.app-shell button.toggle { border-radius: 999px !important; }
+.app-shell :is(.toast, .preview-banner) button { --button-ink: currentColor; }
+.app-shell :is(button:not(.context-menu-dismiss):enabled, [role=button], summary):hover {
+  --button-shine: rgb(255 255 255 / 58%);
+}
+.app-shell button:not(.context-menu-dismiss):disabled {
+  opacity: .48;
+  box-shadow: inset 0 1px 0 #ffffff55;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .app-shell :is(button:not(.context-menu-dismiss), [role=button], summary),
+  .app-shell input[type=file]::file-selector-button {
+    background: #edf3f4 !important;
+    color: #303046 !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .app-shell :is(button.btn.primary, .tool-rail button.active, .view-switch button.active) {
+    background: #454174 !important;
+    color: white !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) { .app-shell { animation: none; } }
+@media (prefers-reduced-transparency: reduce) {
+  .app-shell { --glass-fill: #dbdbe5; }
+  .app-shell :is(.modal, .furniture-context-menu) { --glass-fill: #fff; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app-shell { --glass-fill: #dbdbe5; }
+}

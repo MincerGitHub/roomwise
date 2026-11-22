@@ -60,7 +60,7 @@ Ownership: backend agent schemas/geometry/generator/commands/storage/API/tests. 
 - `POST /api/furniture/drafts/{draftId}/publish`：`{requestId,expectedVersion,assetUrl,confirmations:{category:true,label:true,dimensions:true,direction:true,structure:true}}` -> 已确认资产。页面最终确认按钮提交全部确认，不再要求五次勾选。有受支持类别后，缺失名称、方向和尺寸使用类别模板补全，尺寸来源为 `template`，不冒充实测值；未知类别仍需手动选择。目标混淆、视图冲突、同一物品不确定、裁剪建议和识别失败不阻断人工入库，原识别记录保留。后端仍拒绝非法或不完整属性、未确认请求、运行中任务、版本冲突及无效 GLB；`assetUrl` 必须指向已上传到本机的 GLB。`requestId` 持久去重，同一草稿重放返回同一资产及版本。
 - `POST /api/furniture/{assetId}/edit`：`{}` -> 修订草稿。发布时资产版本递增并检查基础版本，旧场景不联动更新。
 - 场景 `Item` 增加可选 `furnitureAssetId`、`furnitureSnapshot`；未使用的新字段不输出，旧场景不要求迁移。引用家具资产的实例必须携带 `dimensionsConfirmed:true` 的完整快照：资产版本、确认时名称/类别/尺寸、颜色/结构参数、尺寸来源、照片及方向等。实例独立复制，保存、布局与命令处理保留快照；旧快照不依赖家具库在线可查。照片主图和 GLB 继续使用 `photoUrl`、`assetUrl`。
-- 参数化预览、场景程序化回退和 GLB 导出共用构造器，近似模型规范化为确认的宽深高、中心与地面；床头为局部 `-z`，其他家具使用面为 `+z`。布局仍按矩形占地而非网格碰撞。未识别结构用模板补全，材质/风格不是物理认证。
+- 参数化预览、场景程序化回退和 GLB 导出共用构造器，近似模型规范化为确认的宽深高、中心与地面；床头为局部 `-z`，其他家具使用面为 `+z`。边界和通行仍按整体矩形占地检查；存在家具 GLB 资产时，碰撞直接读取并变换 GLB 三角形网格，使用三维三角形相交检查；没有资产的旧家具使用与程序化构造器一致的部件碰撞回退。未识别结构用模板补全，材质/风格不是物理认证。
 - `ROOMWISE_RUNTIME_DIR` 可隔离场景、家具与视频运行文件；默认仍为原本的项目 `runtime`。测试必须关闭视觉及文字服务并使用隔离目录。JSON 导出不包含资源本体，不承诺跨设备可直接显示资产。
 - 外发边界：第三方网关请求只包含固定提取提示、字段协议及预处理图片，不含房间、指令历史、图片 URL、本地路径或网格。不读取 Codex 配置或登录凭据，独立后端密钥仅来自 `ROOMWISE_VISION_API_KEY`。现有语言接口白名单不变，不发送新增家具快照。真实模型实测须单独明确启用，不以模拟测试冒充真实准确率。
 - 三维拾取的身份只来自场景实例根节点，忽略导入模型内部的 `userData.itemId`；兼容早期含预览标识的 GLB。新导出的家具资产不包含实例标识，避免资产元数据污染场景选择与拖动。

@@ -85,14 +85,22 @@ def get_demo():
     return demo_scene()
 
 
+@app.get("/startup-scene")
+def get_startup_scene():
+    from .startup_scene import startup_scene
+
+    return {"scene": startup_scene()}
+
+
 @app.post("/validate")
 def validate(request: SceneRequest):
     from .window_constraints import evaluate_layout_requirements
     from .bedside_constraints import evaluate_bedside_groups
+    from .functional_constraints import evaluate_functional_spaces
 
     scene = request.scene.model_dump()
     return {**validate_scene(scene), "requirements": evaluate_layout_requirements(scene),
-            "functionalRelations": evaluate_bedside_groups(scene)}
+            "functionalRelations": evaluate_bedside_groups(scene), "functionalSpaces": evaluate_functional_spaces(scene)}
 
 
 @app.post("/generate")

@@ -35,6 +35,8 @@
 .owned-furniture-card{padding:14px;border:1px solid #dce3d2;border-radius:8px;display:flex;flex-direction:column;gap:5px}
 .owned-furniture-card>img{height:130px;width:100%;object-fit:contain;background:#f5f6f0}
 .owned-furniture-card>.furniture-preview{height:160px;flex-shrink:0}
+.furniture-card-preview{overflow:hidden;flex-shrink:0}
+.furniture-card-preview>.furniture-preview{width:100%;height:100%}
 .furniture-model-import>p{font-size:12px;color:#74836a}
 .owned-furniture-card>small{color:#74836a}
 @media(max-width:780px){.furniture-editor-grid{grid-template-columns:1fr}.furniture-parameters{grid-template-columns:repeat(2,minmax(0,1fr))}.owned-furniture-grid{grid-template-columns:1fr 1fr}.furniture-library fieldset{padding:12px}.furniture-library .field-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.furniture-crop{width:100%}.app-header{flex-wrap:wrap;height:auto;gap:10px;padding:12px}.header-actions{flex-wrap:wrap}}
@@ -272,6 +274,7 @@
   .owned-furniture-card { display: grid; grid-template-columns: 100px minmax(0,1fr); grid-template-rows: auto auto 1fr; column-gap: 11px; align-items: center; }
   .owned-furniture-card > img { grid-column: 1; grid-row: 1 / span 3; width: 100px; aspect-ratio: 1; }
   .owned-furniture-card > .furniture-preview { grid-column: 1; grid-row: 1 / span 4; width: 100px; height:130px; }
+  .owned-furniture-card > .furniture-card-preview { grid-column: 1; grid-row: 1 / span 4; width: 100px; }
   .owned-furniture-meta { grid-column: 2; }
   .owned-furniture-card > small,.owned-furniture-card .furniture-actions { grid-column: 2; }
   .owned-furniture-card .furniture-actions { align-self: end; }

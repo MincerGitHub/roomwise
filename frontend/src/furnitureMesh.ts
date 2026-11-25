@@ -7,6 +7,32 @@ export function box(g:THREE.Group,w:number,h:number,d:number,x:number,y:number,z
 }
 function legs(g:THREE.Group,w:number,d:number,h:number){for(const x of [-1,1])for(const z of [-1,1])box(g,.045,h,.045,x*(w/2-.07),h/2,z*(d/2-.07),colors.dark)}
 
+function floorLamp(item:Item,primary=colors.dark,secondary=colors.cream){
+ const group=new THREE.Group();group.userData.itemId=item.id;
+ for(const [top,bottom,height,y,color] of [[.3,.3,.04,.02,primary],[.025,.025,.79,.435,primary],[.2,.5,.22,.89,secondary]]){
+  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(top,bottom,height,24),new THREE.MeshStandardMaterial({color,roughness:.65}));
+  mesh.position.y=y;mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);
+ }
+ group.scale.set(item.width,item.height,item.depth);return group;
+}
+
+function appliance(item:Item){
+ const group=new THREE.Group();group.userData.itemId=item.id;
+ const {width:w,height:h,depth:d}=item;
+ if(item.category==='laptop'){
+  box(group,w,h*.06,d,0,h*.03,0,0x676e72);
+  box(group,w,h*.94,d*.06,0,h*.53,-d*.47,0x42494e);
+  box(group,w*.9,h*.82,d*.01,0,h*.53,-d*.43,0x8cabb5);
+ }else if(item.category==='wall_tv'){
+  box(group,w,h,d,0,h/2,0,0x252d32);
+  box(group,w*.96,h*.93,d*.02,0,h/2,d*.51,0x405665);
+ }else{
+  box(group,w,h,d,0,h/2,0,0xf3f1e8);
+  box(group,w*.88,h*.08,d*.02,0,h*.12,d*.51,0x5f6e73);
+ }
+ return group;
+}
+
 export function parameterKeys(category:string|null): (keyof FurnitureParameters)[]{
  const keys:(keyof FurnitureParameters)[]=['primaryColor','secondaryColor','material'];
  if(['chair','armchair','dressing_chair','stool','sofa'].includes(category||''))keys.push('hasBack','hasArms','hasLegs','seatHeightRatio');
@@ -47,11 +73,13 @@ export function displayFurnitureVertexColors(group:THREE.Object3D){
 }
 
 export function createFurniture(item:Item,parameters?:FurnitureParameters):THREE.Group{
+ if(['laptop','wall_tv','air_conditioner'].includes(item.category))return appliance(item);
  const params=parameters||item.furnitureSnapshot?.parameters;
  if(!params)return legacyFurniture(item);
  const raw=new THREE.Group();const {width,depth,height,category}=item;
  const primary=new THREE.Color(params.primaryColor||'#b28c65').getHex();
  const secondary=new THREE.Color(params.secondaryColor||'#e8e2d6').getHex();
+ if(category==='floor_lamp')return floorLamp(item,primary,secondary);
  const part=(partWidth:number,partHeight:number,partDepth:number,posX:number,posY:number,posZ:number,color=primary)=>box(raw,partWidth,partHeight,partDepth,posX,posY,posZ,color);
  const feet=(top:number)=>{for(const side of [-1,1])for(const front of [-1,1])part(width*.065,top,depth*.065,side*width*.4,top/2,front*depth*.4,secondary)};
  if(category.includes('bed')){
@@ -115,6 +143,7 @@ export async function exportFurnitureGLB(item:Item):Promise<Blob>{
  finally{disposeFurniture(group)}
 }
 function legacyFurniture(it:Item):THREE.Group{
+ if(it.category==='floor_lamp')return floorLamp(it);
  const g=new THREE.Group();const {width:w,depth:d,height:h}=it;g.userData.itemId=it.id;
  if(it.category.includes('bed')){
   box(g,w,.13,d,0,.13,0,colors.wood);box(g,w*.97,.16,d*.95,0,.29,0,colors.cream);

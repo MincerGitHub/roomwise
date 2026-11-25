@@ -39,7 +39,9 @@ from .window_constraints import (
 from .relative_constraints import evaluate_relative_position, relative_position_placements
 from .relative_constraints import target_axes
 from .facing_constraints import facing_item_placements, evaluate_facing_preference
-from .supports import support_errors
+from .supports import support_errors, WALL_APPLIANCES
+from .wall_placements import appliance_placements
+from .functional_constraints import evaluate_functional_spaces, repair_functional_spaces
 
 
 MAX_GENERATION_ITEMS = 32
@@ -185,13 +187,17 @@ def _candidate_quality_cost(candidate, result, placed, local_cost):
     """Run the more expensive whole-layout score only on promising placements."""
     partial = deepcopy(result)
     partial["items"] = [*placed, candidate]
-    return local_cost + 1.15 * layout_quality(partial)["penalty"]
+    functional = evaluate_functional_spaces(partial, result)
+    return local_cost + 1.15 * layout_quality(partial)["penalty"] + functional["penalty"] + 2 * len(functional["unsatisfied"])
 
 
 def _wall_placements(item, room, preference, rng):
     """Align furniture backs with actual boundary segments, including slopes."""
     if item.get("locked"):
         yield deepcopy(item)
+        return
+    if item["category"] in WALL_APPLIANCES:
+        yield from appliance_placements(item,room,preference)
         return
     walls = matching_wall_segments(room, preference)
     # Nearest viable wall first; the final cost also penalises unnecessary moves.
@@ -214,6 +220,9 @@ def _wall_placements(item, room, preference, rng):
 
 
 def _placements(item, room, rng, preferences=()):
+    if item["category"] in WALL_APPLIANCES:
+        yield from appliance_placements(item,room)
+        return
     # Include the original transform, wall-adjacent grid placements and samples.
     yield deepcopy(item)
     for preference in preferences:
@@ -343,6 +352,7 @@ def _place_remaining(result, original, placed, movable, rng, anchor_strength, bu
     facing_subjects = {preference["itemId"] for preference in result.get("preferences", [])
                        if preference.get("kind") == "face_item"}
     movable.sort(key=lambda i: (0 if i["id"] in facing_targets else 1 if i["id"] in facing_subjects else 2,
+                                i["category"] not in WALL_APPLIANCES,
                                 i["category"] in ("nightstand", "rug"), i["category"] == "rug",
                                 -i["width"] * i["depth"] * jitter[i["id"]]))
     for item in movable:
@@ -711,7 +721,7 @@ def rule_candidate(original: dict, rng: random.Random, anchor_strength=0, budget
     consumed_vanity_seats = {seat["id"] for seat in vanity_seats.values()}
     # Large solid furniture first; small pieces are inserted around it, rugs last.
     jitter = {i["id"]: rng.uniform(.85, 1.15) for i in movable}
-    movable.sort(key=lambda i: (i["category"] in ("nightstand", "rug"), i["category"] == "rug", -i["width"] * i["depth"] * jitter[i["id"]]))
+    movable.sort(key=lambda i: (i["category"] not in WALL_APPLIANCES,i["category"] in ("nightstand", "rug"), i["category"] == "rug", -i["width"] * i["depth"] * jitter[i["id"]]))
     for item in movable:
         if item["id"] in consumed_vanity_seats:
             continue
@@ -1008,9 +1018,10 @@ def _generate_supported_layouts(scene, mode, count, seed, pool_limit=None, retur
         proposed["preferences"] = deepcopy(scene.get("preferences", []))
         assert_invariants(scene, proposed)
         validation, requirements = validate_scene(proposed), evaluate_layout_requirements(proposed)
-        if not validation["valid"] or not requirements["satisfied"]:
+        functional = evaluate_functional_spaces(proposed, scene)
+        if not validation["valid"] or not requirements["satisfied"] or not functional["satisfied"]:
             continue
-        candidate.update(validation=validation, requirements=requirements,
+        candidate.update(validation=validation, requirements=requirements, functionalSpaces=functional,
                          summary=f"保留全部 {len(scene['items'])} 件物品，收纳箱随承托家具一起移动；通过高度、台面和空间检查。")
         accepted.append(candidate)
     if return_pool:
@@ -1048,7 +1059,7 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limi
     rng = random.Random(seed)
     candidates = []
     fingerprints = set()
-    rejected = {"geometry": 0, "requirements": 0, "functionalRelations": 0, "placementFailed": 0, "model": 0}
+    rejected = {"geometry": 0, "requirements": 0, "functionalRelations": 0, "functionalSpaces": 0, "placementFailed": 0, "model": 0}
     budget = None
     has_spatial_requirements = any(preference.get("required") and preference["kind"] in EXPLICIT_SPATIAL_KINDS
                                   for preference in scene.get("preferences", []))
@@ -1067,11 +1078,13 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limi
         diagnostics["meshCollision"] = {"itemIds": mesh_items, "search": "conservative_footprint", "finalValidation": "original_mesh",
                                         "note": "搜索时保守避开GLB占地重叠，候选仍用原网格复核；可能漏掉可穿插的紧凑摆法。"}
     if not locked_check["valid"]:
-        diagnostics.update(message="锁定家具本身存在越界、门口或相互碰撞。请先修正或明确解锁。", lockedIssues=locked_check["issues"])
+        reasons = "；".join(issue["message"] for issue in locked_check["issues"] if issue["severity"] == "error")
+        diagnostics.update(message="锁定家具未通过空间检查：" + reasons + " 请先修正或明确解锁。", lockedIssues=locked_check["issues"])
         return {"baseVersion": scene.get("version", 0), "candidates": [], "diagnostics": diagnostics}
     original_requirements = evaluate_layout_requirements(scene)
     diagnostics["requirements"] = original_requirements
     diagnostics["functionalRelations"] = evaluate_bedside_groups(scene, scene)
+    diagnostics["functionalSpaces"] = evaluate_functional_spaces(scene)
     locked_ids = {item["id"] for item in scene["items"] if item.get("locked")}
     item_ids = {item["id"] for item in scene["items"]}
     def blocked_requirement(check):
@@ -1110,6 +1123,8 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limi
         check = validate_scene(proposed)
         if not check["valid"]:
             rejected["geometry"] += 1
+            if check.get("wallAppliances", {}).get("unsatisfied"):
+                diagnostics["lastUnsatisfiedWallAppliances"] = check["wallAppliances"]["unsatisfied"]
             return False
         requirements = evaluate_layout_requirements(proposed)
         if not requirements["satisfied"]:
@@ -1126,6 +1141,19 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limi
             rejected["functionalRelations"] += 1
             diagnostics["lastUnsatisfiedVanitySeating"] = vanity_seating["unsatisfied"]
             return False
+        functional = evaluate_functional_spaces(proposed, scene)
+        repairs = []
+        if mode != "model" and actual_method != "model" and functional["unsatisfied"]:
+            proposed, functional, repairs = repair_functional_spaces(proposed, scene, budget)
+            if repairs:
+                check = validate_scene(proposed)
+                requirements = evaluate_layout_requirements(proposed)
+                relations = evaluate_bedside_groups(proposed, scene)
+                vanity_seating = evaluate_vanity_seating(proposed)
+        if not functional["satisfied"]:
+            rejected["functionalSpaces"] += 1
+            diagnostics["lastUnsatisfiedFunctionalSpaces"] = functional["unsatisfied"]
+            return False
         fingerprint = _fingerprint(proposed)
         if fingerprint in fingerprints:
             return False
@@ -1140,17 +1168,23 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limi
         preferences = preference_penalty(proposed, scene)
         # A candidate must first pass hard geometry checks. This soft score
         # ranks common arrangement cues; it is not a design-quality probability.
-        total_penalty = preferences + quality["penalty"]
+        total_penalty = preferences + quality["penalty"] + functional["penalty"]
         score = round(100 / (1 + total_penalty), 2)
         candidates.append({"id": uuid.uuid4().hex[:12], "scene": proposed, "validation": check, "score": score, "mode": actual_method, "summary": f"{len(proposed['items'])}件家具全部保留，{sum(i.get('locked', False) for i in proposed['items'])}件保持锁定；通过占地与入口近似检查。"})
         candidates[-1]["quality"] = {
             "penalty": round(quality["penalty"], 4),
             "components": quality["components"],
             "preferencePenalty": round(preferences, 4),
+            "functionalPenalty": functional["penalty"],
         }
         candidates[-1]["requirements"] = requirements
         candidates[-1]["functionalRelations"] = relations
         candidates[-1]["vanitySeating"] = vanity_seating
+        candidates[-1]["functionalSpaces"] = functional
+        candidates[-1]["functionalRepair"] = repairs
+        candidates[-1]["summary"] += f"功能空间检查 {functional['passed']}/{functional['total']} 项通过。"
+        if repairs:
+            candidates[-1]["summary"] += "已修正家具搭配位置，并重新核验空间与文字要求。"
         if relations["warnings"]:
             candidates[-1]["summary"] += "锁定的床头柜仍有床头位置问题，未自动移动；请查看功能关系提示。"
         requested_ids = {preference["itemId"] for preference in scene.get("preferences", []) if preference.get("required")}
@@ -1269,6 +1303,8 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limi
         diagnostics["message"] = "当前条件下未找到通过检查的布局。系统未删除家具、修改尺寸或移动锁定物品；可解锁部分位置或调整家具清单。"
         if any(preference.get("required") for preference in scene.get("preferences", [])):
             diagnostics["message"] = "当前搜索预算内未找到同时满足明确要求与占地、入口检查的布局。未返回违反靠墙、靠窗或朝向要求的替代方案；请检查目标位置空间、锁定家具，或调整要求。"
+        if diagnostics.get("lastUnsatisfiedWallAppliances"):
+            diagnostics["message"] += "壁挂使用检查：" + "；".join(check["message"] for check in diagnostics["lastUnsatisfiedWallAppliances"][:3])
     if "functionalTemplates" not in diagnostics:
         diagnostics["functionalTemplates"] = {"attempts": 0, "accepted": 0, "poolAccepted": 0, "poolTarget": pool_limit}
     if _return_candidate_pool:
@@ -1299,4 +1335,6 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limi
     diagnostics["searchBudgetExhausted"] = budget.exhausted
     if budget.exhausted:
         diagnostics["message"] += "已达到搜索预算；这不表示数学上不存在可行布局。"
+    if not selected and diagnostics.get("lastUnsatisfiedFunctionalSpaces"):
+        diagnostics["message"] += "功能空间未满足：" + "；".join(c["message"] for c in diagnostics["lastUnsatisfiedFunctionalSpaces"][:3])
     return {"baseVersion": scene.get("version", 0), "candidates": selected, "diagnostics": diagnostics}

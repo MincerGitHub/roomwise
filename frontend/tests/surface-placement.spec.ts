@@ -27,10 +27,8 @@ async function point(page:Page,x:number,z:number,y=0,top=true){
  if(top){const scale=Math.min(bounds.width,bounds.height)/(2*6*.72);return {x:bounds.x+bounds.width/2+(x-3)*scale,y:bounds.y+bounds.height/2+(z-2.5)*scale}}
  return page.evaluate(async({bounds,x,z,y})=>{
   const THREE=await import('/node_modules/.vite/deps/three.js' as string);
-  const camera=new THREE.PerspectiveCamera(38,bounds.width/bounds.height,.05,150);
-  camera.zoom=Math.min(1,bounds.width/bounds.height/1.55);camera.updateProjectionMatrix();
-  camera.position.set(3+6*1.13,6*1.13,2.5-5*1.15);camera.lookAt(3,.1,2.5);camera.updateMatrixWorld();
-  const p=new THREE.Vector3(x,y,z).project(camera);
+  const matrices=JSON.parse(document.querySelector('.scene-canvas')!.getAttribute('data-camera')!);
+  const p=new THREE.Vector3(x,y,z).applyMatrix4(new THREE.Matrix4().fromArray(matrices.view)).applyMatrix4(new THREE.Matrix4().fromArray(matrices.projection));
   return {x:bounds.x+(p.x+1)*bounds.width/2,y:bounds.y+(1-p.y)*bounds.height/2};
  },{bounds,x,z,y});
 }
@@ -55,7 +53,7 @@ test('a box snaps near the table, slides on it, detaches and can be restored wit
  await drag(page,await point(page,box.x,box.z),await point(page,4.4,3));
  box=(await poses(page)).find(item=>item.id==='box')!;
  expect(box.supportId).toBeNull();expect(box.y).toBe(0);expect(box.x).toBeCloseTo(4.4,2);
- await page.getByRole('dialog').getByRole('button',{name:'撤销',exact:true}).click();
+ await page.getByRole('button',{name:'撤销',exact:true}).click();
  await expect.poll(async()=>(await poses(page)).find(item=>item.id==='box')).toEqual(supported);
  await closePreview(page);
  const saving=page.waitForResponse('**/api/scenes/save');await page.getByRole('button',{name:'另存',exact:true}).click();

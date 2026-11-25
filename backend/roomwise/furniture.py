@@ -110,7 +110,11 @@ class FurnitureService:
         row = connection.execute(f"SELECT body FROM {table} WHERE id=?", (identifier,)).fetchone()
         if row is None:
             raise FurnitureError(404, "家具或草稿不存在")
-        return json.loads(row["body"])
+        body = json.loads(row["body"])
+        if table == "furniture_assets":
+            from .functional_constraints import decorate_asset
+            return decorate_asset(body)
+        return body
 
     def put(self, connection, table, body):
         connection.execute(f"INSERT INTO {table}(id,body) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body", (body["id"], json.dumps(body, ensure_ascii=False)))
@@ -243,8 +247,9 @@ class FurnitureService:
         return {"id": identifier, "deleted": True}
 
     def listing(self):
+        from .functional_constraints import decorate_asset
         with self.connect() as connection:
-            assets = [json.loads(row["body"]) for row in connection.execute("SELECT body FROM furniture_assets")]
+            assets = [decorate_asset(json.loads(row["body"])) for row in connection.execute("SELECT body FROM furniture_assets")]
             drafts = [json.loads(row["body"]) for row in connection.execute("SELECT body FROM furniture_drafts")]
         deleted_ids = {body["id"] for body in assets if body.get("deletedAt")}
         return {"assets": sorted([body for body in assets if not body.get("deletedAt")], key=lambda body: body["updatedAt"], reverse=True),
@@ -415,6 +420,7 @@ class FurnitureService:
             snapshot = FurnitureSnapshot.model_validate({
                 **{key: properties[key] for key in ("label", "category", "width", "depth", "height", "parameters", "dimensionSources", "frontDirection", "subtype", "styleTags")},
                 "version": version, "photoUrls": draft["photoUrls"], "dimensionsConfirmed": True,
+                **({"functionalProfile": properties["functionalProfile"]} if properties.get("functionalProfile") else {}),
             }).model_dump()
             asset = {"id": identifier_asset, "version": version, "properties": properties, "photoUrls": draft["photoUrls"], "assetUrl": request.assetUrl, "snapshot": snapshot, "updatedAt": now()}
             if draft.get("modelSource"):

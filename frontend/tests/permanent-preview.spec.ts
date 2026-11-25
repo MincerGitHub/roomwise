@@ -5,6 +5,7 @@ async function setup(page:Page){
  await page.route('**/api/**',async route=>{
   const endpoint=new URL(route.request().url()).pathname;
   if(endpoint==='/api/health')return route.fulfill({json:{status:'ok',modelLoaded:true}});
+  if(endpoint==='/api/startup-scene')return route.fulfill({json:{scene:null}});
   if(endpoint==='/api/catalog')return route.fulfill({json:{items:[]}});
   if(endpoint==='/api/validate')return route.fulfill({json:validation});
   if(endpoint==='/api/generate'){

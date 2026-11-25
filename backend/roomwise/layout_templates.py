@@ -11,6 +11,8 @@ import math
 from .geometry import assert_invariants, footprint, search_placement_errors as placement_errors, validate_scene
 from .window_constraints import evaluate_layout_requirements, evaluate_wall_preference
 from .bedside_constraints import bedside_assignments, bedside_placements, bed_placements_for_locked_stands, evaluate_bedside_groups
+from .supports import WALL_APPLIANCES
+from .wall_placements import appliance_placements
 
 
 BEDS = {"double_bed", "single_bed", "kids_bed"}
@@ -73,10 +75,10 @@ def _groups(items, assignments=None):
         groups.append((table, attached, "table"))
     for item in items:
         if item["id"] not in used:
-            groups.append((item, [], "wall" if item["category"] in WALL_BACKS else "other"))
+            groups.append((item, [], "appliance" if item["category"] in WALL_APPLIANCES else "wall" if item["category"] in WALL_BACKS else "other"))
             used.add(item["id"])
     # Allocate the main activity zones before inserting small isolated objects.
-    order = {"bed": 0, "table": 1, "wall": 2, "other": 3}
+    order = {"appliance": -1, "bed": 0, "table": 1, "wall": 2, "other": 3}
     groups.sort(key=lambda group: (order[group[2]], group[0]["category"] == "rug",
                                    -group[0]["width"] * group[0]["depth"]))
     return groups
@@ -88,6 +90,9 @@ def _anchor_positions(anchor, attached, kind, scene, rng):
 
     if anchor.get("locked"):
         yield deepcopy(anchor)
+        return
+    if anchor["category"] in WALL_APPLIANCES:
+        yield from appliance_placements(anchor,scene["room"])
         return
     room = scene["room"]
     wall_preference = {"kind": "near_wall", "itemId": anchor["id"]}

@@ -14,6 +14,8 @@ from shapely.affinity import rotate, translate
 from shapely.geometry import Point, Polygon, box
 from shapely.ops import unary_union
 from .supports import elevation, separated_vertically, support_errors, top
+from .storage import runtime_directory
+from .mesh_collision import triangle_collision
 
 
 SEAT_CATEGORIES = {"chair", "dressing_chair", "stool"}
@@ -41,6 +43,115 @@ def footprint(item: dict) -> Polygon:
     return _footprint(float(item["width"]), float(item["depth"]), float(item.get("x", 0)),
                       float(item.get("z", 0)), float(item.get("rotation", 0)))
 
+
+def _collision_part(item: dict, width: float, depth: float, center_x: float,
+                    center_z: float, low_y: float, high_y: float, label: str) -> dict:
+    """Build one local rectangular collision part and transform it to room space."""
+    shape = box(-width / 2, -depth / 2, width / 2, depth / 2)
+    shape = translate(shape, xoff=center_x, yoff=center_z)
+    shape = rotate(shape, -float(item.get("rotation", 0)), origin=(0, 0))
+    shape = translate(shape, xoff=float(item.get("x", 0)), yoff=float(item.get("z", 0)))
+    elevation_value = elevation(item)
+    return {"shape": shape, "low": elevation_value + low_y,
+            "high": elevation_value + high_y, "label": label}
+
+
+def _collision_parts_uncached(item: dict) -> list[dict]:
+    """Return component solids, preserving open space between furniture parts."""
+    width, depth, height = (float(item["width"]), float(item["depth"]), float(item["height"]))
+    category = item.get("category")
+    params = _furniture_parameters(item)
+    parts = []
+
+    def add(part_width, part_depth, cx, cz, low, high, label):
+        if part_width > EPSILON and part_depth > EPSILON and high > low + EPSILON:
+            parts.append(_collision_part(item, part_width, part_depth, cx, cz, low, high, label))
+
+    def feet(top_height, part_width=0.065 * width, part_depth=0.065 * depth):
+        for side_x in (-1, 1):
+            for side_z in (-1, 1):
+                add(part_width, part_depth, side_x * .4 * width, side_z * .4 * depth, 0, top_height, "leg")
+
+    if category == "rug":
+        add(width, depth, 0, 0, 0, height, "rug")
+    elif category in SEAT_CATEGORIES:
+        seat = height * (float(params.get("seatHeightRatio")) if params.get("seatHeightRatio") is not None else (.4 if category == "sofa" else .5))
+        if params.get("hasLegs") is False:
+            add(.85 * width, .85 * depth, 0, 0, 0, seat, "seat_base")
+        else:
+            feet(seat)
+        add(width, depth, 0, 0, max(0, seat - .04 * height), min(height, seat + .04 * height), "seat")
+        if params.get("hasBack", category != "stool"):
+            add(width, .1 * depth, 0, -.45 * depth, seat, height, "back")
+        if params.get("hasArms", category in {"armchair", "sofa"}):
+            for side_x in (-1, 1):
+                add(.08 * width, depth, side_x * .46 * width, 0, seat, min(height, seat + .3 * height), "arm")
+        if category == "sofa":
+            seats = int(params.get("seatCount") or 3)
+            for index in range(seats):
+                add(.8 * width / seats, .78 * depth, ((index + .5) / seats - .5) * .85 * width, .04 * depth, seat + .04 * height, min(height, seat + .11 * height), "cushion")
+    elif category in {"desk", "table", "coffee_table", "dressing_table"}:
+        top_height = height * (.57 if category == "dressing_table" else 1.0)
+        if params.get("hasLegs") is False:
+            add(.6 * width, .7 * depth, 0, 0, 0, .94 * top_height, "base")
+        else:
+            feet(.94 * top_height)
+        add(width, depth, 0, 0, .94 * top_height, top_height, "tabletop")
+        drawers = int(params.get("drawerCount") or (3 if category == "desk" else 0))
+        for index in range(drawers):
+            drawer_height = .65 * top_height / drawers
+            low = .22 * top_height + index * drawer_height
+            add(.28 * width, .8 * depth, .32 * width, 0, low, low + drawer_height, "drawer")
+        if category == "dressing_table":
+            add(.55 * width, .04 * depth, 0, -.4 * depth, .6 * height, height, "mirror")
+    elif category in {"double_bed", "single_bed", "kids_bed"}:
+        add(width, depth, 0, 0, 0, .25 * height, "bed_base")
+        add(.97 * width, .96 * depth, 0, 0, .25 * height, .6 * height, "mattress")
+        add(width, .06 * depth, 0, -.47 * depth, 0, height, "headboard")
+        pillow_width = width * (.4 if width > 1.3 else .7)
+        for side_x in ((-.24, .24) if width > 1.3 else (0,)):
+            add(pillow_width, .2 * depth, side_x * width, -.32 * depth, .6 * height, .75 * height, "pillow")
+    elif category in {"shelf", "bookshelf"}:
+        add(width, .06 * depth, 0, -.47 * depth, 0, height, "back")
+        for side_x in (-1, 1):
+            add(.045 * width, depth, side_x * .4775 * width, 0, 0, height, "side")
+        shelves = int(params.get("shelfCount") or 4)
+        for index in range(shelves):
+            add(width, depth, 0, 0, (index + .5) * height / shelves - .0125 * height, (index + .5) * height / shelves + .0125 * height, "shelf")
+    else:
+        add(width, depth, 0, 0, 0, height, "body")
+    return parts
+
+
+
+@lru_cache(maxsize=32768)
+def _collision_parts_cached(width: float, depth: float, height: float, category: str,
+                           x: float, z: float, rotation: float, y: float,
+                           parameters: tuple[tuple[str, object], ...]) -> tuple[dict, ...]:
+    item = {"width": width, "depth": depth, "height": height, "category": category,
+            "x": x, "z": z, "rotation": rotation, "y": y,
+            "parameters": dict(parameters)}
+    return tuple(_collision_parts_uncached(item))
+
+
+def collision_parts(item: dict) -> list[dict]:
+    parameters = _furniture_parameters(item)
+    key = tuple(sorted(parameters.items()))
+    return list(_collision_parts_cached(
+        float(item["width"]), float(item["depth"]), float(item["height"]),
+        str(item.get("category")), float(item.get("x", 0)), float(item.get("z", 0)),
+        float(item.get("rotation", 0)), float(item.get("y", 0)), key,
+    ))
+
+def _mesh_asset_declared(item: dict) -> bool:
+    return str(item.get("assetUrl") or "").startswith("/uploads/")
+
+
+def detailed_collision_area(first: dict, second: dict) -> float:
+    """Return the footprint diagnostic area when triangle meshes intersect."""
+    if not triangle_collision(first, second, runtime_directory() / "uploads", collision_parts):
+        return 0.0
+    return float(footprint(first).intersection(footprint(second)).area)
 
 def _furniture_parameters(item: dict) -> dict:
     """Return confirmed custom-furniture parameters when they exist."""
@@ -145,8 +256,8 @@ def overlap_kind(a: dict, b: dict, area: float) -> str:
     return "collision"
 
 
-def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0):
-    """Fast hard checks used by the generator; excludes accessibility."""
+def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0, *, conservative_mesh: bool = False):
+    """Placement checks without accessibility; exact mesh collision by default."""
     fp = footprint(item)
     if not room_polygon(room).buffer(EPSILON).covers(fp):
         return True
@@ -158,13 +269,25 @@ def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0)
     for other in placed:
         other_fp = footprint(other)
         inter = fp.intersection(other_fp).area
-        if inter > EPSILON and overlap_kind(item, other, inter) == "collision":
-            return True
+        kind = overlap_kind(item, other, inter) if inter > EPSILON else ""
+        mesh_backed = _mesh_asset_declared(item) or _mesh_asset_declared(other)
+        if inter > EPSILON and (kind == "collision" or (kind == "seat_tuck" and mesh_backed)):
+            if (conservative_mesh and mesh_backed) or detailed_collision_area(item, other) > EPSILON:
+                return True
         if gap and not separated_vertically(item, other) and item["category"] != "rug" and other["category"] != "rug" and inter <= EPSILON and fp.distance(other_fp) < gap:
             return True
         if cabinet_door_clearance_conflicts(item, other) or cabinet_door_clearance_conflicts(other, item):
             return True
     return False
+
+
+def search_placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0):
+    """Conservative GLB footprint screening for the many tentative search poses.
+
+    This only rejects additional overlapping proposals; final acceptance still
+    calls validate_scene with original GLBs. Source items and metadata stay intact.
+    """
+    return placement_errors(item, room, placed, gap, conservative_mesh=True)
 
 
 def accessibility(scene: dict, step: float = .18, radius: float = .15):
@@ -243,17 +366,24 @@ def validate_scene(scene: dict, check_access: bool = True):
             issues.append({"type": "door", "severity": "error", "itemIds": [item["id"]], "message": f"{item['label']}占用了门内预留区域"})
     for index, a in enumerate(items):
         for b in items[index + 1:]:
-            area = polygons[a["id"]].intersection(polygons[b["id"]]).area
-            if area <= EPSILON:
+            footprint_area = polygons[a["id"]].intersection(polygons[b["id"]]).area
+            if footprint_area <= EPSILON:
                 continue
-            kind = overlap_kind(a, b, area)
+            kind = overlap_kind(a, b, footprint_area)
             if kind in {"floor_layer", "vertical_layer"}:
                 continue
-            if kind == "seat_tuck":
+            mesh_backed = _mesh_asset_declared(a) or _mesh_asset_declared(b)
+            if kind == "seat_tuck" and not mesh_backed:
                 issues.append({"type": "seat_tuck", "severity": "info", "itemIds": [a["id"], b["id"]], "message": f"{a['label']}与{b['label']}有局部桌椅交叠，须确认实际高度及使用空间"})
                 continue
+            area = detailed_collision_area(a, b)
+            if kind == "seat_tuck" and area <= EPSILON:
+                issues.append({"type": "seat_tuck", "severity": "info", "itemIds": [a["id"], b["id"]], "message": f"{a['label']}与{b['label']}有局部桌椅交叠，须确认实际高度及使用空间"})
+                continue
+            if area <= EPSILON:
+                continue
             collisions += 1
-            issues.append({"type": "collision", "severity": "error", "itemIds": [a["id"], b["id"]], "message": f"{a['label']}与{b['label']}的占地范围相交", "overlapArea": round(area, 4)})
+            issues.append({"type": "collision", "severity": "error", "itemIds": [a["id"], b["id"]], "message": f"{a['label']}与{b['label']}的部件占用范围相交", "overlapArea": round(area, 4)})
     for cabinet in items:
         if not has_opening_doors(cabinet):
             continue
@@ -276,7 +406,7 @@ def validate_scene(scene: dict, check_access: bool = True):
         "valid": not any(i["severity"] == "error" for i in issues),
         "issues": issues,
         "metrics": {"collisions": collisions, "outOfBounds": out, "doorConflicts": door_count, "cabinetDoorConflicts": cabinet_door_count, "reachable": access.get("reachable"), "checkedItems": len(items), "roomArea": round(shell.area, 3), "freeArea": round(free_area, 3), "accessibility": access},
-        "limitations": ["以确认后的矩形占地、离地高度和承托关系检查，未使用精细家具网格", f"带门柜体正面保留 {CABINET_DOOR_CLEARANCE:.2f} 米使用区，未模拟单扇柜门的精细转动轨迹", "台面承托按类别与完整占地检查，未推断实际材质承重", "局部桌椅交叠与地毯按类别例外处理", "通行检查为工程近似，不能代表建筑规范验收"],
+        "limitations": ["边界和通行使用整体占地；有 GLB 资产时碰撞使用其三角形网格，未绑定资产的旧家具使用部件碰撞回退", f"带门柜体正面保留 {CABINET_DOOR_CLEARANCE:.2f} 米使用区，未模拟单扇柜门的精细转动轨迹", "台面承托按类别与完整占地检查，未推断实际材质承重", "局部桌椅交叠与地毯按类别例外处理", "通行检查为工程近似，不能代表建筑规范验收"],
     }
 
 

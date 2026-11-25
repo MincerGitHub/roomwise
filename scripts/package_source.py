@@ -4,7 +4,7 @@ import zipfile,hashlib,json
 
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'release';OUT.mkdir(exist_ok=True)
-targets=['backend','frontend/src','frontend/tests','frontend/scripts','docs','scripts']
+targets=['backend','frontend/src','frontend/tests','frontend/scripts','docs','scripts','integrations']
 files=[]
 for rel in targets:
  for p in (ROOT/rel).rglob('*'):

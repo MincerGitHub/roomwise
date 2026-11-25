@@ -1,0 +1,488 @@
+diff --git a/run.py b/run.py
+index 1454253..7899806 100644
+--- a/run.py
++++ b/run.py
+@@ -18,8 +18,9 @@ from src.utils.camera_util import (
+     get_zero123plus_input_cameras,
+     get_circular_camera_poses,
+ )
+-from src.utils.mesh_util import save_obj, save_obj_with_mtl
++from src.utils.mesh_util import save_obj, save_obj_with_mtl, save_glb
+ from src.utils.infer_util import remove_background, resize_foreground, save_video
++from device import resolve_device, resolve_dtype, device_label
+ 
+ 
+ def get_render_cameras(batch_size=1, M=120, radius=4.0, elevation=20.0, is_flexicubes=False):
+@@ -70,7 +71,7 @@ parser = argparse.ArgumentParser()
+ parser.add_argument('config', type=str, help='Path to config file.')
+ parser.add_argument('input_path', type=str, help='Path to input image or directory.')
+ parser.add_argument('--output_path', type=str, default='outputs/', help='Output directory.')
+-parser.add_argument('--diffusion_steps', type=int, default=75, help='Denoising Sampling steps.')
++parser.add_argument('--diffusion_steps', type=int, default=int(os.getenv('INSTANTMESH_DIFFUSION_STEPS', '75')), help='Denoising Sampling steps.')
+ parser.add_argument('--seed', type=int, default=42, help='Random seed for sampling.')
+ parser.add_argument('--scale', type=float, default=1.0, help='Scale of generated object.')
+ parser.add_argument('--distance', type=float, default=4.5, help='Render distance.')
+@@ -78,7 +79,35 @@ parser.add_argument('--view', type=int, default=6, choices=[4, 6], help='Number
+ parser.add_argument('--no_rembg', action='store_true', help='Do not remove input background.')
+ parser.add_argument('--export_texmap', action='store_true', help='Export a mesh with texture map.')
+ parser.add_argument('--save_video', action='store_true', help='Save a circular-view video.')
++parser.add_argument('--side_image', type=str, default=None,
++                    help='Optional real right-side photo. It replaces one generated view.')
++parser.add_argument('--top_image', type=str, default=None,
++                    help='Optional real top photo. It replaces one generated view.')
++parser.add_argument('--glb_output', type=str, default=None,
++                    help='Optional output path for a vertex-color GLB.')
++parser.add_argument('--device', type=str, default=os.getenv('INSTANTMESH_DEVICE', 'auto'),
++                    choices=['auto', 'cuda', 'directml', 'cpu'],
++                    help='Inference device. auto prefers CUDA, then DirectML, then CPU.')
+ args = parser.parse_args()
++# Keep model diagnostics next to this job's outputs; the app still captures
++# stdout/stderr for its normal error handling.
++import sys
++os.makedirs(args.output_path, exist_ok=True)
++class _JobLog:
++    def __init__(self, stream, filename):
++        self.stream = stream
++        self.log = open(os.path.join(args.output_path, filename), 'w', encoding='utf-8')
++    def write(self, text):
++        self.log.write(text)
++        self.log.flush()
++        return self.stream.write(text)
++    def flush(self):
++        self.log.flush()
++        self.stream.flush()
++    def __getattr__(self, name):
++        return getattr(self.stream, name)
++sys.stdout = _JobLog(sys.stdout, 'stdout.log')
++sys.stderr = _JobLog(sys.stderr, 'stderr.log')
+ seed_everything(args.seed)
+ 
+ ###############################################################################
+@@ -92,45 +121,61 @@ infer_config = config.infer_config
+ 
+ IS_FLEXICUBES = True if config_name.startswith('instant-mesh') else False
+ 
+-device = torch.device('cuda')
++device = resolve_device(args.device)
++dtype = resolve_dtype(device)
++print(f'Using {device_label(device)} ({dtype})')
+ 
+-# load diffusion model
+-print('Loading diffusion model ...')
+-pipeline = DiffusionPipeline.from_pretrained(
+-    "sudo-ai/zero123plus-v1.2", 
+-    custom_pipeline="zero123plus",
+-    torch_dtype=torch.float16,
+-)
+-pipeline.scheduler = EulerAncestralDiscreteScheduler.from_config(
+-    pipeline.scheduler.config, timestep_spacing='trailing'
+-)
+-
+-# load custom white-background UNet
+-print('Loading custom white-background unet ...')
+-if os.path.exists(infer_config.unet_path):
+-    unet_ckpt_path = infer_config.unet_path
+-else:
+-    unet_ckpt_path = hf_hub_download(repo_id="TencentARC/InstantMesh", filename="diffusion_pytorch_model.bin", repo_type="model")
+-state_dict = torch.load(unet_ckpt_path, map_location='cpu')
+-pipeline.unet.load_state_dict(state_dict, strict=True)
+-
+-pipeline = pipeline.to(device)
+-
+-# load reconstruction model
+-print('Loading reconstruction model ...')
+-model = instantiate_from_config(model_config)
+-if os.path.exists(infer_config.model_path):
+-    model_ckpt_path = infer_config.model_path
++use_supplied_views = bool(args.side_image and args.top_image)
++pipeline = None
++if use_supplied_views:
++    # Roomwise already collects front/right/top photos.  Skipping Zero123++
++    # avoids a second multi-GB model on the same DirectML device.
++    print('Using supplied three-view photos; skipping Zero123++ diffusion.')
+ else:
+-    model_ckpt_path = hf_hub_download(repo_id="TencentARC/InstantMesh", filename=f"{config_name.replace('-', '_')}.ckpt", repo_type="model")
+-state_dict = torch.load(model_ckpt_path, map_location='cpu')['state_dict']
+-state_dict = {k[14:]: v for k, v in state_dict.items() if k.startswith('lrm_generator.')}
+-model.load_state_dict(state_dict, strict=True)
++    # load diffusion model
++    # The Arc DirectML backend cannot execute this VAE's convolution path.
++    # Keep only multiview diffusion on CPU; reconstruction still uses the
++    # independently selected encoder/mesh devices below.
++    diffusion_device = resolve_device(os.getenv('INSTANTMESH_DIFFUSION_DEVICE',
++        'cpu' if device.type == 'privateuseone' else args.device))
++    diffusion_dtype = resolve_dtype(diffusion_device)
++    print(f'Multiview diffusion device: {device_label(diffusion_device)} ({diffusion_dtype}); steps: {args.diffusion_steps}')
++    print('Loading diffusion model ...')
++    # Reuse the already downloaded custom pipeline in an offline installation.
++    # The optional override also supports an explicitly reviewed local module.
++    pipeline_source = os.getenv('INSTANTMESH_PIPELINE_PATH', 'zero123plus')
++    local_pipeline = os.path.join(os.getenv('HF_HOME', os.path.expanduser('~/.cache/huggingface')),
++                                  'modules', 'diffusers_modules', 'local', 'pipeline.py')
++    if pipeline_source == 'zero123plus' and os.path.isfile(local_pipeline):
++        # diffusers copies custom code into this same module cache. Loading
++        # directly from that destination raises SameFileError on Windows.
++        import shutil
++        pipeline_source = os.path.join(os.path.dirname(os.path.abspath(__file__)),
++                                       '.roomwise-cache', 'zero123plus', 'pipeline.py')
++        os.makedirs(os.path.dirname(pipeline_source), exist_ok=True)
++        shutil.copyfile(local_pipeline, pipeline_source)
++    pipeline = DiffusionPipeline.from_pretrained(
++        "sudo-ai/zero123plus-v1.2",
++        custom_pipeline=pipeline_source,
++        torch_dtype=diffusion_dtype,
++    )
++    pipeline.scheduler = EulerAncestralDiscreteScheduler.from_config(
++        pipeline.scheduler.config, timestep_spacing='trailing'
++    )
++
++    # load custom white-background UNet
++    print('Loading custom white-background unet ...')
++    if os.path.exists(infer_config.unet_path):
++        unet_ckpt_path = infer_config.unet_path
++    else:
++        unet_ckpt_path = hf_hub_download(repo_id="TencentARC/InstantMesh", filename="diffusion_pytorch_model.bin", repo_type="model")
++    state_dict = torch.load(unet_ckpt_path, map_location='cpu')
++    pipeline.unet.load_state_dict(state_dict, strict=True)
++    del state_dict
++    import gc
++    gc.collect()
+ 
+-model = model.to(device)
+-if IS_FLEXICUBES:
+-    model.init_flexicubes_geometry(device, fovy=30.0)
+-model = model.eval()
++    pipeline = pipeline.to(diffusion_device)
+ 
+ # make output directories
+ image_path = os.path.join(args.output_path, config_name, 'images')
+@@ -159,33 +204,83 @@ print(f'Total number of input images: {len(input_files)}')
+ rembg_session = None if args.no_rembg else rembg.new_session()
+ 
+ outputs = []
++def _real_view(path):
++    """Load a supplied view into the same 320x320 tensor format as Zero123++."""
++    image = Image.open(path)
++    if not args.no_rembg:
++        image = remove_background(image, rembg_session)
++        image = resize_foreground(image, 0.85)
++    if image.mode == 'RGBA':
++        background = Image.new('RGBA', image.size, (255, 255, 255, 255))
++        image = Image.alpha_composite(background, image).convert('RGB')
++    else:
++        image = image.convert('RGB')
++    image = image.resize((320, 320), Image.Resampling.LANCZOS)
++    return torch.from_numpy(np.asarray(image, dtype=np.float32) / 255.0).permute(2, 0, 1).contiguous()
++
+ for idx, image_file in enumerate(input_files):
+     name = os.path.basename(image_file).split('.')[0]
+     print(f'[{idx+1}/{len(input_files)}] Imagining {name} ...')
+ 
+-    # remove background optionally
+-    input_image = Image.open(image_file)
+-    if not args.no_rembg:
+-        input_image = remove_background(input_image, rembg_session)
+-        input_image = resize_foreground(input_image, 0.85)
+-    
+-    # sampling
+-    output_image = pipeline(
+-        input_image, 
+-        num_inference_steps=args.diffusion_steps, 
+-    ).images[0]
++    if use_supplied_views:
++        front = _real_view(image_file)
++        side = _real_view(args.side_image)
++        top = _real_view(args.top_image)
++        images = torch.stack([front, side, side, side, top, top])
++        output_image = Image.open(image_file).convert('RGB')
++    else:
++        # remove background optionally
++        input_image = Image.open(image_file)
++        if not args.no_rembg:
++            input_image = remove_background(input_image, rembg_session)
++            input_image = resize_foreground(input_image, 0.85)
++        output_image = pipeline(input_image, num_inference_steps=args.diffusion_steps).images[0]
++        images = np.asarray(output_image, dtype=np.float32) / 255.0
++        images = torch.from_numpy(images).permute(2, 0, 1).contiguous().float()
++        images = rearrange(images, 'c (n h) (m w) -> (n m) c h w', n=3, m=2)
+ 
+     output_image.save(os.path.join(image_path, f'{name}.png'))
+     print(f"Image saved to {os.path.join(image_path, f'{name}.png')}")
+ 
+-    images = np.asarray(output_image, dtype=np.float32) / 255.0
+-    images = torch.from_numpy(images).permute(2, 0, 1).contiguous().float()     # (3, 960, 640)
+-    images = rearrange(images, 'c (n h) (m w) -> (n m) c h w', n=3, m=2)        # (6, 3, 320, 320)
+-
+     outputs.append({'name': name, 'images': images})
+ 
+ # delete pipeline to save memory
+-del pipeline
++if pipeline is not None:
++    del pipeline
++
++# Load the reconstruction model after releasing the diffusion pipeline.  This
++# is essential on single-device DirectML systems, where keeping both 3D models
++# resident can exceed the shared GPU memory even though CPU RAM is available.
++import gc
++gc.collect()
++print('Loading reconstruction model ...')
++model = instantiate_from_config(model_config)
++if os.path.exists(infer_config.model_path):
++    model_ckpt_path = infer_config.model_path
++else:
++    model_ckpt_path = hf_hub_download(repo_id="TencentARC/InstantMesh", filename=f"{config_name.replace('-', '_')}.ckpt", repo_type="model")
++state_dict = torch.load(model_ckpt_path, map_location='cpu')['state_dict']
++state_dict = {k[14:]: v for k, v in state_dict.items() if k.startswith('lrm_generator.')}
++model.load_state_dict(state_dict, strict=True)
++del state_dict
++gc.collect()
++
++model_device = device
++if device.type == 'privateuseone':
++    # DirectML can run the ViT encoder, but its shared-memory attention path
++    # is unreliable for the 384-token, 1024-wide reconstruction transformer.
++    # Keep the encoder on the Arc GPU and run the transformer/synthesizer and
++    # mesh extraction on CPU; lrm_mesh moves the feature tensor at the boundary.
++    model.encoder.to(device)
++    model.transformer.to('cpu')
++    model.synthesizer.to('cpu')
++    model_device = torch.device('cpu')
++    print('DirectML split: encoder on Arc, transformer/mesh on CPU')
++else:
++    model = model.to(device)
++if IS_FLEXICUBES:
++    model.init_flexicubes_geometry(model_device, fovy=30.0)
++model = model.eval()
+ 
+ ###############################################################################
+ # Stage 2: Reconstruction.
+@@ -231,6 +326,14 @@ for idx, sample in enumerate(outputs):
+         else:
+             vertices, faces, vertex_colors = mesh_out
+             save_obj(vertices, faces, vertex_colors, mesh_path_idx)
++            if args.glb_output:
++                glb_path = args.glb_output
++                if len(input_files) > 1:
++                    stem, suffix = os.path.splitext(glb_path)
++                    glb_path = f'{stem}_{name}{suffix or ".glb"}'
++                os.makedirs(os.path.dirname(os.path.abspath(glb_path)), exist_ok=True)
++                save_glb(vertices, faces, vertex_colors, glb_path)
++                print(f'GLB saved to {glb_path}')
+         print(f"Mesh saved to {mesh_path_idx}")
+ 
+         # get video
+diff --git a/src/models/geometry/render/neural_render.py b/src/models/geometry/render/neural_render.py
+index 4734644..502c119 100644
+--- a/src/models/geometry/render/neural_render.py
++++ b/src/models/geometry/render/neural_render.py
+@@ -8,7 +8,10 @@
+ 
+ import torch
+ import torch.nn.functional as F
+-import nvdiffrast.torch as dr
++try:
++    import nvdiffrast.torch as dr
++except ImportError:  # The renderer is optional for vertex-color mesh export.
++    dr = None
+ from . import Renderer
+ 
+ _FG_LUT = None
+@@ -69,6 +72,8 @@ def compute_vertex_normal(v_pos, t_pos_idx):
+ class NeuralRender(Renderer):
+     def __init__(self, device='cuda', camera_model=None):
+         super(NeuralRender, self).__init__()
++        if dr is None:
++            raise RuntimeError('NeuralRender requires CUDA nvdiffrast.')
+         self.device = device
+         self.ctx = dr.RasterizeCudaContext(device=device)
+         self.projection_mtx = None
+diff --git a/src/models/geometry/rep_3d/flexicubes_geometry.py b/src/models/geometry/rep_3d/flexicubes_geometry.py
+index bf050ee..589f70f 100644
+--- a/src/models/geometry/rep_3d/flexicubes_geometry.py
++++ b/src/models/geometry/rep_3d/flexicubes_geometry.py
+@@ -41,6 +41,13 @@ class FlexiCubesGeometry(Geometry):
+         self.device = device
+         self.args = args
+         self.fc = FlexiCubes(device, weight_scale=0.5)
++        # DirectML currently lacks a few indexing kernels used by FlexiCubes.
++        # Keep the neural model on the GPU and run only this small extraction
++        # step on the CPU when the privateuseone backend is active.
++        self._cpu_fc = (
++            FlexiCubes('cpu', weight_scale=0.5)
++            if str(device).startswith('privateuseone') else None
++        )
+         self.verts, self.indices = self.fc.construct_voxel_grid(grid_res)
+         if isinstance(scale, list):
+             self.verts[:, 0] = self.verts[:, 0] * scale[0]
+@@ -64,10 +71,17 @@ class FlexiCubesGeometry(Geometry):
+         if indices is None:
+             indices = self.indices
+ 
+-        verts, faces, v_reg_loss = self.fc(v_deformed_nx3, sdf_n, indices, self.grid_res,
+-                                            beta_fx12=weight_n[:, :12], alpha_fx8=weight_n[:, 12:20],
+-                                            gamma_f=weight_n[:, 20], training=is_training
+-                                            )
++        extractor = self._cpu_fc or self.fc
++        if self._cpu_fc is not None:
++            v_deformed_nx3 = v_deformed_nx3.to('cpu')
++            sdf_n = sdf_n.to('cpu')
++            indices = indices.to('cpu')
++            weight_n = weight_n.to('cpu') if weight_n is not None else None
++        verts, faces, v_reg_loss = extractor(v_deformed_nx3, sdf_n, indices, self.grid_res,
++                                              beta_fx12=weight_n[:, :12] if weight_n is not None else None,
++                                              alpha_fx8=weight_n[:, 12:20] if weight_n is not None else None,
++                                              gamma_f=weight_n[:, 20] if weight_n is not None else None,
++                                              training=is_training)
+         return verts, faces, v_reg_loss
+ 
+ 
+diff --git a/src/models/lrm_mesh.py b/src/models/lrm_mesh.py
+index cb6e351..71303e1 100644
+--- a/src/models/lrm_mesh.py
++++ b/src/models/lrm_mesh.py
+@@ -15,7 +15,10 @@
+ import numpy as np
+ import torch
+ import torch.nn as nn
+-import nvdiffrast.torch as dr
++try:
++    import nvdiffrast.torch as dr
++except ImportError:  # CUDA-only optional dependency; vertex-color export does not need it.
++    dr = None
+ from einops import rearrange, repeat
+ 
+ from .encoder.dino_wrapper import DinoWrapper
+@@ -76,12 +79,14 @@ class InstantMesh(nn.Module):
+ 
+     def init_flexicubes_geometry(self, device, fovy=50.0):
+         camera = PerspectiveCamera(fovy=fovy, device=device)
+-        renderer = NeuralRender(device, camera_model=camera)
++        # nvdiffrast is CUDA-only.  Mesh extraction with vertex colours only
++        # needs FlexiCubes and can run on DirectML/CPU without a rasterizer.
++        renderer = NeuralRender(device, camera_model=camera) if dr is not None else None
+         self.geometry = FlexiCubesGeometry(
+             grid_res=self.grid_res, 
+             scale=self.grid_scale, 
+             renderer=renderer, 
+-            render_type='neural_render',
++            render_type='neural_render' if renderer is not None else 'none',
+             device=device,
+         )
+ 
+@@ -95,6 +100,8 @@ class InstantMesh(nn.Module):
+         image_feats = rearrange(image_feats, '(b v) l d -> b (v l) d', b=B)
+         
+         # decode triplanes
++        transformer_device = next(self.transformer.parameters()).device
++        image_feats = image_feats.to(transformer_device)
+         planes = self.transformer(image_feats)
+ 
+         return planes
+@@ -107,13 +114,17 @@ class InstantMesh(nn.Module):
+         init_position = self.geometry.verts.unsqueeze(0).expand(planes.shape[0], -1, -1)
+         
+         # Step 1: predict the SDF and deformation
+-        sdf, deformation, weight = torch.utils.checkpoint.checkpoint(
+-            self.synthesizer.get_geometry_prediction,
+-            planes, 
+-            init_position, 
+-            self.geometry.indices,
+-            use_reentrant=False,
+-        )
++        if torch.is_grad_enabled():
++            sdf, deformation, weight = torch.utils.checkpoint.checkpoint(
++                self.synthesizer.get_geometry_prediction,
++                planes,
++                init_position,
++                self.geometry.indices,
++                use_reentrant=False,
++            )
++        else:
++            sdf, deformation, weight = self.synthesizer.get_geometry_prediction(
++                planes, init_position, self.geometry.indices)
+ 
+         # Step 2: Normalize the deformation to avoid the flipped triangles.
+         deformation = 1.0 / (self.grid_res * self.deformation_multiplier) * torch.tanh(deformation)
+@@ -218,12 +229,15 @@ class InstantMesh(nn.Module):
+                 sample_tex_pose_list.append(tex_pos_one_shape)
+             tex_pos = torch.cat(sample_tex_pose_list, dim=0)
+ 
+-        tex_feat = torch.utils.checkpoint.checkpoint(
+-            self.synthesizer.get_texture_prediction,
+-            planes, 
+-            tex_pos,
+-            use_reentrant=False,
+-        )
++        if torch.is_grad_enabled():
++            tex_feat = torch.utils.checkpoint.checkpoint(
++                self.synthesizer.get_texture_prediction,
++                planes,
++                tex_pos,
++                use_reentrant=False,
++            )
++        else:
++            tex_feat = self.synthesizer.get_texture_prediction(planes, tex_pos)
+ 
+         if hard_mask is not None:
+             final_tex_feat = torch.zeros(
+@@ -359,13 +373,19 @@ class InstantMesh(nn.Module):
+ 
+         if not use_texture_map:
+             # query vertex colors
+-            vertices_tensor = vertices.unsqueeze(0)
++            # FlexiCubes may run on CPU for DirectML because its indexing
++            # kernels are not implemented there; texture inference stays on
++            # the model device.
++            vertices_tensor = vertices.unsqueeze(0).to(device)
+             vertices_colors = self.synthesizer.get_texture_prediction(
+                 planes, vertices_tensor).clamp(0, 1).squeeze(0).cpu().numpy()
+             vertices_colors = (vertices_colors * 255).astype(np.uint8)
+ 
+             return vertices.cpu().numpy(), faces.cpu().numpy(), vertices_colors
+ 
++        if dr is None or self.geometry.renderer is None:
++            raise RuntimeError('Texture-map export requires CUDA nvdiffrast; use vertex-color GLB export.')
++
+         # use x-atlas to get uv mapping for the mesh
+         ctx = dr.RasterizeCudaContext(device=device)
+         uvs, mesh_tex_idx, gb_pos, tex_hard_mask = xatlas_uvmap(
+@@ -379,4 +399,4 @@ class InstantMesh(nn.Module):
+         img_feat = torch.lerp(background_feature, tex_feat, tex_hard_mask)
+         texture_map = img_feat.permute(0, 3, 1, 2).squeeze(0)
+ 
+-        return vertices, faces, uvs, mesh_tex_idx, texture_map
+\ No newline at end of file
++        return vertices, faces, uvs, mesh_tex_idx, texture_map
+diff --git a/src/utils/mesh_util.py b/src/utils/mesh_util.py
+index 0ec4663..d587b00 100644
+--- a/src/utils/mesh_util.py
++++ b/src/utils/mesh_util.py
+@@ -7,11 +7,17 @@
+ # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
+ 
+ import torch
+-import xatlas
++try:
++    import xatlas
++except ImportError:  # Only needed for optional texture-map export.
++    xatlas = None
+ import trimesh
+ import cv2
+ import numpy as np
+-import nvdiffrast.torch as dr
++try:
++    import nvdiffrast.torch as dr
++except ImportError:  # CUDA-only optional dependency; vertex colours work without it.
++    dr = None
+ from PIL import Image
+ 
+ 
+@@ -159,6 +165,8 @@ def interpolate(attr, rast, attr_idx, rast_db=None):
+ 
+ 
+ def xatlas_uvmap(ctx, mesh_v, mesh_pos_idx, resolution):
++    if xatlas is None or dr is None:
++        raise RuntimeError('Texture-map export requires xatlas and CUDA nvdiffrast.')
+     vmapping, indices, uvs = xatlas.parametrize(mesh_v.detach().cpu().numpy(), mesh_pos_idx.detach().cpu().numpy())
+ 
+     # Convert to tensors

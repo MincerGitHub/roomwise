@@ -187,16 +187,16 @@ test('legacy library model uses independent scene IDs for selection drag rotatio
  await expect.poll(async()=>(await layout()).find(item=>item[0]===second[0])![1]).not.toBe(restored[1]);
 });
 
-test('incomplete three-view upload makes no model submission and crop stays local',async({page})=>{
+test('two-view upload makes no model submission and crop stays local',async({page})=>{
  let calls=0;await page.route('**/api/furniture/analyze',route=>{calls++;return route.abort()});
  await page.goto('/');await page.getByRole('button',{name:'从图片生成家具',exact:true}).click();
  await expect(page.getByLabel('我同意将所选图片发送到第三方网关 api.tokenlab.pro（非 OpenAI 官方域名），请求 gpt-6-sol / high 进行识别，可能产生服务费用。服务关闭时仅保存在本机。')).toBeVisible();
- await page.getByLabel('选择家具图片').setInputFiles(photo);
+ await page.getByLabel('选择家具图片').setInputFiles([photo,{...photo,name:'side.png'}]);
  await expect(page.getByRole('button',{name:'上传并重建家具'})).toBeDisabled();
- const surface=page.locator('.crop-surface');const bounds=(await surface.boundingBox())!;
+ const surface=page.locator('.crop-surface').first();const bounds=(await surface.boundingBox())!;
  await page.mouse.move(bounds.x+2,bounds.y+2);await page.mouse.down();await page.mouse.move(bounds.x+bounds.width*.8,bounds.y+bounds.height*.8);await page.mouse.up();
- await expect(page.getByRole('button',{name:'使用框选区域'})).toBeEnabled();
- await page.getByRole('button',{name:'使用框选区域'}).click();expect(calls).toBe(0);
+ await expect(page.getByRole('button',{name:'使用框选区域'}).first()).toBeEnabled();
+ await page.getByRole('button',{name:'使用框选区域'}).first().click();expect(calls).toBe(0);
 });
 
 for(const missing of [false,true])test(`uncertain images require mesh with ${missing?'missing':'recognized'} dimensions`,async({page})=>{

@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from roomwise.catalog import demo_scene
 from roomwise.geometry import (
     assert_invariants, cabinet_door_clearance_conflicts, cabinet_door_clearance_zone,
-    footprint, layout_quality, placement_errors, validate_scene,
+    collision_parts, detailed_collision_area, footprint, layout_quality, placement_errors, validate_scene,
 )
 from roomwise.schemas import Scene
 
@@ -34,6 +34,17 @@ def test_rotated_boundary_door_and_collision():
     assert door_check["metrics"]["doorConflicts"] == 1
     overlap = validate_scene(scene_with([item(), item(id="two", x=2.1)]))
     assert overlap["metrics"]["collisions"] == 1
+
+
+def test_component_collision_preserves_open_space_under_table():
+    table = item(category="table", width=1.2, depth=.8, height=.75)
+    stool = item(id="stool", category="stool", width=.4, depth=.4, height=.45)
+    assert footprint(table).intersection(footprint(stool)).area > 0
+    assert len(collision_parts(stool)) == 5
+    assert detailed_collision_area(table, stool) == pytest.approx(0.)
+    check = validate_scene(scene_with([table, stool]))
+    assert check["metrics"]["collisions"] == 0
+    assert check["valid"]
 
 
 def test_rug_not_obstacle_and_limited_chair_tuck():

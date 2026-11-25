@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 import sqlite3
 import struct
 import uuid
@@ -162,8 +163,8 @@ class FurnitureService:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             draft = self.active_draft(connection, identifier)
-            if draft.get("publishedAssetId") or draft.get("editingAssetId") or len(draft["photoUrls"]) != 3:
-                raise FurnitureError(400, "Reconstruction requires a new draft with front, right-side and top photos.")
+            if draft.get("publishedAssetId") or draft.get("editingAssetId") or len(draft["photoUrls"]) not in {1, 3}:
+                raise FurnitureError(400, "请提供单张家具图片，或同一件家具的正面、右侧、顶面三张照片。")
             if draft.get("reconstructionJobId"):
                 previous = self.get(connection, "furniture_reconstruction_jobs", draft["reconstructionJobId"])
                 if previous["status"] in {"queued", "processing"}:
@@ -188,7 +189,7 @@ class FurnitureService:
             self.put(connection, "furniture_reconstruction_jobs", job)
             draft = self.active_draft(connection, job["draftId"])
         directory_id = Path(draft["photoUrls"][0]).parent.name
-        photos = [self.uploads / "furniture" / directory_id / f"photo_{index}.jpg" for index in range(3)]
+        photos = [self.uploads / "furniture" / directory_id / f"photo_{index}.jpg" for index in range(len(draft["photoUrls"]))]
         output_dir = self.uploads / "assets"
         output_dir.mkdir(exist_ok=True)
         output = output_dir / f"{uuid.uuid4().hex}.glb"
@@ -250,6 +251,25 @@ class FurnitureService:
                 "drafts": sorted([body for body in drafts if not body.get("publishedAssetId") and not body.get("deletedAt")
                                   and body.get("editingAssetId") not in deleted_ids],
                                  key=lambda body: body["updatedAt"], reverse=True)}
+
+    def import_model(self, asset_url: str, label: str | None = None, source_note: str = ""):
+        # Accept only an already uploaded local GLB, using the same mesh
+        # validation as reconstruction. No inference or recognition job runs.
+        if not re.fullmatch(r"/uploads/assets/[a-f0-9]{32}\.glb", asset_url):
+            raise FurnitureError(400, "请先上传本机GLB模型文件。")
+        path = self.uploads / "assets" / Path(asset_url).name
+        try:
+            validate_generated_glb(path)
+        except (ReconstructionError, OSError, ValueError, KeyError, IndexError, struct.error, json.JSONDecodeError):
+            raise FurnitureError(400, "导入模型无效或已不存在，请重新上传GLB文件。") from None
+        draft = {"id": uuid.uuid4().hex, "version": 1, "photoUrls": [],
+                 "properties": FurnitureProperties(label=label).model_dump(),
+                 "recognition": None, "jobId": None, "reconstructionJobId": None,
+                 "modelUrl": asset_url, "modelSource": {"kind": "imported_glb", "note": source_note},
+                 "updatedAt": now()}
+        with self.connect() as connection:
+            self.put(connection, "furniture_drafts", draft)
+        return deepcopy(draft)
 
     def create_local(self, identifier: str, photo_urls: list[str]):
         draft = {"id": identifier, "version": 1, "photoUrls": photo_urls, "properties": FurnitureProperties().model_dump(), "recognition": None, "jobId": None, "modelUrl": None, "reconstructionJobId": None, "updatedAt": now()}
@@ -354,6 +374,8 @@ class FurnitureService:
                 "id": uuid.uuid4().hex, "version": 1, "photoUrls": asset["photoUrls"], "properties": asset["properties"],
                 "recognition": None, "jobId": None, "modelUrl": asset["assetUrl"], "editingAssetId": asset["id"], "baseAssetVersion": asset["version"], "updatedAt": now(),
             }
+            if asset.get("modelSource"):
+                draft["modelSource"] = deepcopy(asset["modelSource"])
             self.put(connection, "furniture_drafts", draft)
         return draft
 
@@ -395,6 +417,8 @@ class FurnitureService:
                 "version": version, "photoUrls": draft["photoUrls"], "dimensionsConfirmed": True,
             }).model_dump()
             asset = {"id": identifier_asset, "version": version, "properties": properties, "photoUrls": draft["photoUrls"], "assetUrl": request.assetUrl, "snapshot": snapshot, "updatedAt": now()}
+            if draft.get("modelSource"):
+                asset["modelSource"] = deepcopy(draft["modelSource"])
             draft.update(publishedAssetId=identifier_asset, version=draft["version"] + 1, updatedAt=now())
             self.put(connection, "furniture_assets", asset)
             self.put(connection, "furniture_drafts", draft)

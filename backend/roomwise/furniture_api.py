@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Reques
 from starlette.concurrency import run_in_threadpool
 
 from .furniture import FurnitureError, FurnitureService, prepare_photos
-from .furniture_schemas import PublishFurniture, RetryFurniture, SaveFurnitureDraft
+from .furniture_schemas import ImportFurnitureModel, PublishFurniture, RetryFurniture, SaveFurnitureDraft
 from .furniture_vision import vision_status
 from .furniture_reconstruction import reconstruction_status
 from .storage import runtime_directory
@@ -103,6 +103,11 @@ async def analyze(files: list[UploadFile] = File(...), consent: bool = Form(Fals
 @router.get("")
 def listing():
     return service().listing()
+
+
+@router.post("/import-model")
+def import_model(request: ImportFurnitureModel):
+    return invoke(service().import_model, request.assetUrl, request.label, request.sourceNote)
 
 
 @router.get("/jobs/{job_id}")

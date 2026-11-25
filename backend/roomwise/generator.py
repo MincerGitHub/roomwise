@@ -22,7 +22,7 @@ from .geometry import (
     footprint,
     layout_quality,
     opening_center,
-    placement_errors,
+    search_placement_errors as placement_errors,
     preference_penalty,
     room_polygon,
     validate_scene,
@@ -1057,12 +1057,15 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limi
     # Keep arbitrary imports editable, but bound a single search request.
     if len(scene["items"]) > MAX_GENERATION_ITEMS:
         return {"baseVersion": scene.get("version", 0), "candidates": [], "diagnostics": {"message": f"单次自动布局最多支持{MAX_GENERATION_ITEMS}件家具，当前有{len(scene['items'])}件。请分房间或减少本次参与物品；系统未自动删除。", "generationItemLimit": MAX_GENERATION_ITEMS, "elapsedSeconds": 0}}
-    original_check = validate_scene(scene)
     locked_scene = deepcopy(scene)
     locked_scene["items"] = [i for i in scene["items"] if i.get("locked")]
     locked_check = validate_scene(locked_scene, check_access=False)
     status = learning_status()
     diagnostics = {"modelStatus": status, "seed": seed, "attempts": 0, "modelProposals": 0, "rawModelAccepted": 0, "repairedModelAccepted": 0, "rejected": rejected, "searchLimits": {"items": MAX_GENERATION_ITEMS, "seconds": SEARCH_SECONDS, "placementChecks": SEARCH_PLACEMENT_CHECKS}, "message": "", "limitations": ["候选必须通过独立占地、门口及近似可达性检查", "多样性按家具位置关系、朝向及房间锚点筛选", "未找到候选不能证明所有数学可能性都无解；请调整条件后重试"]}
+    mesh_items = [item["id"] for item in scene["items"] if str(item.get("assetUrl") or "").startswith("/uploads/")]
+    if mesh_items:
+        diagnostics["meshCollision"] = {"itemIds": mesh_items, "search": "conservative_footprint", "finalValidation": "original_mesh",
+                                        "note": "搜索时保守避开GLB占地重叠，候选仍用原网格复核；可能漏掉可穿插的紧凑摆法。"}
     if not locked_check["valid"]:
         diagnostics.update(message="锁定家具本身存在越界、门口或相互碰撞。请先修正或明确解锁。", lockedIssues=locked_check["issues"])
         return {"baseVersion": scene.get("version", 0), "candidates": [], "diagnostics": diagnostics}
@@ -1252,7 +1255,7 @@ def generate_layouts(scene: dict, mode="hybrid", count=3, seed=42, *, _pool_limi
                 candidates[-1]["provenance"] = {"initialization": "user_scene", "layoutNetwork": False,
                                                  "geometricRepair": False, "constraintSearch": True}
                 candidates[-1]["summary"] += "本次使用空间约束搜索，包含所需的桌椅成组处理，未运行布局网络。"
-    if not candidates and mode != "model" and original_check["valid"]:
+    if not candidates and mode != "model" and validate_scene(scene)["valid"]:
         accept(deepcopy(scene), "current")
     candidates.sort(key=lambda c: c["score"], reverse=True)
     pool_count = len(candidates)

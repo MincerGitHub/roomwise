@@ -43,7 +43,7 @@ def test_supported_box_uses_rotated_surface_and_does_not_collide(angle):
     assert not placement_errors(value["items"][1], value["room"], [value["items"][0]])
     floor = deepcopy(value)
     floor["items"][1].update(y=0, supportId=None)
-    assert validate_scene(floor)["metrics"]["collisions"] == 1
+    assert validate_scene(floor)["metrics"]["collisions"] == 0
 
 
 @pytest.mark.parametrize("patch", [dict(y=.8), dict(y=0), dict(supportId="missing"), dict(supportId="box"), dict(x=3.0), dict(height=.7)])

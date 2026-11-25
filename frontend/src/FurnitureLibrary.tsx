@@ -16,6 +16,11 @@ export function furnitureInstance(asset:FurnitureAsset,x:number,z:number):Item{
  return {id:crypto.randomUUID(),label:snapshot.label,category:snapshot.category,width:snapshot.width,depth:snapshot.depth,height:snapshot.height,x,z,rotation:0,keep:true,locked:false,source:'brought',assetUrl:asset.assetUrl,photoUrl:asset.photoUrls[0],furnitureAssetId:asset.id,furnitureSnapshot:snapshot};
 }
 
+function LibraryModelPreview({asset}:{asset:FurnitureAsset}){
+ const item=useMemo(()=>furnitureInstance(asset,0,0),[asset]);
+ return <FurniturePreview item={item}/>;
+}
+
 async function multipart<T>(path:string,form:FormData):Promise<T>{
  const response=await fetch(`/api${path}`,{method:'POST',body:form});
  const body=await response.json();if(!response.ok)throw new Error(typeof body.detail==='string'?body.detail:'文件提交失败，请检查格式和大小');return body;
@@ -36,7 +41,21 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
  function clearEditor(){setDraft(null);setProperties(null);setJob(null);setJobId(null);setReconstructionJobId(null);setReconstructionJob(null);setDirty(false);setStyleText('');pendingPublish.current=null;requestId.current=crypto.randomUUID()}
  async function openDraft(identifier:string){
   if(inFlight.current)return;const generation=++openGeneration.current;setJobId(null);setReconstructionJobId(null);
-  try{const value=await api<FurnitureDraft>(`/furniture/drafts/${identifier}`);if(!alive.current||generation!==openGeneration.current)return;loadDraft(value);setMessage('');setJob(null);if(value.jobId)setJobId(value.jobId);else setJobId(null)}catch(error){if(alive.current&&generation===openGeneration.current)setMessage(String(error))}
+  try{
+   const value=await api<FurnitureDraft>(`/furniture/drafts/${identifier}`);
+   const [previousJob,previousReconstruction]=await Promise.all([
+    value.jobId?api<FurnitureJob>(`/furniture/jobs/${value.jobId}`):Promise.resolve(null),
+    value.reconstructionJobId?api<FurnitureJob>(`/furniture/reconstruction-jobs/${value.reconstructionJobId}`):Promise.resolve(null),
+   ]);
+   if(!alive.current||generation!==openGeneration.current)return;
+   // Read historical job state before enabling edits. Re-polling a completed
+   // job would reload the stored draft and overwrite a user's unsaved input.
+   loadDraft(value);setJob(previousJob);setReconstructionJob(previousReconstruction);
+   const running=(task:FurnitureJob|null)=>task&&['queued','processing'].includes(task.status);
+   setJobId(running(previousJob)?value.jobId:null);
+   setReconstructionJobId(running(previousReconstruction)?value.reconstructionJobId||null:null);
+   setMessage(previousJob?.error||previousReconstruction?.error||'');
+  }catch(error){if(alive.current&&generation===openGeneration.current)setMessage(String(error))}
  }
  useEffect(()=>{
   if(!jobId)return;let cancelled=false,timer:ReturnType<typeof setTimeout>;const generation=openGeneration.current;
@@ -74,11 +93,19 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
  function updateParameter(key:keyof FurnitureParameters,value:unknown){if(properties)update({parameters:{...properties.parameters,[key]:value}})}
  async function guarded(operation:()=>Promise<void>){if(inFlight.current)return;inFlight.current=true;setBusy(true);setMessage('');try{await operation()}catch(error){if(alive.current)setMessage(error instanceof Error?error.message:String(error))}finally{inFlight.current=false;if(alive.current)setBusy(false)}}
  async function submit(){await guarded(async()=>{
-  if(files.length!==3)throw new Error('请按正面、右侧、顶面的顺序上传三张图片');
+  if(![1,3].includes(files.length))throw new Error('请选择单张家具图片，或按正面、右侧、顶面顺序上传三张图片');
   const form=new FormData();files.forEach(file=>form.append('files',file));if(consent)form.append('consent','true');else form.append('localOnly','true');
   const result=await multipart<{draftId:string;jobId:string|null}>('/furniture/analyze',form);openGeneration.current++;
   const value=await api<FurnitureDraft>(`/furniture/drafts/${result.draftId}`);if(!alive.current)return;loadDraft(value);setJob(null);setJobId(result.jobId);setFiles([]);await refresh();
   if(!result.jobId){const reconstruction=await api<{jobId:string}>(`/furniture/drafts/${result.draftId}/reconstruct`,{});setReconstructionJobId(reconstruction.jobId)}
+ })}
+ async function importModel(file:File|undefined){if(!file)return;await guarded(async()=>{
+  if(!/\.glb$/i.test(file.name)||file.size>50*1024*1024)throw new Error('请选择不超过50MB的GLB模型文件');
+  const form=new FormData();form.append('file',file);
+  const uploaded=await multipart<{url:string}>('/assets',form);
+  const value=await api<FurnitureDraft>('/furniture/import-model',{assetUrl:uploaded.url,label:file.name.replace(/\.glb$/i,'').slice(0,100)});
+  if(!alive.current)return;openGeneration.current++;loadDraft(value);setJob(null);setJobId(null);
+  setMessage('模型已导入。请核对类别、尺寸和朝向，再保存到家具库。');await refresh();
  })}
  async function saveDraft(){if(!draft||!properties)return;await guarded(async()=>{const value=await api<FurnitureDraft>(`/furniture/drafts/${draft.id}/save`,{expectedVersion:draft.version,properties:completeFurnitureProperties(properties,catalog)});if(alive.current){setDraft(value);setProperties(clone(value.properties));setDirty(false);pendingPublish.current=null;requestId.current=crypto.randomUUID();setMessage('草稿已保存到本机。')}await refresh()})}
  const modelProperties=useMemo(()=>properties?completeFurnitureProperties(properties,catalog):null,[properties,catalog]);
@@ -129,17 +156,22 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
  function selectFiles(selected:FileList|null){if(!selected)return;const values=Array.from(selected);if(values.length>3||values.some(file=>file.size>10*1024*1024||!(/\.(jpe?g|png|webp)$/i.test(file.name)))){setMessage('请选择 1—3 张 JPEG、PNG、WebP，每张不超过 10 MB。');return}setFiles(values);setMessage('')}
  return <div className="modal-backdrop furniture-backdrop"><section className="modal furniture-library" role="dialog" aria-modal="true" aria-labelledby="furniture-title">
   <div className="modal-heading"><div><span className="eyebrow">OWNED FURNITURE</span><h2 id="furniture-title">自有家具库 · 从图片添加</h2></div><button className="icon-btn" aria-label="关闭自有家具库" disabled={busy} onClick={()=>{if(dirty&&!window.confirm('有未保存的修改，确认关闭？原草稿仍保留。'))return;onClose()}}><X size={20}/></button></div>
-  <p className="furniture-intro">同一件家具：正面、右侧、顶面各一张。</p>
+  <p className="furniture-intro">可用单张家具图片生成模型，也可提供同一件家具的正面、右侧、顶面三张照片。单图的背面和遮挡部分由模型推测。</p>
   <div className={`furniture-service ${status?.reconstruction?.enabled?'ready':'offline'}`} role="status"><span className="furniture-service-dot"/><div><strong>{status?.reconstruction?.enabled?'本地重建已就绪':'本地重建不可用'}</strong>{status&&!status.reconstruction.enabled&&<span>{status.reconstruction.message}</span>}</div></div>
-  <fieldset disabled={busy||!!jobId||!!reconstructionJobId} className="furniture-upload"><legend>1. 选择照片</legend><input aria-label="选择家具图片" type="file" multiple accept=".jpg,.jpeg,.png,.webp" onChange={event=>{selectFiles(event.target.files);event.target.value=''}}/><p className="furniture-upload-note">按正面 → 右侧 → 顶面顺序选择；顶面图正面朝下。JPG、PNG、WebP，单张不超过 10 MB。</p>
+  <fieldset disabled={busy||!!jobId||!!reconstructionJobId} className="furniture-upload"><legend>1. 选择照片</legend><input aria-label="选择家具图片" type="file" multiple accept=".jpg,.jpeg,.png,.webp" onChange={event=>{selectFiles(event.target.files);event.target.value=''}}/><p className="furniture-upload-note">选择一张图片；或按正面 → 右侧 → 顶面顺序选择三张，顶面图正面朝下。JPG、PNG、WebP，单张不超过 10 MB。</p>
    <div className="furniture-crops">{files.map((file,index)=><FurnitureCrop key={index} file={file} index={index} onChange={replacement=>setFiles(previous=>previous.map((value,position)=>position===index?replacement:value))}/>)}</div>
    <label className="furniture-check furniture-consent" aria-label="我同意将所选图片发送到第三方网关 api.tokenlab.pro（非 OpenAI 官方域名），请求 gpt-6-sol / high 进行识别，可能产生服务费用。服务关闭时仅保存在本机。"><input type="checkbox" checked={consent} onChange={event=>setConsent(event.target.checked)}/><span>我同意将照片发送到第三方网关 <strong>api.tokenlab.pro</strong>（非 OpenAI 官方域名）进行识别，可能产生费用。</span></label>
-   <button className="btn primary" disabled={files.length!==3||!status?.reconstruction?.enabled} onClick={submit}>上传并重建家具</button>
+   <button className="btn primary" disabled={![1,3].includes(files.length)||!status?.reconstruction?.enabled} onClick={submit}>上传并重建家具</button>
+  </fieldset>
+  <fieldset disabled={busy||!!jobId||!!reconstructionJobId} className="furniture-model-import"><legend>或导入已有模型</legend>
+   <label className="field">选择家具GLB模型<input aria-label="选择家具GLB模型" type="file" accept=".glb" onChange={event=>{const file=event.target.files?.[0];event.target.value='';void importModel(file)}}/></label>
+   <p>已有模型可直接预览和入库，无需重建。GLB单文件不超过50MB；请填写实际尺寸，未知尺寸会注明为类别模板。</p>
   </fieldset>
   {message&&<p className="furniture-message" role="status">{message}</p>}
   {jobId&&<p role="status">{job?.status==='processing'?'正在识别属性…':'属性识别排队中…'}</p>}
   {reconstructionJobId&&<p role="status">{reconstructionJob?.status==='processing'?'正在重建网格…':'网格重建排队中…'}</p>}
   {draft&&properties&&<fieldset disabled={busy||!!jobId} className="furniture-editor"><legend>2. 核对属性与三维预览</legend>
+   {draft.modelSource?.kind==='imported_glb'&&<p className="furniture-upload-note">已有GLB模型；尺寸与朝向需要核对。{draft.modelSource.note}</p>}
    <div className="furniture-photos">{draft.photoUrls.map((url,index)=><a href={url} target="_blank" rel="noreferrer" key={url}><img src={url} alt={`家具原图 ${index+1}`}/></a>)}</div>
    {draft.recognition&&<details className="furniture-evidence"><summary>识别详情</summary><p>{draft.recognition.views.map(view=>`图${view.imageIndex+1} ${view.view}：${view.description}`).join('；')}</p>{[...draft.recognition.warnings,...draft.recognition.uncertainFields].map((text,index)=><p key={index}>{text}</p>)}</details>}
    <div className="furniture-editor-grid"><div>
@@ -157,11 +189,12 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
     if(key.startsWith('has'))return <label className="field" key={key}>{parameterNames[key]}<select value={value===null?'':String(value)} onChange={event=>updateParameter(key,event.target.value===''?null:event.target.value==='true')}><option value="">默认</option><option value="true">有</option><option value="false">无</option></select></label>;
     return <label className="field" key={key}>{parameterNames[key]}<input type="number" step={key==='seatHeightRatio'?.01:1} min={key==='seatHeightRatio'?.15:key==='shelfCount'||key==='seatCount'?1:0} max={key==='seatHeightRatio'?.8:key==='seatCount'||key==='doorCount'?8:12} value={typeof value==='number'?value:''} placeholder="默认" onChange={event=>updateParameter(key,event.target.value===''?null:Number(event.target.value))}/></label>;
    })}</div>
-   <div className="furniture-actions"><button className="btn" onClick={saveDraft}>保存草稿</button>{!draft.editingAssetId&&<button className="btn" disabled={!!reconstructionJobId} onClick={regenerate}>重新重建模型</button>}{!draft.editingAssetId&&<button className="btn" disabled={!consent} onClick={retry}>同意计费并重新识别</button>}<button className="btn primary" disabled={!preview||!modelLoaded||!draft.modelUrl||!modelProperties?.category||!modelProperties.width||!modelProperties.depth||!modelProperties.height||!!reconstructionJobId} onClick={publish}>确认并保存到家具库</button></div>
+   <div className="furniture-actions"><button className="btn" onClick={saveDraft}>保存草稿</button>{!draft.editingAssetId&&!draft.modelSource&&<button className="btn" disabled={!!reconstructionJobId} onClick={regenerate}>重新重建模型</button>}{!draft.editingAssetId&&!draft.modelSource&&<button className="btn" disabled={!consent} onClick={retry}>同意计费并重新识别</button>}<button className="btn primary" disabled={!preview||!modelLoaded||!draft.modelUrl||!modelProperties?.category||!modelProperties.width||!modelProperties.depth||!modelProperties.height||!!reconstructionJobId} onClick={publish}>确认并保存到家具库</button></div>
   </fieldset>}
   <section className="furniture-saved"><div className="furniture-section-heading"><div><span className="furniture-section-kicker">LIBRARY</span><h3>已确认家具 <span className="furniture-count">{assets.length}</span></h3></div><p>选择家具即可加入房间</p></div>
    <div className="owned-furniture-grid">{assets.map(asset=><article key={asset.id} className="owned-furniture-card">
-    <img src={asset.photoUrls[0]} alt={asset.snapshot.label}/><div className="owned-furniture-meta"><strong>{asset.snapshot.label}</strong><span>v{asset.version}</span></div><small>{asset.snapshot.width} × {asset.snapshot.depth} × {asset.snapshot.height} m</small>
+    {asset.photoUrls[0]?<img src={asset.photoUrls[0]} alt={asset.snapshot.label}/>:<LibraryModelPreview asset={asset}/>}<div className="owned-furniture-meta"><strong>{asset.snapshot.label}</strong><span>v{asset.version}</span></div><small>{asset.snapshot.width} × {asset.snapshot.depth} × {asset.snapshot.height} m</small>
+    {asset.modelSource&&<small>已有GLB模型 · {Object.values(asset.snapshot.dimensionSources).some(value=>value==='template')?'含模板尺寸，未实测':'尺寸来源见修改页'}</small>}
     <div className="furniture-actions"><button className="btn primary" aria-label="加入当前房间" disabled={busy||!!jobId} onClick={()=>onAdd(asset)}>加入房间</button><button className="btn" disabled={busy||!!jobId} onClick={()=>editAsset(asset)}>修改</button><button className="btn furniture-delete" aria-label={`删除${asset.snapshot.label}`} disabled={busy||!!jobId} onClick={()=>deleteAsset(asset)}>删除</button></div>
    </article>)}</div>{!assets.length&&<p className="furniture-empty">保存后的家具会显示在这里</p>}
   </section>

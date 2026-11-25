@@ -212,7 +212,9 @@ npm run test:e2e
 
 测试使用本机 Microsoft Edge，默认端口为前端15173、后端18766，无需手动启动服务。测试完成或失败后会关闭自己启动的服务并清理临时数据；端口被占用时会停止测试，不会复用已有服务。可通过 `ROOMWISE_E2E_WEB_PORT`、`ROOMWISE_E2E_API_PORT` 指定其他空闲测试端口，或通过 `ROOMWISE_E2E_PYTHON` 指定已安装后端依赖的 Python。直接执行 `npx playwright test` 也使用相同隔离配置。为避免误连正式家具库，不再支持 `ROOMWISE_E2E_BASE_URL`。真实语言接口评测需另行控制用例和费用，不混入自动回归。
 
-## 可选：DeepSeek 自然语言交互
+## 可选：GPT / DeepSeek 自然语言交互
+
+桌椅候选、座位容量及统一功能验收规则见 [功能组说明](docs/FUNCTIONAL_GROUPS.md)。
 
 基础本地功能不需要 API。若要使用语言模型理解不同说法，在项目根目录执行：
 
@@ -226,6 +228,10 @@ notepad runtime\language.local.json
 ```
 
 在自己电脑的文件中填写 API 密钥，并按示例设置 `enabled`、提供方和模型。也可以将 `.env.language.example` 复制为项目根目录的 `.env.language`，填写并取消注释相应提供方、接口、模型和密钥；已有文件不要覆盖。仓库示例不含密钥，不会替新用户预先配置账户。
+
+GPT 的 Responses 接口使用 `provider: "responses"`，`url` 填完整 `/responses` 地址或服务商的接口根地址，`model` 和 `apiKey` 按账户配置；`responseFormat` 设为 `json_schema`，可选 `reasoningEffort` 对应 `.env.language` 中的 `ROOMWISE_LANGUAGE_REASONING_EFFORT`。请求只接受完整的助手 JSON 输出，仍通过同一套家具引用、锁定和操作校验；拒绝、未完成和工具调用不会执行。Responses 单次请求最多等待 120 秒，不自动重试。DeepSeek 和其他 Chat Completions 接口继续使用 `chatcompletions`，本地 Ollama 使用 `ollama`。
+
+完整且明确的基础靠窗、朝窗指令由本地规则处理，消息会注明识别方式；家具不存在、对象有歧义、窗户未指定或家具已锁定时仍需澄清。附带其他要求的句子继续交给语言模型，不丢弃未识别的子句。服务商的策略拒绝、认证、权限、限流、超时与计划格式错误分别提示；不会把接口拒绝当作模型已理解，也不会自动重试或切换服务商。
 
 配置优先级为：**后端进程环境变量 > 项目根目录 `.env.language` > `runtime/language.local.json` > 默认关闭**。后端在健康检查和每次文字指令时重新读取这两个文件，不依赖启动工作目录；保存后刷新网页即可。若启动终端设置了 `ROOMWISE_LANGUAGE_PROVIDER='disabled'`，文件不能覆盖它；需在终端移除该环境变量并重启后端。JSON 中的 `enabled:false` 可由更高优先级的 provider 配置覆盖。`.env.language` 只支持单行 `KEY=VALUE`、可选 `export`、单/双引号及注释，不执行命令或展开变量，同名键最后一条生效。检查 `/api/health` 的 `language.enabled` 和 `language.message`；启用仅代表本地配置有效，不代表已验证远端连通性。
 

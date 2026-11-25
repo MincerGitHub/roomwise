@@ -154,6 +154,26 @@ def is_bedside_only_command(text):
     return bool(clauses) and all(_bedside_syntax(clause) is not None for clause in clauses)
 
 
+def is_window_only_command(text, scene, selected_id=None):
+    """A complete basic window request, without dropping any other condition."""
+    names = {name for item in scene["items"] for name in (item["id"], item["label"])}
+    names.update(name for aliases in ALIASES.values() for name in aliases)
+    if selected_id:
+        names.update(("它", "这个", "这件", "该家具", "选中的家具"))
+    clauses = [part.strip() for part in re.split(r"[,，;；。！？!?]|同时|然后", text) if part.strip()]
+    for clause in clauses:
+        match = re.fullmatch(
+            r"(?:请帮我|帮我|请)?(?:把|将|让)?(?P<subject>.+?)(?:尽量|最好|优先)?"
+            r"(?:靠近窗户|靠近窗|靠窗|(?:面朝|朝向|正对|面向)(?:着)?(?:窗户|窗)(?:方向)?)"
+            r"(?:\s+(?P<window>[A-Za-z0-9_-]{1,100}))?", clause,
+        )
+        if not match or match["subject"].strip() not in names:
+            return False
+        if match["window"] and match["window"] not in {window["id"] for window in scene["room"].get("windows", [])}:
+            return False
+    return bool(clauses)
+
+
 def _vanity_syntax(clause):
     """Recognize a chair placed in front of a dressing table or its mirror."""
     move = re.fullmatch(

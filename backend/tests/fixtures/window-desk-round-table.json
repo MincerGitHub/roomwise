@@ -1,0 +1,147 @@
+{
+  "id": "window-pair-regression",
+  "name": "Window desk and round table regression",
+  "version": 0,
+  "room": {
+    "width": 5.2,
+    "depth": 4.2,
+    "height": 2.7,
+    "polygon": null,
+    "referenceImageUrl": null,
+    "door": {
+      "wall": "south",
+      "offset": 0.45,
+      "width": 0.9,
+      "clearance": 0.9
+    },
+    "windows": [
+      {
+        "id": "window-1",
+        "wall": "north",
+        "offset": 2.15,
+        "width": 1.8,
+        "sillHeight": 1.25
+      }
+    ]
+  },
+  "items": [
+    {
+      "id": "bed-1",
+      "label": "bed-1",
+      "category": "double_bed",
+      "width": 2.099,
+      "depth": 2.1,
+      "height": 0.99,
+      "x": 3.78,
+      "z": 2.95,
+      "rotation": 180.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "id": "cabinet-1",
+      "label": "cabinet-1",
+      "category": "cabinet",
+      "width": 1.93,
+      "depth": 0.351,
+      "height": 1.6,
+      "x": 1.15,
+      "z": 3.9,
+      "rotation": 180.0,
+      "locked": true,
+      "keep": false,
+      "source": "existing"
+    },
+    {
+      "id": "table-1",
+      "label": "table-1",
+      "category": "table",
+      "width": 1.002,
+      "depth": 1.002,
+      "height": 0.75,
+      "x": 1.5,
+      "z": 1.45,
+      "rotation": 0.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "id": "chair-1",
+      "label": "chair-1",
+      "category": "chair",
+      "width": 0.541,
+      "depth": 0.668,
+      "height": 0.9,
+      "x": 1.5,
+      "z": 2.435,
+      "rotation": 180.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "id": "lamp-1",
+      "label": "lamp-1",
+      "category": "floor_lamp",
+      "width": 0.641,
+      "depth": 0.445,
+      "height": 1.5,
+      "x": 4.65,
+      "z": 0.55,
+      "rotation": 0.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "id": "ac-1",
+      "label": "ac-1",
+      "category": "air_conditioner",
+      "width": 0.9,
+      "depth": 0.2,
+      "height": 0.3,
+      "x": 0.12,
+      "z": 2.4,
+      "y": 2.2,
+      "rotation": 90.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "id": "lowpoly-desk",
+      "label": "lowpoly-desk",
+      "category": "desk",
+      "width": 1.2,
+      "depth": 0.6,
+      "height": 1.16,
+      "x": 2.6,
+      "z": 2.1,
+      "rotation": 0.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought",
+      "functionalProfile": {
+        "surfaceHeight": 0.76,
+        "frontUseDepth": 0.65,
+        "note": "低模作者模型尺寸与人工功能参数，非家庭实测；沿用2026-11-22本地实验声明。"
+      }
+    }
+  ],
+  "preferences": [
+    {
+      "kind": "near_window",
+      "itemId": "lowpoly-desk",
+      "required": true,
+      "targetId": "window-1"
+    },
+    {
+      "kind": "face_window",
+      "itemId": "chair-1",
+      "required": true,
+      "targetId": "window-1"
+    }
+  ]
+}

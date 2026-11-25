@@ -453,7 +453,7 @@ def evaluate_vanity_seating(scene: dict) -> dict:
     A pair that is both locked is reported as a warning and left untouched.
     """
     tables = [item for item in scene.get("items", []) if item.get("category") == "dressing_table"]
-    chairs = [item for item in scene.get("items", []) if item.get("category") in {"dressing_chair", "stool"}]
+    chairs = [item for item in scene.get("items", []) if item.get("category") in {"chair", "armchair", "dressing_chair", "stool"}]
     chairs_by_id = {chair["id"]: chair for chair in chairs}
     tables_by_id = {table["id"]: table for table in tables}
     available = set(chairs_by_id)
@@ -468,19 +468,13 @@ def evaluate_vanity_seating(scene: dict) -> dict:
             pairs.append((table, chair))
             available.remove(chair["id"])
             paired_tables.add(table["id"])
+    from .functional_constraints import functional_pairs
+    assigned = {(aid, bid) for kind, aid, bid in functional_pairs(scene) if kind == "work"}
     for table in tables:
-        if table["id"] in paired_tables:
-            continue
-        candidates = [chair for chair in chairs
-                      if chair["id"] in available and chair.get("category") == "dressing_chair"]
-        if not candidates:
-            candidates = [chair for chair in chairs
-                          if chair["id"] in available and chair.get("category") == "stool"]
-        if not candidates:
-            continue
-        chair = min(candidates, key=lambda item: math.dist((item["x"], item["z"]), (table["x"], table["z"])))
-        pairs.append((table, chair))
-        available.remove(chair["id"])
+        for chair in chairs:
+            if (table["id"], chair["id"]) in assigned and chair["id"] in available:
+                pairs.append((table, chair))
+                available.remove(chair["id"])
     checks = []
     unsatisfied = []
     warnings = []
@@ -602,21 +596,12 @@ def layout_quality(scene: dict) -> dict:
     tables = [i for i in items if i.get("category") in TABLE_CATEGORIES]
     beds = [i for i in items if "bed" in i.get("category", "")]
     nightstands = [i for i in items if i.get("category") == "nightstand"]
-    partners = {
-        "chair": {"desk", "table"},
-        "dressing_chair": {"dressing_table"},
-        "stool": {"desk", "table", "dressing_table", "coffee_table"},
-    }
+    from .functional_constraints import functional_pairs
+    assigned_tables = {bid: aid for kind, aid, bid in functional_pairs(scene) if kind == "work"}
     for seat in items:
-        partner_categories = partners.get(seat.get("category"), set())
-        seat_tables = [table for table in tables if table.get("category") in partner_categories]
-        if seat.get("category") == "stool":
-            vanity_tables = [table for table in seat_tables if table.get("category") == "dressing_table"]
-            if vanity_tables:
-                seat_tables = vanity_tables
-        if not seat_tables:
+        table = next((candidate for candidate in tables if candidate["id"] == assigned_tables.get(seat["id"])), None)
+        if table is None:
             continue
-        table = min(seat_tables, key=lambda candidate: footprint(seat).distance(footprint(candidate)))
         distance = footprint(seat).distance(footprint(table))
         # A seat belongs in front of its matching work surface, close enough
         # to use but with a small pull-out gap. Keep its centre near the

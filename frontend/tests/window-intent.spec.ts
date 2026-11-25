@@ -1,6 +1,11 @@
 import {test,expect} from '@playwright/test';
 
 test('window command is recognized and preview satisfies both requests without moving locks',async({page})=>{
+ await page.route('**/api/health',async route=>{
+  const response=await route.fetch(),body=await response.json();
+  body.language={enabled:true,configured:true,provider:'responses',model:'gpt-6-sol',message:'语言模型已配置'};
+  await route.fulfill({response,json:body});
+ });
  await page.goto('/');
  const canvas=page.locator('.scene-canvas');
  await expect(page.locator('.scene-canvas canvas')).toBeVisible();
@@ -10,19 +15,24 @@ test('window command is recognized and preview satisfies both requests without m
  await page.getByLabel('布局方法').selectOption('hybrid');
  const commandResponse=page.waitForResponse(r=>r.url().endsWith('/api/command')&&r.request().method()==='POST');
  const generatedResponse=page.waitForResponse(r=>r.url().endsWith('/api/generate')&&r.request().method()==='POST',{timeout:45000});
- await page.getByLabel('输入修改要求').fill('桌子靠窗，椅子面朝窗户方向');
+ await page.getByLabel('输入修改要求').fill('书桌靠窗，办公椅面朝窗户方向');
  await page.getByLabel('发送要求').click();
  const command=await (await commandResponse).json();
  expect(command.action).toBe('generate');
+ expect(command.parser).toBe('offline_restricted_chinese');
+ expect(command.message).toContain('本地规则');
  expect(command.scene.preferences).toEqual(expect.arrayContaining([
   expect.objectContaining({kind:'near_window',itemId:'desk-1',required:true}),
   expect.objectContaining({kind:'face_window',itemId:'chair-1',required:true}),
  ]));
- const recognized=page.getByLabel('已识别的布局要求');
+ const generated=await (await generatedResponse).json();
+ if(await page.getByRole('button',{name:'展开已识别的布局要求',exact:true}).count()){
+  await page.getByRole('button',{name:'展开已识别的布局要求',exact:true}).click();
+ }
+ const recognized=page.getByLabel('已识别的布局要求',{exact:true});
  await expect(recognized).toContainText('旧书桌：靠近');
  await expect(recognized).toContainText('办公椅：面朝');
  await expect(page.getByRole('alert')).toHaveCount(0);
- const generated=await (await generatedResponse).json();
  expect(generated.candidates.length).toBeGreaterThan(0);
  for(const candidate of generated.candidates){
   expect(candidate.validation.valid).toBe(true);

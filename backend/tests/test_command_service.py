@@ -173,6 +173,61 @@ def test_bad_model_plan_does_not_fall_back_to_partially_matching_regex(monkeypat
     assert reply["action"] == "clarify" and "scene" not in reply
 
 
+def test_complete_window_command_works_without_calling_configured_provider(monkeypatch):
+    scene = demo_scene()
+    before = deepcopy(scene)
+    monkeypatch.setattr(service, "language_status", lambda: {"enabled": True, "provider": "responses", "model": "gpt-6-sol"})
+    monkeypatch.setattr(service, "plan_command", lambda *args: pytest.fail("A complete basic window command stays local"))
+    reply = service.interpret_command(scene, "书桌靠窗，办公椅面朝窗户方向")
+    assert reply["action"] == "generate"
+    assert reply["parser"] == "offline_restricted_chinese"
+    assert "本地规则" in reply["message"]
+    assert {("near_window", "desk-1"), ("face_window", "chair-1")} <= {
+        (pref["kind"], pref["itemId"]) for pref in reply["scene"]["preferences"]}
+    assert all(pref["required"] for pref in reply["scene"]["preferences"] if pref["kind"] in {"near_window", "face_window"})
+    assert reply["scene"]["items"] == scene["items"] and scene == before
+
+
+@pytest.mark.parametrize("text", [
+    "书桌靠窗，办公椅换成蓝色", "书桌靠窗并换成蓝色", "书桌不要靠窗", "办公椅不要面朝窗户",
+    "书桌靠窗，办公椅随便安排", "书桌旋转90度后靠窗", "书桌靠窗 unknown-window",
+])
+def test_basic_window_path_never_drops_extra_requirements(monkeypatch, text):
+    calls = []
+    monkeypatch.setattr(service, "language_status", lambda: {"enabled": True})
+    def plan(*args):
+        calls.append(1)
+        return {"action": "clarify", "message": "未获得完整计划", "operations": [], "error": {"code": "provider_policy", "httpStatus": 403}}
+    monkeypatch.setattr(service, "plan_command", plan)
+    scene = demo_scene()
+    before = deepcopy(scene)
+    reply = service.interpret_command(scene, text)
+    assert len(calls) == 1
+    assert reply["action"] == "clarify" and "scene" not in reply and scene == before
+    assert reply["languageError"] == {"code": "provider_policy", "httpStatus": 403}
+
+
+@pytest.mark.parametrize("condition", ["locked", "ambiguous-chair", "multiple-windows", "no-windows", "missing-desk"])
+def test_basic_window_path_preserves_ambiguity_and_lock_checks(monkeypatch, condition):
+    scene = demo_scene()
+    if condition == "locked":
+        next(item for item in scene["items"] if item["id"] == "chair-1")["locked"] = True
+    elif condition == "ambiguous-chair":
+        scene["items"].append({**scene["items"][3], "id": "chair-2", "label": "备用办公椅"})
+    elif condition == "multiple-windows":
+        scene["room"]["windows"].append({**scene["room"]["windows"][0], "id": "window-2"})
+    elif condition == "no-windows":
+        scene["room"]["windows"] = []
+    else:
+        scene["items"] = [item for item in scene["items"] if item["id"] != "desk-1"]
+        scene["preferences"] = []
+    before = deepcopy(scene)
+    monkeypatch.setattr(service, "plan_command", lambda *args: pytest.fail("Window checks stay local"))
+    reply = service.interpret_command(scene, "书桌靠窗，办公椅面朝窗户方向")
+    assert reply["action"] == "clarify" and "scene" not in reply
+    assert scene == before
+
+
 def test_exact_undo_does_not_incure_language_call(monkeypatch):
     monkeypatch.setattr(service, "language_status", lambda: pytest.fail("Undo should remain local"))
     monkeypatch.setattr(service, "plan_command", lambda *args: pytest.fail("Undo should remain local"))

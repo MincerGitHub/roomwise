@@ -1,4 +1,4 @@
-export type FunctionalProfile={surfaceHeight?:number|null;seatHeight?:number|null;frontUseDepth?:number|null;rearUseDepth?:number|null;bedsideAccess?:number|null;note?:string};
+export type FunctionalProfile={surfaceHeight?:number|null;seatHeight?:number|null;frontUseDepth?:number|null;rearUseDepth?:number|null;bedsideAccess?:number|null;seatCapacity?:number|null;note?:string};
 export type FunctionalSpaces={satisfied:boolean;passed:number;total:number;checks:RequirementCheck[];unsatisfied:RequirementCheck[];warnings:RequirementCheck[];note:string};
 export type Wall='south'|'north'|'east'|'west';
 export type FurnitureParameters={primaryColor:string|null;secondaryColor:string|null;material:'wood'|'fabric'|'leather'|'metal'|'plastic'|'glass'|'mixed'|'unknown';hasBack:boolean|null;hasArms:boolean|null;hasLegs:boolean|null;drawerCount:number|null;doorCount:number|null;shelfCount:number|null;seatCount:number|null;seatHeightRatio:number|null};

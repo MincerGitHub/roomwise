@@ -113,6 +113,7 @@ class FunctionalProfile(DataModel):
     frontUseDepth: float | None = Field(default=None, gt=0, le=5)
     rearUseDepth: float | None = Field(default=None, gt=0, le=5)
     bedsideAccess: float | None = Field(default=None, gt=0, le=5)
+    seatCapacity: int | None = Field(default=None, ge=1, le=8, strict=True)
     note: str = Field(default="", max_length=500)
 
 

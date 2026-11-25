@@ -1,0 +1,179 @@
+{
+  "id": "crowded-functional-test",
+  "name": "Crowded functional room regression",
+  "version": 0,
+  "room": {
+    "width": 5.2,
+    "depth": 4.2,
+    "height": 2.7,
+    "polygon": null,
+    "referenceImageUrl": null,
+    "door": {
+      "wall": "south",
+      "offset": 0.45,
+      "width": 0.9,
+      "clearance": 0.9
+    },
+    "windows": [
+      {
+        "id": "window-1",
+        "wall": "north",
+        "offset": 2.15,
+        "width": 1.8,
+        "sillHeight": 1.25
+      }
+    ]
+  },
+  "items": [
+    {
+      "id": "bed-1",
+      "label": "bed-1",
+      "category": "double_bed",
+      "width": 2.099,
+      "depth": 2.1,
+      "height": 0.99,
+      "x": 3.78,
+      "z": 2.95,
+      "rotation": 180.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "id": "cabinet-1",
+      "label": "cabinet-1",
+      "category": "cabinet",
+      "width": 1.93,
+      "depth": 0.351,
+      "height": 1.6,
+      "x": 1.15,
+      "z": 3.9,
+      "rotation": 180.0,
+      "locked": true,
+      "keep": false,
+      "source": "existing"
+    },
+    {
+      "id": "table-1",
+      "label": "table-1",
+      "category": "table",
+      "width": 1.002,
+      "depth": 1.002,
+      "height": 0.75,
+      "x": 1.5,
+      "z": 1.45,
+      "rotation": 0.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "id": "chair-1",
+      "label": "chair-1",
+      "category": "chair",
+      "width": 0.541,
+      "depth": 0.668,
+      "height": 0.9,
+      "x": 1.5,
+      "z": 2.435,
+      "rotation": 180.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "id": "lamp-1",
+      "label": "lamp-1",
+      "category": "floor_lamp",
+      "width": 0.641,
+      "depth": 0.445,
+      "height": 1.5,
+      "x": 4.65,
+      "z": 0.55,
+      "rotation": 0.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "id": "ac-1",
+      "label": "ac-1",
+      "category": "air_conditioner",
+      "width": 0.9,
+      "depth": 0.2,
+      "height": 0.3,
+      "x": 0.12,
+      "z": 2.4,
+      "y": 2.2,
+      "rotation": 90.0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "category": "nightstand",
+      "label": "stand-new",
+      "width": 0.45,
+      "depth": 0.4,
+      "height": 0.5,
+      "id": "stand-new",
+      "x": 2.3,
+      "z": 3.9,
+      "rotation": 180,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    },
+    {
+      "category": "desk",
+      "label": "desk-new",
+      "width": 1.2,
+      "depth": 0.6,
+      "height": 0.75,
+      "id": "desk-new",
+      "x": 2.15,
+      "z": 0.45,
+      "rotation": 0,
+      "locked": false,
+      "keep": false,
+      "source": "brought",
+      "functionalProfile": {
+        "surfaceHeight": 0.75,
+        "frontUseDepth": 0.65
+      }
+    },
+    {
+      "category": "chair",
+      "label": "a-chair-new",
+      "width": 0.48,
+      "depth": 0.5,
+      "height": 0.85,
+      "id": "a-chair-new",
+      "x": 2.15,
+      "z": 1.1,
+      "rotation": 180,
+      "locked": false,
+      "keep": false,
+      "source": "brought",
+      "functionalProfile": {
+        "seatHeight": 0.45,
+        "rearUseDepth": 0.55
+      }
+    },
+    {
+      "id": "stool-new",
+      "label": "stool-new",
+      "category": "stool",
+      "width": 0.524,
+      "depth": 0.524,
+      "height": 0.45,
+      "x": 3.25,
+      "z": 0.7,
+      "rotation": 0,
+      "locked": false,
+      "keep": false,
+      "source": "brought"
+    }
+  ],
+  "preferences": []
+}

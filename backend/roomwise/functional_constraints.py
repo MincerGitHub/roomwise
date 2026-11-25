@@ -12,7 +12,7 @@ from .storage import runtime_directory
 
 BEDS = {"double_bed", "single_bed", "kids_bed"}
 TABLES = {"desk", "table", "dressing_table"}
-SEATS = {"chair", "stool", "dressing_chair"}
+SEATS = {"chair", "armchair", "stool", "dressing_chair"}
 
 
 @lru_cache(maxsize=4)
@@ -32,8 +32,10 @@ def functional_profile(item):
         return {key: value for key, value in declared.items() if value is not None}
     # Local compatibility metadata lets old saved snapshots use the declared
     # profiles without rewriting scenes. Never depend on experiment directories.
+    if not item.get("furnitureAssetId"):
+        return {}
     path = runtime_directory() / "furniture-functional-profiles.json"
-    if not item.get("furnitureAssetId") or not path.exists():
+    if not path.exists():
         return {}
     record = _registry(path, path.stat().st_mtime_ns).get(item["furnitureAssetId"], {})
     if record.get("assetUrl") != item.get("assetUrl") or any(
@@ -72,24 +74,151 @@ def _relative(anchor, other):
     return math.cos(angle) * x - math.sin(angle) * z, math.sin(angle) * x + math.cos(angle) * z
 
 
-def functional_pairs(scene):
-    """Bind by the input scene, so movement cannot silently change partners."""
+def _seat_capacity(table):
+    profile = functional_profile(table)
+    if profile.get("seatCapacity") is not None:
+        return int(profile["seatCapacity"])
+    snapshot = table.get("furnitureSnapshot") or {}
+    parameters = snapshot.get("parameters") or table.get("parameters") or {}
+    if isinstance(parameters, dict) and parameters.get("seatCount") is not None:
+        return int(parameters["seatCount"])
+    return 1 if table.get("category") in {"desk", "dressing_table"} else 4
+
+
+def _minimum_cost_maximum_assignment(seat_ids, table_ids, capacities, costs):
+    """Min-cost maximum bipartite assignment with table seat capacities."""
+    if not seat_ids or not table_ids:
+        return []
+    slots = [table_id for table_id in table_ids for _ in range(capacities.get(table_id, 0))]
+    if not slots:
+        return []
+    row_count, real_columns = len(seat_ids), len(slots)
+    column_count = real_columns + row_count  # one unmatched dummy per seat
+    forbidden, unmatched = 10**15, 10**12
+    matrix = [[costs.get((seat_id, slots[column]), forbidden) if column < real_columns
+               else unmatched + column - real_columns for column in range(column_count)]
+              for seat_id in seat_ids]
+
+    # Rectangular Hungarian algorithm; rows <= columns due to dummy slots.
+    u, v = [0] * (row_count + 1), [0] * (column_count + 1)
+    p, way = [0] * (column_count + 1), [0] * (column_count + 1)
+    for row in range(1, row_count + 1):
+        p[0] = row
+        column0 = 0
+        minimum = [forbidden] * (column_count + 1)
+        used = [False] * (column_count + 1)
+        while True:
+            used[column0] = True
+            row0 = p[column0]
+            delta, column1 = forbidden, 0
+            for column in range(1, column_count + 1):
+                if used[column]:
+                    continue
+                reduced = matrix[row0 - 1][column - 1] - u[row0] - v[column]
+                if reduced < minimum[column]:
+                    minimum[column], way[column] = reduced, column0
+                if minimum[column] < delta:
+                    delta, column1 = minimum[column], column
+            for column in range(column_count + 1):
+                if used[column]:
+                    u[p[column]] += delta
+                    v[column] -= delta
+                else:
+                    minimum[column] -= delta
+            column0 = column1
+            if p[column0] == 0:
+                break
+        while True:
+            column1 = way[column0]
+            p[column0] = p[column1]
+            column0 = column1
+            if column0 == 0:
+                break
+    assigned = []
+    for column in range(1, real_columns + 1):
+        if p[column] and matrix[p[column] - 1][column - 1] < unmatched:
+            assigned.append((seat_ids[p[column] - 1], slots[column - 1]))
+    return assigned
+
+
+def functional_pair_candidates(scene):
+    """Return every compatible table/seat edge before final assignment."""
     items = scene["items"]
-    pairs, used = [], set()
+    candidates = []
     preferences = scene.get("preferences", [])
+    profiles = {item["id"]: functional_profile(item) for item in items}
     for anchor_category, dependent_categories, kind in ((TABLES, SEATS, "work"), ({"sofa"}, {"coffee_table"}, "lounge")):
         anchors = [item for item in items if item["category"] in anchor_category]
-        for dependent in sorted((item for item in items if item["category"] in dependent_categories), key=lambda item: item["id"]):
-            if any(pref["itemId"] == dependent["id"] and pref["kind"] == "relative_position" for pref in preferences):
+        for dependent in (item for item in items if item["category"] in dependent_categories):
+            requests = [pref for pref in preferences if pref["itemId"] == dependent["id"]]
+            targets = {pref.get("targetId") for pref in requests if pref["kind"] in {"face_item", "vanity_seating"}}
+            priority = 0 if targets else 2
+            facing = [pref for pref in requests if pref["kind"] == "face_window"]
+            if kind == "work" and not targets and facing:
+                windows = scene.get("room", {}).get("windows", [])
+                sole_window = windows[0]["id"] if len(windows) == 1 else None
+                faced_windows = {pref.get("targetId") or sole_window for pref in facing}
+                targets = {pref["itemId"] for pref in preferences if pref["kind"] == "near_window"
+                           and pref["itemId"] in {anchor["id"] for anchor in anchors}
+                           and (pref.get("targetId") or sole_window) in faced_windows
+                           and (pref.get("targetId") or sole_window) is not None}
+                if targets:
+                    priority = 1
+            for anchor in anchors:
+                vanity = anchor["category"] == "dressing_table"
+                preferred = "dressing_chair" if vanity else "chair"
+                anchor_profile, seat_profile = profiles[anchor["id"]], profiles[dependent["id"]]
+                surface, seat_height = anchor_profile.get("surfaceHeight"), seat_profile.get("seatHeight")
+                if surface is not None and seat_height is not None:
+                    difference = surface - seat_height
+                    height_priority = -3 if .18 <= difference <= .42 else 4
+                elif surface is not None or seat_height is not None:
+                    height_priority = 1
+                else:
+                    height_priority = 2
+                requested = not targets or anchor["id"] in targets
+                is_window_match = not (facing and targets) or anchor["id"] in targets
+                edge_priority = (0 if targets and requested else 3 if targets else priority,
+                                 0 if is_window_match else 1, height_priority,
+                                 dependent["category"] != preferred, not vanity,
+                                 math.dist((anchor["x"], anchor["z"]), (dependent["x"], dependent["z"])),
+                                 anchor["id"], dependent["id"])
+                candidates.append((kind, anchor["id"], dependent["id"], edge_priority, requested))
+    return candidates
+
+
+def functional_pairs(scene):
+    """Choose one global capacity-aware assignment from all compatible edges."""
+    items = {item["id"]: item for item in scene["items"]}
+    preferences = scene.get("preferences", [])
+    pairs = []
+    all_edges = functional_pair_candidates(scene)
+    for kind, anchor_categories, seat_categories in (
+            ("work", TABLES, SEATS), ("lounge", {"sofa"}, {"coffee_table"})):
+        anchors = [item for item in scene["items"] if item["category"] in anchor_categories]
+        seats = [item for item in scene["items"] if item["category"] in seat_categories
+                 and not any(pref["itemId"] == item["id"] and pref["kind"] == "relative_position"
+                             for pref in preferences)]
+        if not anchors or not seats:
+            continue
+        capacities = {item["id"]: _seat_capacity(item) if kind == "work" else 1 for item in anchors}
+        edge_by_ids = {(edge_kind, aid, bid): edge for edge_kind, aid, bid, *edge in all_edges
+                       if edge_kind == kind}
+        costs = {}
+        table_order = {item["id"]: index for index, item in enumerate(anchors)}
+        seat_order = {item["id"]: index for index, item in enumerate(seats)}
+        for (edge_kind, aid, bid), (priority, requested) in edge_by_ids.items():
+            if not requested:
                 continue
-            targets = [pref.get("targetId") for pref in preferences if pref["itemId"] == dependent["id"]
-                       and pref["kind"] in {"face_item", "vanity_seating"}]
-            choices = [item for item in anchors if (kind, item["id"]) not in used and (not targets or item["id"] in targets)]
-            if not choices:
-                continue
-            anchor = min(choices, key=lambda item: (math.dist((item["x"], item["z"]), (dependent["x"], dependent["z"])), item["id"]))
-            used.add((kind, anchor["id"]))
-            pairs.append((kind, anchor["id"], dependent["id"]))
+            distance_milli = min(999_999, int(priority[5] * 1000))
+            # Preference strength and dedicated seat type dominate distance.
+            costs[(bid, aid)] = (priority[0] * 10**10 + priority[1] * 10**8
+                                 + int(priority[2]) * 10**7 + int(priority[3]) * 10**6
+                                 + int(priority[4]) * 10**5 + distance_milli * 100
+                                 + table_order[aid] * max(1, len(seats)) + seat_order[bid])
+        assignment = _minimum_cost_maximum_assignment(
+            [item["id"] for item in seats], [item["id"] for item in anchors], capacities, costs)
+        pairs.extend((kind, aid, bid) for bid, aid in assignment)
     return pairs
 
 
@@ -115,20 +244,33 @@ def evaluate_functional_spaces(scene, original=None):
         inside = shell.covers(polygon)
         return {"satisfied": inside and not blockers, "blockers": blockers, "insideRoom": inside}
 
-    for kind, aid, bid in functional_pairs(original):
+    pairs = functional_pairs(original)
+    assigned_counts = {}
+    for kind, aid, _ in pairs:
+        if kind == "work":
+            assigned_counts[aid] = assigned_counts.get(aid, 0) + 1
+    for kind, aid, bid in pairs:
+        paired.update((aid, bid))
         if aid not in items or bid not in items:
             continue
         a, b = items[aid], items[bid]
         pa, pb = profiles[aid], profiles[bid]
-        paired.update((aid, bid))
         lateral, forward = _relative(a, b)
         gap = forward - a["depth"] / 2 - b["depth"] / 2
         declared = any(key != "note" for p in (pa, pb) for key in p)
         if kind == "work":
-            error = abs((front_rotation(b) - front_rotation(a) - 180 + 180) % 360 - 180)
-            add("work_position", [aid, bid], .08-1e-6 <= gap <= .50+1e-6 and abs(lateral) <= .22+1e-6 and error <= 20,
+            assigned_count = assigned_counts.get(aid, 1)
+            if a["category"] == "table" and assigned_count > 1:
+                gap = abs(forward) - a["depth"] / 2 - b["depth"] / 2
+                target_rotation = front_rotation(a) + (180 if forward >= 0 else 0)
+                error = abs((front_rotation(b) - target_rotation + 180) % 360 - 180)
+            else:
+                error = abs((front_rotation(b) - front_rotation(a) - 180 + 180) % 360 - 180)
+            lane = max(.22, min((a["width"] - b["width"]) / 2, a["width"] * .35)) if assigned_count > 1 else .22
+            add("work_position", [aid, bid], .08-1e-6 <= gap <= .50+1e-6 and abs(lateral) <= lane+1e-6 and error <= 20,
                 f"{a['label']}与{b['label']}：核对桌前间距、横向对齐和座椅朝向。", declared,
-                {"gapMeters": gap, "lateralOffsetMeters": lateral, "angleErrorDegrees": error})
+                {"gapMeters": gap, "lateralOffsetMeters": lateral, "allowedLateralMeters": lane,
+                 "assignedSeats": assigned_count, "angleErrorDegrees": error})
             rear = pb.get("rearUseDepth", .55)
             area = zone(b, 0, -front_sign(b) * (b["depth"] / 2 + rear / 2), max(.55, b["width"]), rear, {aid, bid})
             add("chair_pullout", [bid, aid], area["satisfied"], f"{b['label']}后方需留出 {rear:.2f} 米后撤空间。",

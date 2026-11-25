@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from roomwise.functional_constraints import (
-    evaluate_functional_spaces, functional_profile, local_position, repair_functional_spaces,
+    evaluate_functional_spaces, functional_pairs, functional_profile, local_position, repair_functional_spaces,
 )
 from roomwise.geometry import assert_invariants, footprint, validate_scene
 from roomwise.schemas import Scene
@@ -178,3 +178,115 @@ def test_multiple_tables_do_not_reassign_partners_after_moving():
     result = evaluate_functional_spaces(moved, scene)
     check = next(c for c in result["checks"] if c["kind"] == "work_position")
     assert check["itemIds"] == ["desk", "chair"] and not check["satisfied"]
+
+
+def test_nearest_pairs_are_independent_of_input_order_and_chair_ids():
+    scene = work_scene()
+    scene["items"].extend([
+        item("second-table", "table", 5.5, 2, width=1.0, depth=.6),
+        item("a-second-chair", "chair", 5.5, 2.75, rotation=180),
+    ])
+    assert evaluate_functional_spaces(scene)["satisfied"]
+    assert {tuple(check["itemIds"]) for check in evaluate_functional_spaces(scene)["checks"]
+            if check["kind"] == "work_position"} == {("desk", "chair"), ("second-table", "a-second-chair")}
+    scene["items"].reverse()
+    assert evaluate_functional_spaces(scene)["satisfied"]
+
+
+def test_explicit_pair_claims_target_before_nearby_implicit_seat():
+    scene = work_scene()
+    scene["items"].extend([
+        item("second-table", "table", 5.5, 2),
+        item("a-nearby-chair", "chair", 3, 2.6),
+    ])
+    scene["preferences"] = [{"kind": "face_item", "itemId": "chair", "targetId": "desk", "required": True}]
+    assert ("work", "desk", "chair") in functional_pairs(scene)
+    assert evaluate_functional_spaces(scene)["satisfied"]
+
+
+def test_window_request_pairs_facing_chair_with_requested_desk_before_old_round_table():
+    scene = work_scene()
+    scene["items"].extend([item("old-table", "table", 3, 3.5)])
+    scene["room"]["windows"] = [{"id": "window", "wall": "north", "offset": 2, "width": 2, "sillHeight": 1}]
+    scene["preferences"] = [
+        {"kind": "near_window", "itemId": "desk", "targetId": "window", "required": True},
+        {"kind": "face_window", "itemId": "chair", "targetId": "window", "required": True},
+    ]
+    # The initial chair is closer to the round table, but its named window
+    # request pairs it with the desk that must move to that same window.
+    scene["items"][1].update(z=3.2)
+    assert functional_pairs(scene) == [("work", "desk", "chair")]
+    moved = deepcopy(scene)
+    moved["items"][0].update(z=6.6, rotation=180)
+    moved["items"][1].update(z=5.9, rotation=0)
+    assert functional_pairs(moved) == [("work", "desk", "chair")]
+    result = evaluate_functional_spaces(moved)
+    assert result["satisfied"], result
+
+
+def test_window_pairing_respects_different_windows_and_explicit_item_targets():
+    scene = work_scene()
+    scene["items"].append(item("other-table", "table", 6, 6))
+    scene["room"]["windows"] = [
+        {"id": "north-window", "wall": "north", "offset": 2, "width": 2},
+        {"id": "east-window", "wall": "east", "offset": 2, "width": 2},
+    ]
+    scene["preferences"] = [
+        {"kind": "near_window", "itemId": "other-table", "targetId": "east-window", "required": True},
+        {"kind": "face_window", "itemId": "chair", "targetId": "north-window", "required": True},
+    ]
+    assert functional_pairs(scene) == [("work", "desk", "chair")]
+    scene["preferences"][0]["targetId"] = "north-window"
+    assert functional_pairs(scene) == [("work", "other-table", "chair")]
+    scene["preferences"].append({"kind": "face_item", "itemId": "chair", "targetId": "desk", "required": True})
+    assert functional_pairs(scene) == [("work", "desk", "chair")]
+
+
+def test_all_compatible_chairs_are_candidates_and_assignment_obeys_explicit_global_targets():
+    from roomwise.functional_constraints import functional_pair_candidates
+
+    scene = work_scene()
+    second_table = item("second-desk", "desk", 5, 5)
+    second_chair = item("second-chair", "chair", 5, 5)
+    scene["items"].extend([second_table, second_chair])
+    edges = functional_pair_candidates(scene)
+    assert {(aid, bid) for kind, aid, bid, _, _ in edges if kind == "work"} == {
+        ("desk", "chair"), ("desk", "second-chair"),
+        ("second-desk", "chair"), ("second-desk", "second-chair"),
+    }
+    # The locally nearest edge could consume desk first. Global assignment
+    # honors both named targets and recovers the complete two-pair matching.
+    scene["preferences"] = [
+        {"kind": "face_item", "itemId": "chair", "targetId": "second-desk", "required": True},
+        {"kind": "face_item", "itemId": "second-chair", "targetId": "desk", "required": True},
+    ]
+    assert set(functional_pairs(scene)) == {
+        ("work", "second-desk", "chair"), ("work", "desk", "second-chair")}
+
+
+def test_dining_table_declared_capacity_assigns_multiple_distinct_seats():
+    from roomwise.functional_constraints import _seat_capacity, functional_pair_candidates
+
+    scene = scene_with(
+        item("dining", "table", 3, 3, width=1.8, depth=.9, parameters={"seatCount": 2}),
+        item("chair-a", "chair", 2, 2), item("chair-b", "armchair", 3, 2),
+        item("chair-c", "stool", 4, 2),
+    )
+    assert _seat_capacity(scene["items"][0]) == 2
+    assert len(functional_pair_candidates(scene)) == 3
+    assigned = functional_pairs(scene)
+    assert len(assigned) == 2
+    assert {edge[1] for edge in assigned} == {"dining"}
+    assert len({edge[2] for edge in assigned}) == 2
+
+
+def test_global_assignment_uses_complete_declared_work_height_match_before_distance():
+    scene = scene_with(
+        item("dining", "table", 3, 3),
+        item("desk", "desk", 4.1, 3, width=1.2, depth=.6, functionalProfile={"surfaceHeight": .75}),
+        item("seat-a", "chair", 3, 3.8, functionalProfile={"seatHeight": .45}),
+        item("seat-b", "chair", 4.1, 3.8),
+    )
+    assigned = dict((bid, aid) for kind, aid, bid in functional_pairs(scene) if kind == "work")
+    assert assigned["seat-a"] == "desk"
+    assert assigned["seat-b"] == "dining"

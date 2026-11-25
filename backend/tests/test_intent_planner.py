@@ -11,18 +11,18 @@ from roomwise import intent_planner as planner
 
 @pytest.fixture(autouse=True)
 def isolated_language_environment(monkeypatch, tmp_path):
-    for key in ("PROVIDER", "MODEL", "URL", "API_KEY", "RESPONSE_FORMAT"):
+    for key in planner.LANGUAGE_ENV_KEYS:
         monkeypatch.delenv("ROOMWISE_LANGUAGE_" + key, raising=False)
     monkeypatch.setenv("ROOMWISE_LANGUAGE_CONFIG", str(tmp_path / "absent.json"))
     monkeypatch.setenv("ROOMWISE_LANGUAGE_ENV_FILE", str(tmp_path / "absent.env"))
-    monkeypatch.setattr(planner, "_post_json", lambda *args: pytest.fail("Unexpected network request"))
+    monkeypatch.setattr(planner, "_post_json", lambda *args, **kwargs: pytest.fail("Unexpected network request"))
 
 
 def configure(monkeypatch, provider="ollama"):
     monkeypatch.setenv("ROOMWISE_LANGUAGE_PROVIDER", provider)
     monkeypatch.setenv("ROOMWISE_LANGUAGE_MODEL", "test-model")
-    if provider == "chatcompletions":
-        monkeypatch.setenv("ROOMWISE_LANGUAGE_URL", "https://language.invalid/v1/chat/completions")
+    if provider in ("chatcompletions", "responses"):
+        monkeypatch.setenv("ROOMWISE_LANGUAGE_URL", "https://language.invalid/v1/" + ("responses" if provider == "responses" else "chat/completions"))
         monkeypatch.setenv("ROOMWISE_LANGUAGE_API_KEY", "secret-only-in-header")
 
 
@@ -157,12 +157,16 @@ def test_language_env_health_and_command_share_configuration(monkeypatch, tmp_pa
 def mock_plan(monkeypatch, value, provider="ollama", seen=None):
     configure(monkeypatch, provider)
 
-    def post(endpoint, payload, key):
+    def post(endpoint, payload, key, **kwargs):
         if seen is not None:
-            seen.update(endpoint=endpoint, payload=payload, key=key)
+            seen.update(endpoint=endpoint, payload=payload, key=key, **kwargs)
         content = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
         if provider == "ollama":
             return {"message": {"content": content}}
+        if provider == "responses":
+            return {"status": "completed", "output": [{"type": "reasoning", "summary": []},
+                    {"type": "message", "role": "assistant", "status": "completed",
+                     "content": [{"type": "output_text", "text": content}]}]}
         return {"choices": [{"message": {"content": content}}]}
 
     monkeypatch.setattr(planner, "_post_json", post)
@@ -189,7 +193,7 @@ def test_bad_endpoint_is_disabled_without_disclosing_it(monkeypatch, endpoint):
     assert endpoint not in json.dumps(planner.language_status())
 
 
-@pytest.mark.parametrize("provider", ["ollama", "chatcompletions"])
+@pytest.mark.parametrize("provider", ["ollama", "chatcompletions", "responses"])
 def test_real_provider_protocol_and_only_confirmed_scene_fields(monkeypatch, provider):
     seen = {}
     mock_plan(monkeypatch, {"action": "apply", "operations": [
@@ -208,7 +212,7 @@ def test_real_provider_protocol_and_only_confirmed_scene_fields(monkeypatch, pro
     assert parsed["action"] == "generate"
     assert scene == original
     request = seen["payload"]
-    user_context = json.loads(request["messages"][1]["content"])
+    user_context = json.loads(request["input"][0]["content"][0]["text"] if provider == "responses" else request["messages"][1]["content"])
     assert user_context["scene"]["selectedId"] == "chair-1"
     assert len(user_context["recentInstructions"]) == 6
     serialized = json.dumps(request)
@@ -217,11 +221,71 @@ def test_real_provider_protocol_and_only_confirmed_scene_fields(monkeypatch, pro
     if provider == "ollama":
         assert request["format"]["additionalProperties"] is False
         assert seen["key"] == ""
-    else:
+    elif provider == "chatcompletions":
         assert request["response_format"]["type"] == "json_schema"
         assert seen["key"] == "secret-only-in-header"
+    else:
+        assert request["text"]["format"]["type"] == "json_schema"
+        assert request["text"]["format"]["strict"] is True
+        assert request["store"] is False
+        assert not any(key in request for key in ("messages", "temperature", "max_tokens"))
+        assert seen["key"] == "secret-only-in-header"
+        assert seen["timeout"] == planner.RESPONSES_TIMEOUT_SECONDS
     status_text = json.dumps(planner.language_status())
     assert "secret-only-in-header" not in status_text and "language.invalid" not in status_text
+
+
+@pytest.mark.parametrize("base", ["https://language.invalid", "https://language.invalid/v1/", "https://language.invalid/v1/responses"])
+def test_responses_url_normalization_reasoning_and_json_mode(monkeypatch, base):
+    seen = {}
+    mock_plan(monkeypatch, {"action": "apply", "operations": [{"name": "lock", "itemIds": ["desk-1"]}]}, "responses", seen)
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_URL", base)
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_REASONING_EFFORT", "high")
+    monkeypatch.setenv("ROOMWISE_LANGUAGE_RESPONSE_FORMAT", "json_object")
+    result = planner.plan_command(demo_scene(), "书桌保持原位")
+    assert result["action"] == "apply"
+    assert seen["endpoint"] == base.rstrip("/") + ("" if base.endswith("/responses") else "/responses")
+    assert seen["payload"]["reasoning"] == {"effort": "high"}
+    assert seen["payload"]["text"]["format"] == {"type": "json_object"}
+    assert "JSON schema" in seen["payload"]["instructions"]
+    assert planner.language_status()["reasoningEffort"] == "high"
+
+
+@pytest.mark.parametrize("response", [
+    {"status": "incomplete", "output": []},
+    {"status": "completed", "error": {"message": "private-provider-error"}, "output": []},
+    {"status": "completed", "output": [{"type": "message", "role": "assistant", "status": "in_progress", "content": []}]},
+    {"status": "completed", "output": [{"type": "message", "role": "assistant", "status": "completed", "content": [{"type": "refusal", "refusal": "private-provider-refusal"}]}]},
+    {"status": "completed", "output": [{"type": "function_call", "arguments": "untrusted"}]},
+    {"status": "completed", "output": []},
+])
+def test_responses_incomplete_refused_or_tool_output_never_executes(monkeypatch, response):
+    configure(monkeypatch, "responses")
+    calls = []
+    def post(*args, **kwargs):
+        calls.append(1)
+        return response
+    monkeypatch.setattr(planner, "_post_json", post)
+    scene = demo_scene()
+    before = deepcopy(scene)
+    result = planner.plan_command(scene, "书桌靠窗")
+    assert result["action"] == "clarify" and not result["operations"] and not result["canonicalText"]
+    assert len(calls) == 1 and scene == before
+    assert "private-provider" not in json.dumps(result)
+
+
+def test_responses_api_uses_existing_validated_executor(monkeypatch):
+    from fastapi.testclient import TestClient
+    from roomwise.main import app
+
+    mock_plan(monkeypatch, {"action": "apply", "operations": [{"name": "lock", "itemIds": ["desk-1"]}]}, "responses")
+    with TestClient(app) as client:
+        result = client.post("/api/command", json={"scene": demo_scene(), "text": "书桌保持原位"}).json()
+        health = client.get("/api/health").json()
+    assert result["parser"] == "language_model_with_validated_executor"
+    assert next(item for item in result["scene"]["items"] if item["id"] == "desk-1")["locked"]
+    assert result["language"]["provider"] == health["language"]["provider"] == "responses"
+    assert "secret-only-in-header" not in json.dumps(result) + json.dumps(health)
 
 
 def test_exclusion_wall_quantifier_expands_to_unlocked_nonexcluded_items(monkeypatch):

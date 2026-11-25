@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {readFileSync} from 'node:fs';
 
 const item=(id:string,category:string,x:number,z:number,extra={})=>({id,label:id,category,x,z,width:.5,depth:.5,height:.9,rotation:0,locked:false,keep:true,source:'brought',...extra});
 const scene=(items:unknown[])=>({id:'functional-ui',name:'功能空间回归',version:0,room:{width:7,depth:7,height:3,door:null,windows:[]},items,preferences:[]});
@@ -48,4 +49,35 @@ test('functional repair is checked in preview and profiles survive apply and sav
  const saved=await(await saving).json();
  const restored=await(await page.request.get('/api/scenes/'+saved.id)).json();
  expect(restored.items.find((i:{id:string})=>i.id==='sofa')).toMatchObject(fixture.items[0]);
+});
+
+test('two tables with added furniture produce usable candidates through preview and apply',async({page})=>{
+ const fixture=JSON.parse(readFileSync(new URL('../../backend/tests/fixtures/crowded-functional-room.json',import.meta.url),'utf8'));
+ fixture.name='功能空间回归';
+ await load(page,fixture);
+ await page.getByLabel('布局方法').selectOption('hybrid');
+ const response=page.waitForResponse('**/api/generate');
+ await page.locator('.generation-actions button.primary').click();
+ const result=await(await response).json();
+ // The bounded search can return fewer than three distinct arrangements.
+ // It must find a usable result and every returned result must revalidate.
+ expect(result.candidates.length).toBeGreaterThan(0);
+ for(const candidate of result.candidates){
+  expect(candidate.scene.items).toHaveLength(fixture.items.length);
+  const check=await(await page.request.post('/api/validate',{data:{scene:candidate.scene}})).json();
+  expect(check.valid).toBe(true);
+  expect(check.requirements.satisfied).toBe(true);
+  expect(check.functionalSpaces.satisfied).toBe(true);
+  expect(check.functionalSpaces.warnings.every((warning:{required:boolean})=>!warning.required)).toBe(true);
+ }
+ await page.getByLabel('预览方案 1',{exact:true}).click();
+ await expect(page.locator('.preview-inspection summary')).toContainText('空间检查通过');
+ await page.locator('.preview-inspection summary').click();
+ await expect(page.locator('.preview-check-details').getByRole('region',{name:'功能空间检查'})).not.toContainText('未满足');
+ const recheck=page.waitForResponse('**/api/validate');
+ await page.locator('.preview-banner').getByRole('button',{name:'应用此方案'}).click();
+ const applied=await(await recheck).json();
+ expect(applied.valid).toBe(true);
+ expect(applied.functionalSpaces.satisfied).toBe(true);
+ await expect(page.locator('.validation-hero')).toContainText('通过当前空间检查');
 });

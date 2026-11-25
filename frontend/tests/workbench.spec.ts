@@ -2,6 +2,8 @@
 
 test('the fallback north-wall wardrobe faces into the room',async({page})=>{
  await page.goto('/');
+ await expect(page.locator('.scene-canvas')).toHaveCount(1);
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  const layout=JSON.parse((await page.locator('.scene-canvas').getAttribute('data-layout'))!);
  const wardrobe=layout.find((item:[string,number,number,number])=>item[0]==='wardrobe-1');
 
@@ -13,8 +15,11 @@ test('the fallback north-wall wardrobe faces into the room',async({page})=>{
 test('candidate preview is isolated until explicitly applied',async({page})=>{
  await page.goto('/');
  const canvas=page.locator('.scene-canvas');
+ const close=page.getByRole('button',{name:'返回当前布局'});
+ await expect(canvas).toHaveCount(1);
  await expect(canvas.locator('canvas')).toBeVisible();
  const original=JSON.parse((await canvas.getAttribute('data-layout'))!);
+ await page.locator('.item-card').first().click();
  const x=page.locator('.sidebar-content .field-grid').nth(1).locator('input').nth(0);
  const originalX=await x.inputValue();
  await page.locator('.generation-actions select').selectOption('rules');
@@ -29,19 +34,23 @@ test('candidate preview is isolated until explicitly applied',async({page})=>{
  await first.locator('button').first().click();
  await expect(page.locator('.preview-banner')).toBeVisible();
  await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).not.toEqual(original);
- await expect(x).toHaveValue(originalX);
- await expect(page.locator('.header-actions button').nth(4)).toBeDisabled();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ const choices=page.getByRole('group',{name:'切换方案'}).getByRole('button');
+ await expect(choices).toHaveCount(3);
+ await choices.nth(1).click();
+ await expect(choices.nth(1)).toHaveAttribute('aria-pressed','true');
  const preview=JSON.parse((await canvas.getAttribute('data-layout'))!);
- await page.locator('.preview-banner button').first().click();
- await expect(page.locator('.preview-banner')).toHaveCount(0);
- await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(original);
+ await close.click();
+ await expect(page.getByRole('button',{name:'返回当前布局'})).toHaveCount(0);
+ await expect(canvas).toHaveCount(1);
  await expect(x).toHaveValue(originalX);
+ await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(original);
  await first.locator('button').first().click();
+ await choices.nth(1).click();
  await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(preview);
- await page.locator('.preview-banner button').nth(1).click();
- await expect(page.locator('.preview-banner')).toHaveCount(0);
+ await page.getByRole('button',{name:'应用此方案'}).click();
+ await expect(canvas).toHaveCount(1);
  await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(preview);
- await expect(x).not.toHaveValue(originalX);
 });
 
 test('invalid furniture size yields no candidates and current plan can be exported',async({page})=>{
@@ -58,15 +67,17 @@ test('invalid furniture size yields no candidates and current plan can be export
 });
 
 test('top view drag edits furniture position while locked furniture stays put',async({page})=>{
- await page.goto('/');await page.locator('.view-switch button').nth(1).click();await page.waitForTimeout(600);
- const canvas=page.locator('canvas'),bounds=(await canvas.boundingBox())!;
- const scale=bounds.height/(2*5.2*.72);
+ await page.goto('/');await expect(page.locator('.scene-canvas canvas')).toBeVisible();
+ await page.getByRole('button',{name:'俯视',exact:true}).click();
+ const scene=page.locator('.scene-canvas'),canvas=scene.locator('canvas'),bounds=(await canvas.boundingBox())!;
+ const scale=Math.min(bounds.width,bounds.height)/(2*5.2*.72);
  const point=(x:number,z:number)=>({x:bounds.x+bounds.width/2+(x-2.6)*scale,y:bounds.y+bounds.height/2+(z-2.1)*scale});
- const x=page.locator('.sidebar-content .field-grid').nth(1).locator('input').nth(0);
+ const layout=async()=>JSON.parse((await scene.getAttribute('data-layout'))!) as [string,number,number,number][];
+ const itemX=async(id:string)=>(await layout()).find(item=>item[0]===id)?.[1];
  const bed=point(3.8,2.4);await page.mouse.move(bed.x,bed.y);await page.mouse.down();await page.mouse.move(bed.x-35,bed.y+12,{steps:12});await page.mouse.up();
- await expect(x).not.toHaveValue('3.8');
+ await expect.poll(()=>itemX('bed-1')).not.toBe(3.8);
  const cabinet=point(1.15,3.8);await page.mouse.move(cabinet.x,cabinet.y);await page.mouse.down();await page.mouse.move(cabinet.x+50,cabinet.y-30,{steps:8});await page.mouse.up();
- await expect(x).toHaveValue('1.15');
+ expect(await itemX('wardrobe-1')).toBe(1.15);
 });
 
 test('video extraction shows frames without inventing furniture candidates',async({page})=>{

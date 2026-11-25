@@ -1,125 +1,904 @@
-/* Keep the canvas and its hit targets clear; only workbench controls use glass. */
-.app-shell {
-  --ink: #252634;
-  --muted: #55586b;
-  --accent: #504a8c;
-  --green: var(--accent);
-  --studio-green: var(--accent);
-  --studio-ink: var(--ink);
-  --soft: #dddde6;
-  --line: #bfbfcf;
-  --glass-fill: rgb(217 219 233 / 54%);
-  --glass-edge: rgb(255 255 255 / 70%);
-  --glass-shadow: inset 0 1px 0 #ffffffac, 0 6px 20px #28443d13;
-  background: linear-gradient(112deg, #bdc5d8 0%, #ccd0e2 18%, #d9d8e2 38%, #e1cbc9 58%, #d8cfdc 80%, #b4c6d6 100%);
-  background-attachment: fixed;
-  background-size: 180% 100%;
-  animation: roomwise-daylight 32s ease-in-out infinite alternate;
+:root {
+  --primary: #5B8C6E;
+  --primary-strong: #3D6B52;
+  --primary-bg: #E8F3EC;
+  --primary-hover: #D6EADF;
+  --primary-border: #C9E2D3;
+  --accent-bg: #FBF6E4;
+  --accent-text: #8A7A3E;
+  --accent-border: #EFE6C8;
+  --bg-page: #FFFFFF;
+  --bg-subtle: #FAFBFA;
+  --bg-mint: #F7FAF8;
+  --text-primary: #2F3A34;
+  --text-secondary: #5C6660;
+  --text-muted: #8A938D;
+  --text-disabled: #B8BFBB;
+  --border-light: #EDF1EE;
+  --border-base: #E0E6E2;
+  --success-bg: #E8F3EC;
+  --success-text: #3D6B52;
+  --warning-bg: #FBF6E4;
+  --warning-text: #8A7A3E;
+  --error-bg: #FBEDED;
+  --error-text: #A85454;
+  --error-border: #EACFCF;
+  --float-shadow: 0 2px 8px rgba(47,58,52,0.06);
+  font-size: 14px;
+  color-scheme: light;
 }
-.app-shell .workspace { background: transparent; }
-.app-shell .main-panel { background: transparent; }
-.app-shell .app-header {
-  --glass-fill: linear-gradient(108deg, #282a34ed, #393943e5 55%, #483e50e6);
-}
-.app-shell .tabs.tool-rail {
-  --glass-fill: linear-gradient(175deg, #34343fe8, #41404bdd 65%, #484452e3);
-}
-.app-shell .tabs.tool-rail button:is(.active, :hover) { color: white; background: #ffffff26; border-radius: 8px; }
-.app-shell .sidebar { --glass-fill: linear-gradient(135deg, #cfd3e566, #e3dee691); }
-.app-shell .items-list .item-card { border-radius: 8px; margin-block: 2px; }
-.app-shell .items-list .item-card.selected { background: #ffffff80; box-shadow: inset 3px 0 var(--accent); }
-.app-shell .canvas-header { background: linear-gradient(115deg,#ffffff45,#ffffff18); }
-.app-shell .main-panel > :is(.generation-bar, .identified-requirements, .conversation) {
-  background: linear-gradient(110deg, #cacee366, #e5dce785) !important;
-  border-color: #ffffff85 !important;
-}
-.app-shell .generation-actions select { background: #ffffff80 !important; border-color: #ffffffd9 !important; border-radius: 8px !important; }
-.app-shell .viewport :is(.view-switch, .canvas-tools, .selected-label) { border-radius: 10px; }
-.app-shell .viewport .view-switch button { border-radius: 7px; }
-.app-shell .viewport .view-switch button.active { background: #284c53; }
-.app-shell .main-panel .generation-actions .primary { background: #285c5b; border-radius: 8px; color: white; }
-.app-shell :is(.app-header, .tool-rail, .sidebar, .canvas-tools, .canvas-room-meta, .selected-label, .modal, .furniture-context-menu, .view-switch, .generation-actions select) {
-  background: var(--glass-fill);
-  border-color: var(--glass-edge);
-  box-shadow: var(--glass-shadow);
-  -webkit-backdrop-filter: blur(32px) saturate(125%);
-  backdrop-filter: blur(32px) saturate(125%);
-}
-.app-shell :is(.modal, .furniture-context-menu) { --glass-fill: rgb(221 222 234 / 94%); }
-.app-shell .modal-backdrop { background: rgb(34 32 45 / 38%); }
-.app-shell .tool-rail button.active { background: #daebe2; color: #214d38; }
-.app-shell .sidebar-footer { background: rgb(211 213 225 / 64%); }
-.app-shell .canvas-tools button:not(:hover):not(.active) { background-color: transparent; }
-.app-shell :is(.field select, .generation-actions select) option { background: #fff; color: #283b33; }
-.app-shell :is(button, select, input, textarea, a):focus-visible { outline: 2px solid #51469c; outline-offset: 2px; }
-@keyframes roomwise-daylight { to { background-position: 100% 50%; } }
 
-.app-shell :is(.furniture-import-entry, .furniture-service, .furniture-evidence, .note-card, .support-inspector-note, .inspector-fold, .suggest-box, .owned-furniture-card, .surface-snap-hint) {
-  background: rgb(204 205 222 / 56%);
-  color: var(--ink);
-  border-color: var(--line);
+/* Last stylesheet in main.tsx. Keep existing display, order, geometry and
+   state bindings; specificity is intentional for the older !important rules. */
+#root .app-shell {
+  --ink: var(--text-primary);
+  --accent: var(--primary);
+  --green: var(--primary);
+  --studio-green: var(--primary);
+  --studio-ink: var(--text-primary);
+  --studio-muted: var(--text-muted);
+  --studio-line: var(--border-light);
+  --studio-surface: var(--bg-subtle);
+  --muted: var(--text-muted);
+  --line: var(--border-light);
+  --rule: var(--border-light);
+  --paper: var(--bg-page);
+  --soft: var(--bg-mint);
+  --stone: var(--bg-mint);
+  --lime: var(--primary-bg);
+  color: var(--text-primary);
+  font: 400 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg-page);
+  animation: none;
 }
-.app-shell :is(.furniture-import-entry p, .furniture-library legend, .field, .panel-context, .item-card-text small) { color: var(--muted); }
-.app-shell .field :is(input:not([type=color]), select, textarea),
-.app-shell .furniture-library .modal-heading,
-.app-shell .command-box { background: rgb(231 231 239 / 76%) !important; border-color: var(--line); color: var(--ink); }
-.app-shell .furniture-check input { accent-color: var(--accent); }
-.app-shell .crop-selection { border-color: var(--accent); background: rgb(116 102 183 / 20%); }
-.app-shell .candidate-card.active { background: rgb(163 156 201 / 30%) !important; }
-.app-shell .brand-mark { background: #535260; }
+body { background: var(--bg-page); color: var(--text-primary); }
+#root .app-shell *,
+#root .app-shell *::before,
+#root .app-shell *::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+#root .app-shell :where(h1,h2,h3,h4,p,span,strong,small,label,button,input,select,textarea,summary,legend,a,pre,li) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: normal;
+}
+#root .app-shell :is(h1,h2,h3,h4,strong,b,legend) { font-weight: 600; }
+#root .app-shell :is(h1,h2,h3,h4) { color: var(--text-primary) !important; line-height: 1.25; }
+#root .app-shell :is(h3,h4) { font-size: 16px !important; }
+#root .app-shell :is(.sidebar-intro h1,.canvas-header h2) { font-size: 24px; color: var(--primary-strong) !important; }
+#root .app-shell :is(.section-heading h2,.modal-heading h2) { font-size: 16px; }
+#root .app-shell :is(.eyebrow,.hint,small,.section-heading>span,.sidebar-intro p,.panel-context,.sidebar-footer,.canvas-header h2>span,.canvas-guide,.canvas-validation,.selected-label,.generation-copy p,.requirements-heading>span,.conversation-heading>span,.identified-requirements p,.language-status span,.furniture-intro,.furniture-upload-note,.furniture-section-kicker,.furniture-section-heading>p,.candidate-difference,.candidate-quality,.video-upload p,.video-frames span,.requirement-check small,.room-summary-card p) {
+  color: var(--text-secondary) !important;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: normal;
+}
+#root .app-shell :is(.eyebrow,.furniture-section-kicker,.hint,.field small,.item-card-text small) { color: var(--text-muted) !important; }
+#root .app-shell :is(.workspace,.main-panel,.app-header,.sidebar,.tabs.tool-rail,.canvas-header) {
+  background: var(--bg-page);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+#root .app-shell .app-header { padding: 0 24px; gap: 24px; }
+#root .app-shell .brand { gap: 8px; font-size: 20px; font-weight: 600; color: var(--primary-strong); }
+#root .app-shell .brand-mark { border-radius: 6px; background: var(--primary-bg); color: var(--primary); }
+#root .app-shell .brand small { color: var(--text-muted); font-size: 12px; }
+#root .app-shell .project-title { padding-left: 24px; gap: 8px; color: var(--text-secondary); }
+#root .app-shell .header-actions { gap: 8px; }
+#root .app-shell .tabs.tool-rail { padding: 24px 8px; gap: 12px; }
+#root .app-shell .tabs.tool-rail button { padding: 8px 4px; gap: 8px; font-size: 12px; }
+#root .app-shell .tabs.tool-rail button.active::before { background: transparent; }
+#root .app-shell .sidebar-intro { padding: 24px 16px 16px; }
+#root .app-shell .sidebar-intro h1 { margin: 8px 0 0; }
+#root .app-shell .panel-context { margin-top: 24px; padding: 12px 0; gap: 8px; }
+#root .app-shell .panel-context>span:last-child { color: var(--text-muted); font-size: 12px; }
+#root .app-shell .sidebar-content { padding: 16px 16px 24px; scrollbar-color: var(--border-base) transparent; }
+#root .app-shell .sidebar-footer { padding: 12px 16px; gap: 8px; background: var(--bg-subtle); }
+#root .app-shell .section-heading { margin-bottom: 16px; gap: 8px; }
+#root .app-shell .sidebar-content h3 { margin: 24px 0 12px; }
+#root .app-shell .canvas-header { padding: 16px 24px; margin: 0; gap: 16px; }
+#root .app-shell .canvas-header h2 { margin-top: 8px; }
+#root .app-shell .canvas-header h2>span { margin-left: 12px; }
+#root .app-shell .status-dot { border-radius: 6px; background: var(--primary); }
+#root .app-shell .status-dot.offline { background: var(--warning-text); }
 
-/* The menu dismissal layer is an invisible hit target, not a visible control. */
-.app-shell :is(button:not(.context-menu-dismiss), [role=button], summary),
-.app-shell input[type=file]::file-selector-button {
-  --button-fill: rgb(255 255 255 / 15%);
-  --button-shine: rgb(255 255 255 / 38%);
-  --button-ink: #303046;
-  /* Older workbench rules force solid backgrounds and square prompt chips. */
-  background: linear-gradient(154deg, var(--button-shine), transparent 48%, rgb(127 191 209 / 12%)), var(--button-fill) !important;
-  border: 1px solid rgb(255 255 255 / 35%) !important;
+/* Three button variants. Variables preserve semantic colors through all states.
+   The full-screen context-menu-dismiss remains an invisible hit target. */
+#root .app-shell :is(button:not(.context-menu-dismiss),[role=button],summary),
+#root .app-shell input[type=file]::file-selector-button {
+  --control-bg: var(--bg-page);
+  --control-ink: var(--text-primary);
+  --control-border: var(--border-base);
+  --control-hover: var(--bg-mint);
+  --control-active: var(--primary-bg);
+  border: 1px solid var(--control-border) !important;
+  border-radius: 6px !important;
+  background: var(--control-bg) !important;
+  color: var(--control-ink) !important;
+  font-weight: 500;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(91,140,110,.15);
+}
+#root .app-shell :is(.btn,.add-outline,.suggest-box button,.prompt-examples button,.saved-row,.furniture-context-menu button),
+#root .app-shell input[type=file]::file-selector-button { padding: 8px 12px; gap: 8px; }
+#root .app-shell .btn { min-height: 36px; }
+#root .app-shell :is(.btn.primary,.command-box button) {
+  --control-bg: var(--primary-bg);
+  --control-ink: var(--primary-strong);
+  --control-border: var(--primary-border);
+  --control-hover: var(--primary-hover);
+  --control-active: var(--primary-border);
+}
+#root .app-shell :is(.btn.quiet,.text-btn,.icon-btn,.sidebar-footer button,.canvas-validation button,.identified-requirements li>button,.toast button,.furniture-context-menu button,.tabs.tool-rail button,.view-switch button,summary) {
+  --control-bg: transparent;
+  --control-border: transparent;
+  --control-ink: var(--primary);
+  --control-hover: var(--primary-bg);
+}
+#root .app-shell :is(.tabs.tool-rail button,.view-switch button) { --control-ink: var(--text-secondary); }
+#root .app-shell :is(.tabs.tool-rail button.active,.view-switch button.active,.items-list .item-card.selected) {
+  --control-bg: var(--primary-bg);
+  --control-ink: var(--primary);
+  --control-border: var(--primary-border);
+  --control-hover: var(--primary-hover);
+}
+#root .app-shell :is(.danger-action,.furniture-delete,.text-btn.danger,.furniture-context-menu button.danger) {
+  --control-ink: var(--error-text);
+  --control-hover: var(--error-bg);
+  --control-active: var(--error-bg);
+}
+#root .app-shell :is(button:not(.context-menu-dismiss),[role=button],summary):hover:not(:disabled):not([aria-disabled=true]),
+#root .app-shell input[type=file]:enabled::file-selector-button:hover {
+  background: var(--control-hover) !important;
+  border-color: var(--primary-border) !important;
+  transform: none !important;
+}
+#root .app-shell :is(button:not(.context-menu-dismiss),[role=button],summary):active:not(:disabled):not([aria-disabled=true]),
+#root .app-shell input[type=file]:enabled::file-selector-button:active {
+  background: var(--control-active) !important;
+  border-color: var(--primary) !important;
+  transform: none !important;
+}
+#root .app-shell :is(button:disabled,[aria-disabled=true]),
+#root .app-shell input[type=file]:disabled::file-selector-button {
+  background: var(--bg-subtle) !important;
+  color: var(--text-disabled) !important;
+  border-color: var(--border-base) !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+}
+#root .app-shell button:disabled :is(span,strong,small,svg) { color: inherit !important; }
+#root .app-shell :is(button,a,input,select,textarea,summary,[tabindex]):focus { outline: none; }
+#root .app-shell :is(button,a,input,select,textarea,summary,[tabindex]):focus-visible {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 2px;
+}
+#root .app-shell a { color: var(--primary); border-radius: 6px; }
+#root .app-shell a:hover { color: var(--primary-strong); background: var(--primary-bg); }
+#root .app-shell a:active { color: var(--primary-strong); background: var(--primary-hover); }
+
+/* Inputs and forms; keep file, color and native checkbox behaviors intact. */
+#root .app-shell .field { gap: 4px; margin-bottom: 16px; font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+#root .app-shell :is(input,select,textarea):not([type=checkbox]):not([type=radio]),
+#root .app-shell .generation-actions select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-base) !important;
+  border-radius: 6px !important;
+  background: var(--bg-page) !important;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+#root .app-shell :is(input,select,textarea):enabled:hover { border-color: var(--primary-border) !important; }
+#root .app-shell :is(input,select,textarea):enabled:focus { border-color: var(--primary) !important; }
+#root .app-shell :is(input,select,textarea):focus-visible { box-shadow: 0 0 0 2px rgba(91,140,110,.15) !important; }
+#root .app-shell :is(input,select,textarea):disabled {
+  border-color: var(--border-base) !important; background: var(--bg-subtle) !important;
+  color: var(--text-disabled) !important; cursor: not-allowed;
+}
+#root .app-shell :is(input,textarea)::placeholder { color: var(--text-muted); opacity: 1; }
+#root .app-shell :is(input,select,textarea):is([aria-invalid=true],:user-invalid) { border-color: var(--error-text) !important; }
+#root .app-shell :is(input,select,textarea):is([aria-invalid=true],:user-invalid):focus-visible { outline-color: var(--error-text) !important; }
+#root .app-shell :is(.field-error,.field [role=alert]) { margin-top: 4px; color: var(--error-text); font-size: 12px; }
+#root .app-shell :is(.required-marker,.required-asterisk) { margin-left: 4px; color: var(--error-text); }
+#root .app-shell :is(input[type=checkbox],input[type=radio]) { accent-color: var(--primary); }
+#root .app-shell input[type=color] { padding: 4px !important; }
+#root .app-shell select option { background: var(--bg-page); color: var(--text-primary); }
+#root .app-shell .field-grid { gap: 12px; }
+#root .app-shell .hint { margin: 8px 0 16px; }
+#root .app-shell .toggle-row { padding: 8px 0; gap: 8px; }
+#root .app-shell .toggle { width: 42px; height: 26px; padding: 4px; --control-bg: var(--border-base); }
+#root .app-shell .toggle>span { width: 16px; height: 16px; border-radius: 4px; background: var(--bg-page); }
+#root .app-shell .toggle.on { --control-bg: var(--primary); --control-hover: var(--primary-strong); }
+#root .app-shell .toggle.on>span { transform: translateX(16px); }
+
+/* Lists, panels and summaries: borders replace decorative depth. */
+#root .app-shell :is(.note-card,.suggest-box,.inspector-fold,.furniture-import-entry,.support-inspector-note,.language-status,.preview-requirements,.functional-relations,.furniture-service,.furniture-evidence,.furniture-check,.owned-furniture-card,.furniture-preview,.metric-grid>div,.room-summary-card) {
+  border: 1px solid var(--border-light);
+  border-radius: 6px !important;
+  background: var(--bg-subtle) !important;
+  color: var(--text-secondary);
+}
+#root .app-shell :is(.note-card,.suggest-box,.furniture-import-entry,.support-inspector-note,.language-status,.preview-requirements,.functional-relations,.furniture-evidence,.metric-grid>div) { padding: 12px; gap: 8px; }
+#root .app-shell :is(.suggest-box>span,.suggest-box p,.suggest-box svg,.inspector-fold summary strong,.inspector-fold summary span,.language-status strong,.language-status span,.requirement-check strong,.requirement-check span,.requirement-check small) { color: inherit !important; }
+#root .app-shell .note-card { margin: 16px 0; }
+#root .app-shell .note-card svg { margin-top: 0; }
+#root .app-shell .furniture-import-entry { margin: 0 0 16px; padding: 16px; }
+#root .app-shell .furniture-import-entry p { margin: 8px 0 12px; color: var(--text-secondary); }
+#root .app-shell .items-list { gap: 8px; }
+#root .app-shell .items-list .item-card { padding: 8px; gap: 12px; border-color: var(--border-light) !important; }
+#root .app-shell .items-list .item-card.selected { border-color: var(--primary-border) !important; }
+#root .app-shell .item-symbol { margin-left: 0; border-radius: 6px; background: var(--bg-mint); color: var(--text-muted); }
+#root .app-shell .item-card-text strong { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+#root .app-shell .item-card-text small { margin-top: 4px; font-size: 12px; }
+#root .app-shell .item-card>svg { color: var(--text-muted); }
+#root .app-shell :is(.add-outline,.btn.full) { margin-top: 12px; }
+#root .app-shell .suggest-box { margin-top: 24px; background: var(--accent-bg) !important; border-color: var(--accent-border); color: var(--accent-text); }
+#root .app-shell .suggest-box p { margin: 8px 0 12px; }
+#root .app-shell .suggest-box>div { gap: 8px; }
+#root .app-shell .inspector-fold { margin-top: 24px; padding: 0 12px; }
+#root .app-shell .inspector-fold summary { margin-top: 0; padding: 8px 4px; gap: 8px; }
+#root .app-shell .inspector-fold summary span { padding: 4px 8px; gap: 4px; border-radius: 6px; border-color: var(--border-base); background: var(--bg-page); font-size: 12px; }
+#root .app-shell .inspector-actions { margin-top: 16px; gap: 8px; }
+#root .app-shell .inspector-actions .btn { padding: 8px; font-size: 12px; }
+#root .app-shell .main-panel>.room-summary { padding: 16px 24px; gap: 12px; background: var(--bg-mint); color: var(--text-primary); border-bottom: 1px solid var(--border-light); }
+#root .app-shell .room-summary-card { padding: 12px; gap: 12px; background: var(--bg-page) !important; }
+#root .app-shell .room-summary-card svg { margin-top: 0; color: var(--primary); opacity: 1; }
+#root .app-shell .room-summary-card h3 { font-size: 14px !important; font-weight: 500; opacity: 1; color: var(--text-secondary) !important; }
+#root .app-shell .room-summary-card strong { margin: 4px 0; font-size: 20px; font-weight: 600; color: var(--primary-strong); }
+#root .app-shell .room-summary-card p { opacity: 1; }
+#root .app-shell :is(.tag,.count,.requirement-tag,.candidate-status,.furniture-count,.owned-furniture-meta>span) {
+  padding: 4px 8px; border: 1px solid var(--primary-border); border-radius: 6px;
+  background: var(--primary-bg); color: var(--primary-strong); font-size: 12px; font-weight: 500; line-height: 1.5;
+}
+#root .app-shell .count { margin-left: 4px; }
+#root .app-shell .tabs i { padding: 0; border-radius: 6px; background: var(--error-bg); color: var(--error-text); font-size: 12px; }
+#root .app-shell .viewport { border-color: var(--border-light); border-radius: 8px; background: var(--bg-mint); }
+#root .app-shell .viewport :is(.view-switch,.canvas-tools,.selected-label,.canvas-validation) {
+  border: 1px solid var(--border-base); border-radius: 6px; background: var(--bg-page);
+  box-shadow: var(--float-shadow) !important;
+}
+#root .app-shell .viewport .view-switch { padding: 4px; gap: 4px; }
+#root .app-shell .view-switch button { padding: 4px 12px; gap: 8px; font-size: 12px; }
+#root .app-shell .canvas-tools { gap: 4px; padding: 4px; }
+#root .app-shell .canvas-tools button { width: 32px; height: 32px; }
+#root .app-shell .selected-label { padding: 8px 12px; gap: 8px; }
+#root .app-shell .selected-label span { padding-left: 8px; margin-left: 4px; border-color: var(--border-light); color: var(--text-muted); font-size: 12px; }
+#root .app-shell .canvas-guide { padding: 8px; gap: 8px; border-radius: 6px; background: var(--bg-page); }
+#root .app-shell .canvas-validation { padding: 8px 12px; gap: 8px; }
+#root .app-shell .canvas-validation .status-dot { background: var(--warning-text); }
+#root .app-shell .canvas-validation.ok .status-dot { background: var(--primary); }
+#root .app-shell .canvas-validation button { gap: 4px; padding: 4px; }
+
+/* Existing sections remain in their original sequence. */
+#root .app-shell .main-panel>:is(.identified-requirements,.generation-bar,.conversation) {
+  margin: 0; padding: 24px;
+  border: 0 !important; border-bottom: 1px solid var(--border-light) !important;
+  border-radius: 0 !important; background: var(--bg-page) !important;
+}
+#root .app-shell .main-panel>.generation-bar { background: var(--bg-mint) !important; gap: 16px; }
+#root .app-shell :is(.requirements-heading,.conversation-heading) { gap: 8px; }
+#root .app-shell .generation-copy h3 { color: var(--primary-strong) !important; }
+#root .app-shell .generation-copy p { margin-top: 4px; }
+#root .app-shell .generation-actions { gap: 8px; }
+#root .app-shell .generation-actions select { width: 180px; }
+#root .app-shell .generation-actions .btn { font-size: 14px; }
+#root .app-shell .identified-requirements ul { margin: 12px 0 0; gap: 8px; }
+#root .app-shell .identified-requirements li { padding: 8px !important; gap: 8px; border-color: var(--border-light) !important; color: var(--text-primary); }
+#root .app-shell .identified-requirements li>button { padding: 4px; }
+#root .app-shell :is(.requirement-checks,.preview-requirements,.functional-relations) { margin-top: 12px; gap: 8px; }
+#root .app-shell .requirement-check { padding: 12px; border: 1px solid var(--primary-border); border-radius: 6px; background: var(--success-bg); color: var(--success-text); }
+#root .app-shell .requirement-check.unmet { border-color: var(--accent-border); background: var(--warning-bg); color: var(--warning-text); }
+#root .app-shell .candidate-strip { gap: 12px; margin: 16px 24px; border-color: var(--border-light); }
+#root .app-shell .candidate-card { padding: 12px; gap: 12px; border: 1px solid var(--border-light) !important; border-radius: 8px !important; background: var(--bg-page) !important; }
+#root .app-shell .candidate-card.active { border-color: var(--primary-border) !important; background: var(--primary-bg) !important; }
+#root .app-shell .candidate-number { color: var(--primary); font-size: 20px; font-weight: 500; }
+#root .app-shell .candidate-overview { gap: 4px; }
+#root .app-shell .candidate-overview h4 { font-size: 14px !important; }
+#root .app-shell .candidate-status.needs-adjustment { background: var(--warning-bg); color: var(--warning-text); border-color: var(--accent-border); }
+#root .app-shell .preview-banner { padding: 12px; margin: 16px 24px; gap: 12px; border-radius: 6px; border-color: var(--primary-border); background: var(--primary-bg); color: var(--primary-strong); }
+#root .app-shell .preview-banner>span,#root .app-shell .preview-banner>div { gap: 8px; }
+#root .app-shell .messages { padding-top: 12px; margin: 12px 0; border-color: var(--border-light); }
+#root .app-shell .message { padding: 8px 0; margin: 8px 0; gap: 8px; color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
+#root .app-shell .message.user { color: var(--text-primary); }
+#root .app-shell .message>span { background: var(--primary-bg); color: var(--primary); border-radius: 6px; }
+#root .app-shell .prompt-examples { gap: 8px; margin-bottom: 12px; }
+#root .app-shell .prompt-examples button { padding: 4px 8px; font-size: 12px; }
+#root .app-shell .command-box { padding: 4px 8px 4px 12px; border: 1px solid var(--border-base); border-radius: 6px !important; background: var(--bg-page) !important; }
+#root .app-shell .command-box:has(input:focus-visible) { border-color: var(--primary); }
+#root .app-shell .command-box input { padding: 8px 0; border: 0 !important; }
+#root .app-shell .command-box button { margin-left: 8px; }
+
+/* Status styling uses existing classes; never infer an error from role=status. */
+#root .app-shell :is(.command-warning,.message.warning,.validation-hero.warn,.furniture-message,.furniture-service.offline) {
+  border: 1px solid var(--accent-border) !important; border-radius: 6px !important;
+  background: var(--warning-bg) !important; color: var(--warning-text) !important;
+}
+#root .app-shell :is(.command-warning p,.command-warning small,.validation-hero p,.furniture-service strong,.furniture-service span) { color: inherit !important; }
+#root .app-shell .command-warning { margin-top: 16px; padding: 16px; gap: 16px; }
+#root .app-shell .command-warning :is(p,small) { margin-top: 4px; }
+#root .app-shell :is(.error-message,.furniture-crop [role=alert],.furniture-preview [role=alert]) {
+  padding: 12px; margin-top: 12px; border: 1px solid var(--error-border); border-radius: 6px;
+  background: var(--error-bg); color: var(--error-text); font-size: 14px;
+}
+#root .app-shell .message.warning { padding: 12px !important; }
+#root .app-shell .issue { padding: 12px; gap: 8px; margin-top: 12px; --control-bg: var(--warning-bg); --control-border: var(--accent-border); --control-ink: var(--warning-text); }
+#root .app-shell .issue.error { --control-bg: var(--error-bg); --control-border: var(--error-border); --control-ink: var(--error-text); }
+#root .app-shell .issue-dot { border-radius: 6px; margin-top: 8px; }
+#root .app-shell .validation-hero { padding: 24px; border-radius: 6px; background: var(--bg-subtle); color: var(--text-secondary); }
+#root .app-shell .validation-hero strong { margin: 12px 0; font-size: 16px; }
+#root .app-shell .validation-hero.pass { background: var(--success-bg); border-color: var(--primary-border); color: var(--success-text); }
+#root .app-shell .metric-grid { gap: 8px; margin: 16px 0; }
+#root .app-shell .metric-grid span { color: var(--text-secondary); font-size: 12px; }
+#root .app-shell .metric-grid strong { margin-top: 4px; font-size: 16px; color: var(--text-primary); }
+#root .app-shell .generation-info { margin: 12px 24px; padding: 12px; border: 1px solid var(--border-light); border-radius: 6px; background: var(--bg-subtle); color: var(--text-secondary); font-size: 14px; }
+
+/* The shared busy flag already disables every prompt-example button. Restyle
+   existing action icons as spinners without adding markup or changing JS. */
+#root .app-shell:has(.prompt-examples button:disabled) :is(.generation-actions .primary,.command-box button) { color: var(--text-muted) !important; }
+#root .app-shell:has(.prompt-examples button:disabled) :is(.generation-actions .primary,.command-box button)>svg {
+  width: 14px; height: 14px; flex: 0 0 14px; stroke: transparent;
+  border: 1.5px solid var(--primary-border); border-top-color: var(--primary);
+  border-radius: 50%; animation: roomwise-theme-spin .9s linear infinite;
+}
+@keyframes roomwise-theme-spin { to { transform: rotate(360deg); } }
+#root .app-shell .progress { margin: 16px 0; font-size: 12px; color: var(--text-secondary); }
+#root .app-shell .progress>div { margin-top: 8px; background: var(--primary-bg); }
+#root .app-shell .progress i { background: var(--primary); }
+#root .app-shell .video-upload { padding: 24px 12px; gap: 12px; --control-bg: var(--bg-mint); --control-border: var(--primary-border); }
+#root .app-shell .video-upload:has(button:disabled) { cursor: not-allowed; color: var(--text-disabled) !important; }
+#root .app-shell .video-candidate { padding: 12px; margin: 12px 0; gap: 12px; border-color: var(--border-light); border-radius: 6px; }
+#root .app-shell .video-candidate :is(small,button) { margin-top: 4px; }
+#root .app-shell .video-frames span { padding: 4px; }
+#root .app-shell .video-frames button { padding: 0; }
+
+/* Floating surfaces. Existing overlay levels and dismissal handlers are kept. */
+#root .app-shell .modal-backdrop { padding: 24px; background: rgba(47,58,52,.25); }
+#root .app-shell .modal { padding: 24px; border: 1px solid var(--border-light); border-radius: 8px; background: var(--bg-page); box-shadow: var(--float-shadow) !important; color: var(--text-primary); font-size: 14px; line-height: 1.55; overscroll-behavior: contain; }
+#root .app-shell .modal-heading { margin-bottom: 24px; gap: 16px; }
+#root .app-shell .modal-heading h2 { margin-top: 4px; }
+#root .app-shell .modal-actions { margin-top: 24px; gap: 8px; justify-content: flex-end; }
+#root .app-shell .catalog-grid { gap: 12px; }
+#root .app-shell .catalog-grid>button { padding: 16px 12px; gap: 8px; }
+#root .app-shell .catalog-grid>button>span { border-radius: 6px; background: var(--bg-mint); color: var(--primary); }
+#root .app-shell .catalog-grid>button>svg { color: var(--text-muted); }
+#root .app-shell .suggestion { padding: 16px; gap: 16px; margin: 12px 0; border-radius: 6px; border-color: var(--border-light); }
+#root .app-shell .suggestion p { color: var(--text-secondary); }
+#root .app-shell .saved-row { margin: 8px 0; }
+#root .app-shell .saved-row small { margin-top: 4px; }
+#root .app-shell .experiment-json { padding: 16px; border-radius: 6px; background: var(--bg-subtle); color: var(--text-secondary); font-size: 12px; }
+#root .app-shell .toast { padding: 12px 16px; gap: 8px; border: 1px solid var(--primary-border); border-radius: 6px; background: var(--primary-bg); color: var(--primary-strong); box-shadow: var(--float-shadow) !important; }
+#root .app-shell .toast button { margin-left: 8px; }
+#root .app-shell .furniture-context-menu { padding: 4px; border: 1px solid var(--border-base); border-radius: 6px; background: var(--bg-page); box-shadow: var(--float-shadow) !important; }
+#root .app-shell .furniture-context-menu button { padding: 8px; font-size: 14px; }
+
+/* Furniture library and crop tools retain their existing geometry. */
+#root .app-shell .modal.furniture-library { padding: 0 24px 24px; }
+#root .app-shell .furniture-library .modal-heading { margin: 0 -24px 16px; padding: 24px; border-color: var(--border-light); background: var(--bg-page); }
+#root .app-shell .furniture-library fieldset { margin: 0 0 24px; padding: 16px; border: 1px solid var(--border-light); border-radius: 6px; background: var(--bg-page); }
+#root .app-shell .furniture-library fieldset:disabled { opacity: 1; }
+#root .app-shell .furniture-library legend { padding: 0 8px; color: var(--primary-strong); }
+#root .app-shell .furniture-intro { margin: 0 0 16px; }
+#root .app-shell .furniture-service { padding: 12px; gap: 8px; margin: 0 0 16px; }
+#root .app-shell .furniture-service>div { gap: 4px; }
+#root .app-shell .furniture-service-dot { margin-top: 4px; background: var(--text-muted); border-radius: 6px; }
+#root .app-shell .furniture-service.ready .furniture-service-dot { background: var(--primary); }
+#root .app-shell input[type=file]::file-selector-button { margin: 0 12px 0 0; font: inherit; }
+#root .app-shell .furniture-upload-note { margin: 8px 0 0; }
+#root .app-shell .furniture-library .furniture-check { padding: 12px; margin: 16px 0; gap: 8px; color: var(--text-secondary); }
+#root .app-shell .furniture-check input { margin: 4px 0 0; }
+#root .app-shell .furniture-consent strong { color: var(--text-primary); font-weight: 500; }
+#root .app-shell .furniture-message { padding: 12px; margin: 12px 0; }
+#root .app-shell .furniture-crops { margin: 12px 0 4px; gap: 12px; }
+#root .app-shell .crop-surface { margin: 8px 0; }
+#root .app-shell :is(.crop-surface img,.furniture-photos img,.owned-furniture-card>img) { border-radius: 6px; background: var(--bg-subtle); }
+#root .app-shell .crop-selection { border-color: var(--primary); background: rgba(91,140,110,.15); }
+#root .app-shell .furniture-crop small { margin-top: 4px; font-size: 12px; }
+#root .app-shell .furniture-photos { margin-bottom: 16px; gap: 12px; }
+#root .app-shell .furniture-preview p { padding: 24px; }
+#root .app-shell .furniture-evidence { margin-bottom: 16px; }
+#root .app-shell .furniture-evidence p { margin-top: 4px; }
+#root .app-shell .furniture-parameters { margin-top: 16px; gap: 12px; }
+#root .app-shell .furniture-library .furniture-saved,
+#root .app-shell .furniture-library .furniture-draft-section { margin-top: 24px; }
+#root .app-shell .furniture-section-heading { gap: 16px; margin-bottom: 16px; }
+#root .app-shell .furniture-section-heading h3 { margin: 4px 0 0; gap: 8px; }
+#root .app-shell .furniture-section-heading>p { margin: 0; }
+#root .app-shell .owned-furniture-grid { gap: 12px; }
+#root .app-shell .owned-furniture-card { padding: 12px; gap: 8px; background: var(--bg-page) !important; }
+#root .app-shell .owned-furniture-card:hover { transform: none; border-color: var(--primary-border); }
+#root .app-shell .owned-furniture-meta { gap: 8px; margin-top: 4px; }
+#root .app-shell .owned-furniture-meta>strong { color: var(--text-primary); font-weight: 500; }
+#root .app-shell .owned-furniture-card>small { color: var(--text-secondary); }
+#root .app-shell .owned-furniture-card .furniture-actions { gap: 8px; margin-top: 8px; }
+#root .app-shell .owned-furniture-card .furniture-actions .btn { padding: 8px; font-size: 12px; }
+#root .app-shell .furniture-draft { gap: 8px; }
+#root .app-shell .furniture-empty,
+#root .app-shell .modal>.hint:only-of-type:last-child {
+  padding: 32px; border: 1px solid var(--border-light); border-radius: 6px;
+  background: var(--bg-subtle); color: var(--text-muted); text-align: center; font-size: 14px;
+}
+#root .app-shell .furniture-empty :is(svg,small) { color: var(--text-muted); font-size: 12px; }
+
+/* Tables inherit the same theme when an existing table is rendered. */
+#root .app-shell table { border-collapse: collapse; background: var(--bg-page); }
+#root .app-shell table :is(th,td) { padding: 12px 16px; border-bottom: 1px solid var(--border-light); text-align: left; }
+#root .app-shell table th { background: var(--bg-mint); font-weight: 600; }
+#root .app-shell table tbody tr { background: var(--bg-page); }
+#root .app-shell table tbody tr:hover { background: #F3F8F5; }
+
+@media (max-width: 1200px) {
+  #root .app-shell .app-header { padding: 0 16px; gap: 16px; }
+  #root .app-shell .project-title { padding-left: 16px; }
+  #root .app-shell .tabs.tool-rail { padding-inline: 4px; }
+}
+@media (max-width: 900px) {
+  #root .app-shell .app-header { padding-block: 12px; gap: 12px 16px; }
+}
+@media (max-width: 780px) {
+  #root .app-shell .app-header { padding: 12px; gap: 12px; }
+  #root .app-shell .tabs.tool-rail { padding: 8px 12px; gap: 8px; }
+  #root .app-shell .tabs.tool-rail button { padding: 8px 4px; gap: 4px; }
+  #root .app-shell .sidebar-intro { padding: 16px 16px 8px; }
+  #root .app-shell .sidebar-intro h1 { margin: 0; font-size: 20px; }
+  #root .app-shell .canvas-header { padding: 16px; }
+  #root .app-shell .canvas-header h2 { font-size: 20px; }
+  #root .app-shell .main-panel>:is(.identified-requirements,.generation-bar,.conversation,.room-summary) { padding: 16px; }
+  #root .app-shell .room-summary-card>div { column-gap: 8px; }
+  #root .app-shell :is(.candidate-strip,.preview-banner) { margin: 12px 16px; }
+  #root .app-shell .generation-actions { gap: 8px; }
+  #root .app-shell .modal-backdrop { padding: 8px; }
+  #root .app-shell .modal { padding: 16px; }
+  #root .app-shell .modal.furniture-library { padding: 0 16px 16px; }
+  #root .app-shell .furniture-library .modal-heading { margin: 0 -16px 16px; padding: 16px; }
+  #root .app-shell .furniture-library fieldset { padding: 12px; }
+}
+@media (max-width: 420px) {
+  #root .app-shell .header-actions { gap: 4px; }
+  #root .app-shell .header-actions .btn { padding: 8px; gap: 4px; font-size: 12px; }
+  #root .app-shell .canvas-header h2>span { margin: 8px 0 0; }
+  #root .app-shell .generation-actions select { width: 0; flex: 1; min-width: 0; }
+  #root .app-shell .view-switch button { padding: 4px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #root .app-shell *, #root .app-shell *::before, #root .app-shell *::after {
+    transition: none !important; animation: none !important; scroll-behavior: auto !important;
+  }
+}
+
+/* Normalize legacy component typography to the requested type scale. */
+#root .app-shell * {
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 1.55;
+  letter-spacing: 0 !important;
+}
+#root .app-shell :is(.app-header .brand,.brand-mark,.sidebar-intro h1,.canvas-header h2,.room-summary-card strong,.candidate-number) {
+  font-size: 24px !important;
+  font-weight: 600 !important;
+  line-height: 1.25;
+}
+#root .app-shell :is(.section-heading h2,.modal-heading h2,.requirements-heading h3,.conversation-heading h3,.generation-copy h3,.sidebar-content h3,.furniture-section-heading h3,.functional-relations h3,.video-upload strong,.validation-hero strong,.candidate-overview h4,.video-candidate strong,.suggestion h3,.owned-furniture-meta>strong) {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.25;
+}
+#root .app-shell :is(.project-title,.btn,.text-btn,.icon-btn,.tabs.tool-rail button,.view-switch button,.field,.canvas-guide,.canvas-validation,.selected-label,.identified-requirements li,.message,.language-status strong,.video-candidate strong,.suggestion h3,.saved-row strong,.furniture-crop strong,.furniture-consent,.room-summary-card h3,.furniture-context-menu button) {
+  font-size: 14px !important;
+}
+#root .app-shell :is(.eyebrow,.hint,small,.tag,.count,.item-card-text small,.panel-context,.sidebar-footer,.section-heading>span,.canvas-header h2>span,.canvas-room-meta,.selected-label>span,.generation-copy p,.requirements-heading>span,.conversation-heading>span,.identified-requirements p,.requirement-check small,.language-status span,.candidate-difference,.candidate-quality,.video-upload p,.video-frames span,.furniture-intro,.furniture-upload-note,.furniture-section-kicker,.furniture-section-heading>p,.furniture-crop small,.owned-furniture-card>small,.owned-furniture-meta>span,.bed-head-marker,.bed-head-marker span) {
+  font-size: 12px !important;
+}
+#root .app-shell :is(.brand,.sidebar-intro h1,.canvas-header h2,.section-heading h2,.modal-heading h2,.requirements-heading h3,.conversation-heading h3,.generation-copy h3,.sidebar-content h3,.furniture-section-heading h3,.functional-relations h3,.video-upload strong,.validation-hero strong,.candidate-overview h4,.video-candidate strong,.suggestion h3,legend,.room-summary-card strong,.owned-furniture-meta>strong) {
+  font-weight: 600 !important;
+}
+#root .app-shell :is(.btn,.text-btn,.icon-btn,.tabs.tool-rail button,.view-switch button,.field,.tag,.count,.candidate-status,.requirement-tag,.owned-furniture-meta>span) {
+  font-weight: 500 !important;
+}
+#root .app-shell :is(.icon-btn,.canvas-tools button) { padding: 0 !important; }
+#root .app-shell :is(.text-btn,.sidebar-footer button,.canvas-validation button,.identified-requirements li>button) { gap: 4px; }
+#root .app-shell .text-btn.danger { margin-top: 16px; }
+#root .app-shell .bed-head-marker { padding: 8px; border-color: var(--primary-border); background: var(--bg-page); color: var(--primary-strong); }
+#root .app-shell .bed-head-marker span { color: var(--text-muted); }
+#root .app-shell .room-inside-toggle { padding-inline: 12px; }
+#root .app-shell .prompt-examples { margin-top: 12px; }
+#root .app-shell .btn.primary:hover:not(:disabled),
+#root .app-shell .header-actions .btn.primary:hover:not(:disabled),
+#root .app-shell .generation-actions .btn.primary:hover:not(:disabled),
+#root .app-shell .furniture-library .btn.primary:hover:not(:disabled) {
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-border) !important;
+  color: var(--primary-strong) !important;
+}
+#root .app-shell .btn.primary:active:not(:disabled),
+#root .app-shell .header-actions .btn.primary:active:not(:disabled),
+#root .app-shell .generation-actions .btn.primary:active:not(:disabled),
+#root .app-shell .furniture-library .btn.primary:active:not(:disabled) {
+  background: var(--primary-border) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary-strong) !important;
+}
+#root .app-shell .view-switch button.active:hover:not(:disabled),
+#root .app-shell .tabs.tool-rail button.active:hover:not(:disabled) {
+  background: var(--primary-hover) !important;
+  color: var(--primary-strong) !important;
+}
+#root .app-shell :is(button,a,input,select,textarea,summary):focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+#root .app-shell :is(button,a,input,select,textarea,summary):focus-visible {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 780px) {
+  #root .app-shell .canvas-header h2,
+  #root .app-shell .sidebar-intro h1 { font-size: 20px !important; }
+}
+
+/* Small legacy controls whose original rules have !important declarations. */
+#root .app-shell .canvas-room-meta>span { gap: 8px; }
+#root .app-shell .canvas-tools button { padding: 4px !important; }
+#root .app-shell .command-box button { padding: 8px !important; }
+#root .app-shell .room-inside-toggle { padding: 8px 12px !important; }
+#root .app-shell button.btn.primary:hover:not(:disabled):not([aria-disabled=true]),
+#root .app-shell .header-actions button.btn.primary:hover:not(:disabled):not([aria-disabled=true]),
+#root .app-shell .generation-actions button.btn.primary:hover:not(:disabled):not([aria-disabled=true]),
+#root .app-shell .furniture-library button.btn.primary:hover:not(:disabled):not([aria-disabled=true]) {
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-border) !important;
+  color: var(--primary-strong) !important;
+}
+#root .app-shell button.btn.primary:active:not(:disabled):not([aria-disabled=true]),
+#root .app-shell .header-actions button.btn.primary:active:not(:disabled):not([aria-disabled=true]),
+#root .app-shell .generation-actions button.btn.primary:active:not(:disabled):not([aria-disabled=true]),
+#root .app-shell .furniture-library button.btn.primary:active:not(:disabled):not([aria-disabled=true]) {
+  background: var(--primary-border) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary-strong) !important;
+}
+
+/* Normalize remaining browser-default button spacing and compact actions. */
+#root .app-shell button:not(.context-menu-dismiss) { padding: 8px 12px; gap: 8px; }
+#root .app-shell :is(.icon-btn,.canvas-tools button) { padding: 0 !important; gap: 4px; }
+#root .app-shell .canvas-tools button { padding: 4px !important; }
+#root .app-shell .view-switch button { padding: 4px 12px !important; }
+#root .app-shell .tabs.tool-rail button { padding: 8px 4px !important; }
+#root .app-shell .text-btn { padding: 4px 0 !important; gap: 4px; }
+#root .app-shell :is(.sidebar-footer button,.canvas-validation button,.identified-requirements li>button,.toast button) {
+  padding: 4px !important; gap: 4px;
+}
+#root .app-shell .toggle { padding: 4px !important; }
+#root .app-shell .toggle>span { padding: 0 !important; }
+#root .app-shell .command-box button { padding: 8px !important; }
+#root .app-shell .room-inside-toggle { padding: 8px 12px !important; }
+#root .app-shell .canvas-room-meta>span { gap: 8px !important; }
+
+/* Resolve specificity against grouped legacy selectors. */
+#root .app-shell .suggest-box.suggest-box { background: var(--accent-bg) !important; border-color: var(--accent-border); color: var(--accent-text); }
+#root .app-shell .suggest-box>span { gap: 8px !important; }
+#root .app-shell .room-summary-card.room-summary-card { background: var(--bg-page) !important; }
+#root .app-shell .command-box input:not([type=checkbox]):not([type=radio]) { border: 0 !important; }
+
+/* Roomwise workbench layout */
+#root .app-shell {
+  --color-bg-white: #ffffff;
+  --color-bg-light-green: #f7fbf5;
+  --color-bg-light-yellow: #fdf8e4;
+  --color-green-soft: #b8d9a8;
+  --color-green-main: #8fbf7f;
+  --color-text-darkgreen: #3f5f45;
+  --color-text-normal: #4a4a4a;
+  --color-border: #dde8d4;
+  --primary: #8fbf7f;
+  --primary-strong: #3f5f45;
+  --primary-bg: #f7fbf5;
+  --primary-hover: #edf6e9;
+  --primary-border: #b8d9a8;
+  --accent-bg: #fdf8e4;
+  --accent-text: #746a45;
+  --accent-border: #eee5c5;
+  --bg-page: #ffffff;
+  --bg-subtle: #f7fbf5;
+  --bg-mint: #f7fbf5;
+  --text-primary: #3f5f45;
+  --text-secondary: #4a4a4a;
+  --text-muted: #767d75;
+  --text-disabled: #aeb7aa;
+  --border-light: #dde8d4;
+  --border-base: #dde8d4;
+  --success-bg: #f1f7ed;
+  --success-text: #3f5f45;
+  --warning-bg: #fdf8e4;
+  --warning-text: #746a45;
+  --float-shadow: 0 2px 8px rgba(63, 95, 69, .06);
+  min-height: 100vh;
+  background: #f7fbf5;
+}
+
+body { background: #f7fbf5; }
+#root .app-shell .app-header {
+  position: sticky;
+  z-index: 40;
+  top: 0;
+  height: 68px;
+  min-height: 68px;
+  padding-inline: 24px;
+  border-bottom: 1px solid #dde8d4;
+  background: #ffffff;
+}
+#root .app-shell .workspace {
+  display: grid;
+  grid-template-columns: 64px minmax(280px, 316px) minmax(0, 1fr);
+  align-items: start;
+  min-height: calc(100vh - 68px);
+  background: #f7fbf5;
+}
+#root .app-shell .tabs.tool-rail {
+  position: sticky;
+  z-index: 20;
+  top: 68px;
+  display: flex;
+  width: 64px;
+  height: calc(100svh - 68px);
+  min-height: 420px;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 16px 8px;
+  gap: 8px;
+  border-right: 1px solid #dde8d4;
+  border-bottom: 0;
+  background: #ffffff;
+}
+#root .app-shell .tabs.tool-rail button {
+  min-height: 48px;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 2px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  color: #626a61;
+  font-size: 11px !important;
+  white-space: normal;
+}
+#root .app-shell .tabs.tool-rail button.active {
+  background: #f1f7ed !important;
+  color: #3f5f45 !important;
+}
+#root .app-shell .tabs.tool-rail button i { top: 2px; right: 2px; }
+#root .app-shell .sidebar {
+  position: sticky;
+  top: 68px;
+  width: auto;
+  height: calc(100svh - 68px);
+  max-height: calc(100svh - 68px);
+  min-height: 420px;
+  border-right: 1px solid #dde8d4;
+  background: #ffffff;
+}
+#root .app-shell .sidebar-intro { padding: 24px 16px 16px; }
+#root .app-shell .sidebar-intro h1 { margin-top: 8px; font-size: 20px !important; }
+#root .app-shell .sidebar-content { padding: 16px 16px 24px; }
+#root .app-shell .sidebar-footer { border-top: 1px solid #dde8d4; background: #f7fbf5; }
+
+#root .app-shell .main-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  max-width: none;
+  min-height: calc(100vh - 68px);
+  padding: 0 24px 32px;
+  background: #f7fbf5;
+}
+#root .app-shell .workbench-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  align-items: start;
+  gap: 16px;
+  min-width: 0;
+}
+#root .app-shell .scene-stage { position: sticky; top: 84px; min-width: 0; }
+#root .app-shell .planning-panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+#root .app-shell .canvas-header {
+  margin: 0 -24px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #dde8d4;
+  background: #ffffff;
+}
+#root .app-shell .canvas-header h2 { margin-top: 8px; font-size: 24px !important; }
+#root .app-shell .main-panel > .room-summary {
+  grid-area: room-summary;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  gap: 8px;
+  border: 0;
+  background: transparent !important;
+  color: #3f5f45;
+}
+#root .app-shell .room-summary-card {
+  min-height: 88px;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 12px;
+  border: 1px solid #dde8d4;
   border-radius: 8px !important;
-  color: var(--button-ink) !important;
-  box-shadow: inset 0 1px 0 #ffffff87, inset 0 -1px 0 #294d6321, 0 2px 6px #183b4929;
-  -webkit-backdrop-filter: blur(12px) saturate(135%);
-  backdrop-filter: blur(12px) saturate(135%);
+  background: #ffffff !important;
+  color: #3f5f45;
 }
-.app-shell :is(.header-actions, .tool-rail) button { --button-ink: white; }
-.app-shell :is(button.btn.primary, .command-box button, .view-switch button.active, .tool-rail button.active) {
-  --button-ink: white;
-  --button-fill: rgb(61 58 117 / 88%);
+#root .app-shell .room-summary-card:nth-child(2) { background: #f7fbf5 !important; }
+#root .app-shell .room-summary-card:nth-child(3) { background: #fdf8e4 !important; border-color: #eee5c5; }
+#root .app-shell .room-summary-card svg { color: #64865b; }
+#root .app-shell .room-summary-card h3 { font-size: 12px !important; }
+#root .app-shell .room-summary-card strong { margin: 4px 0; font-size: 24px !important; }
+#root .app-shell .room-summary-card p { font-size: 12px !important; }
+#root .app-shell .scene-stage > .preview-banner { margin: 0 0 12px; flex-wrap: wrap; }
+#root .app-shell .viewport {
+  position: relative;
+  z-index: 2;
+  top: auto;
+  align-self: start;
+  width: 100%;
+  height: clamp(420px, calc(100svh - 340px), 640px);
+  min-width: 0;
+  border: 1px solid #dde8d4;
+  border-radius: 8px;
+  background: #fdf8e4;
 }
-.app-shell :is(button.danger-action, button.danger, button.furniture-delete) { --button-ink: #912d39; }
-.app-shell :is(button.item-card.selected, button.toggle.on, button[aria-pressed=true]:not(.active)) {
-  --button-fill: rgb(126 119 178 / 32%);
-  --button-ink: #302e53;
+#root .app-shell .planning-panel > :is(.command-warning,.generation-info) { margin: 0; }
+#root .app-shell .planning-panel>:is(.identified-requirements,.generation-bar,.conversation) {
+  min-width: 0;
+  margin: 0;
+  padding: 16px !important;
+  border: 1px solid #dde8d4 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(63, 95, 69, .04) !important;
 }
-.app-shell button.toggle { border-radius: 999px !important; }
-.app-shell :is(.toast, .preview-banner) button { --button-ink: currentColor; }
-.app-shell :is(button:not(.context-menu-dismiss):enabled, [role=button], summary):hover {
-  --button-shine: rgb(255 255 255 / 58%);
+#root .app-shell .planning-panel > .generation-bar {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  background: #fdf8e4 !important;
+  border-color: #eee5c5 !important;
 }
-.app-shell button:not(.context-menu-dismiss):disabled {
-  opacity: .48;
-  box-shadow: inset 0 1px 0 #ffffff55;
+#root .app-shell .generation-copy { min-width: 0; flex: 1 1 100%; gap: 12px; }
+#root .app-shell .generation-actions { min-width: 0; flex: 1 1 100%; flex-wrap: wrap; }
+#root .app-shell .generation-actions select { width: auto; min-width: 0; flex: 1 1 145px; }
+#root .app-shell :is(.btn.primary,.command-box button) {
+  --control-bg: var(--color-green-soft);
+  --control-ink: var(--color-text-darkgreen);
+  --control-hover: var(--color-green-main);
+  --control-active: var(--color-green-main);
 }
-@media (prefers-reduced-transparency: reduce) {
-  .app-shell :is(button:not(.context-menu-dismiss), [role=button], summary),
-  .app-shell input[type=file]::file-selector-button {
-    background: #edf3f4 !important;
-    color: #303046 !important;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+#root .app-shell :is(.btn.quiet,.text-btn,.icon-btn,.sidebar-footer button,.canvas-validation button,.identified-requirements li>button,.tabs.tool-rail button.active,.view-switch button.active) { --control-ink: var(--color-text-darkgreen); }
+#root .app-shell .generation-actions .btn.primary {
+  flex: 0 0 auto;
+}
+#root .app-shell .planning-panel > .candidate-strip {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+}
+#root .app-shell .candidate-card {
+  min-width: 0;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid #dde8d4 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+}
+#root .app-shell .candidate-card.active { background: #f7fbf5 !important; border-color: #b8d9a8 !important; }
+#root .app-shell .candidate-number { color: #64865b; font-size: 18px !important; }
+#root .app-shell .candidate-card .preview-action { border-radius: 6px !important; }
+#root .app-shell .conversation-heading { flex-wrap: wrap; align-items: center; }
+#root .app-shell .conversation-heading h3::before { content: none; }
+#root .app-shell .language-status { display: flex; background: #fdf8e4 !important; border-color: #eee5c5 !important; }
+#root .app-shell .command-box { border: 1px solid #dde8d4; border-radius: 6px; background: #ffffff; }
+#root .app-shell .command-box:focus-within { border-color: #8fbf7f; box-shadow: 0 0 0 2px rgba(143, 191, 127, .18); }
+#root .app-shell .identified-requirements li { border-radius: 6px !important; background: #f7fbf5 !important; }
+#root .app-shell .preview-requirements,
+#root .app-shell .functional-relations { border-radius: 6px !important; background: #f7fbf5 !important; }
+#root .app-shell .requirement-check { border-radius: 6px; background: #f1f7ed; color: #3f5f45; }
+#root .app-shell .requirement-check.unmet { border-color: #eee5c5; background: #fdf8e4; color: #746a45; }
+#root .app-shell :is(.error-message,.issue.error,.message.warning) { color: #8d514b; }
+#root .app-shell .error-message,
+#root .app-shell .message.warning { border: 1px solid #ead4cf; border-radius: 6px; background: #fff7f5; padding: 10px 12px; }
+#root .app-shell .validation-hero.warn { border-color: #eee5c5; background: #fdf8e4; }
+#root .app-shell .validation-hero.pass { border-color: #dde8d4; background: #f7fbf5; }
+#root .app-shell :is(button:not(.context-menu-dismiss),a,input,select,textarea,summary,[role=button]),
+#root .app-shell input[type=file]::file-selector-button {
+  transition: color 220ms ease, background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+#root .app-shell .toggle > span { transition: transform 220ms ease; }
+#root .app-shell .progress i { transition: width 220ms ease; }
+#root .app-shell .inspector-fold summary span svg { transition: transform 220ms ease; }
+#root .app-shell .empty-state {
+  display: grid; justify-items: center; gap: 8px; padding: 32px 16px;
+  border: 1px dashed var(--color-border); border-radius: 6px;
+  background: var(--color-bg-light-green); color: var(--color-text-darkgreen); text-align: center;
+}
+#root .app-shell .empty-state p { font-size: 12px !important; color: var(--color-text-normal); }
+
+@media (max-width: 1240px) and (min-width: 781px) {
+  #root .app-shell .workspace { grid-template-columns: 56px minmax(240px, 270px) minmax(0, 1fr); }
+  #root .app-shell .tabs.tool-rail { width: 56px; padding-inline: 6px; }
+  #root .app-shell .workbench-body { grid-template-columns: minmax(0, 1fr); }
+  #root .app-shell .scene-stage { position: relative; top: auto; }
+  #root .app-shell .viewport { position: relative; top: auto; height: clamp(420px, 58svh, 620px); }
+}
+@media (max-width: 780px) {
+  #root .app-shell .app-header { position: relative; height: auto; min-height: 64px; padding: 12px 16px; gap: 8px 12px; }
+  #root .app-shell .header-actions { flex-wrap: wrap; justify-content: flex-start; }
+  #root .app-shell .header-actions .quiet { display: inline-flex; }
+  #root .app-shell .workspace { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  #root .app-shell .tabs.tool-rail {
+    position: sticky;
+    z-index: 30;
+    top: 0;
+    display: flex;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex-direction: row;
+    justify-content: stretch;
+    padding: 8px;
+    gap: 8px;
+    border-right: 0;
+    border-bottom: 1px solid #dde8d4;
   }
-  .app-shell :is(button.btn.primary, .tool-rail button.active, .view-switch button.active) {
-    background: #454174 !important;
-    color: white !important;
+  #root .app-shell .tabs.tool-rail button { min-height: 40px; flex: 1 1 0; flex-direction: row; gap: 4px; font-size: 12px !important; }
+  #root .app-shell .sidebar {
+    order: 1;
+    position: relative;
+    top: auto;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid #dde8d4;
   }
+  #root .app-shell .sidebar-intro { padding: 12px 16px 8px; }
+  #root .app-shell .sidebar-intro h1 { font-size: 18px !important; }
+  #root .app-shell .sidebar-content { max-height: 46svh; padding: 12px 16px 16px; }
+  #root .app-shell .sidebar-footer { display: flex; }
+  #root .app-shell .main-panel {
+    order: 2;
+    gap: 16px;
+    padding: 0 12px 24px;
+  }
+  #root .app-shell .workbench-body { grid-template-columns: minmax(0, 1fr); }
+  #root .app-shell .scene-stage { position: relative; top: auto; }
+  #root .app-shell .canvas-header { margin-inline: -12px; padding: 16px; }
+  #root .app-shell .canvas-header h2 { font-size: 20px !important; }
+  #root .app-shell .main-panel > .room-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  #root .app-shell .room-summary-card:nth-child(3) { grid-column: 1 / -1; }
+  #root .app-shell .room-summary-card { min-height: 80px; padding: 12px; gap: 8px; }
+  #root .app-shell .room-summary-card > div { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+  #root .app-shell .room-summary-card h3 { white-space: nowrap; }
+  #root .app-shell .room-summary-card strong { grid-column: 1; grid-row: auto; }
+  #root .app-shell .room-summary-card svg { width: 16px; }
+  #root .app-shell .room-summary-card strong { font-size: 20px !important; }
+  #root .app-shell .room-summary-card p { display: block; font-size: 12px !important; }
+  #root .app-shell .viewport { position: relative; top: auto; height: clamp(320px, 54svh, 460px); }
+  #root .app-shell .generation-actions { justify-content: stretch; }
+  #root .app-shell .generation-actions .btn { flex: 1 0 100%; }
+  #root .app-shell .candidate-card { gap: 8px; }
 }
-@media (prefers-reduced-motion: reduce) { .app-shell { animation: none; } }
-@media (prefers-reduced-transparency: reduce) {
-  .app-shell { --glass-fill: #dbdbe5; }
-  .app-shell :is(.modal, .furniture-context-menu) { --glass-fill: #fff; }
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .app-shell { --glass-fill: #dbdbe5; }
+
+@media (prefers-reduced-motion: reduce) {
+  #root .app-shell :is(button,a,input,select,textarea,summary) { transition: none !important; }
 }

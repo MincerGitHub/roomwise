@@ -19,9 +19,12 @@ test('GLB layouts generate preview apply and save while retaining locked assets'
   x:1.5,z:2.,rotation:25,locked:true,keep:true,source:'brought',assetUrl,furnitureAssetId:'test-glb-asset',furnitureSnapshot:snapshot};
  scene.items=[fixed,{...fixed,id:'glb-movable',locked:false}];
  await page.locator('input[type=file][accept=".json"]').setInputFiles({name:'glb-layout.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(scene))});
+ await expect(page.locator('.item-card')).toHaveCount(2);
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  const canvas=page.locator('.scene-canvas');
  await expect.poll(()=>canvas.getAttribute('data-layout')).toContain('glb-movable');
  const original=await canvas.getAttribute('data-layout');
+ if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click();
  await page.getByLabel('布局方法').selectOption('hybrid');
  const generatedResponse=page.waitForResponse('**/api/generate',{timeout:20000});
  await page.locator('.generation-actions button.primary').click();
@@ -29,7 +32,9 @@ test('GLB layouts generate preview apply and save while retaining locked assets'
  expect(generated.candidates.length).toBeGreaterThan(0);
  expect(generated.diagnostics.meshCollision.finalValidation).toBe('original_mesh');
  expect(generated.diagnostics.modelError).toBeUndefined();
- expect(await canvas.getAttribute('data-layout')).toBe(original);
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
+ await expect(canvas).toHaveAttribute('data-layout',original!);
+ if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click();
  for(const candidate of generated.candidates){
   expect(candidate.validation.valid).toBe(true);
   const retained=candidate.scene.items.find((value:{id:string})=>value.id===fixed.id);

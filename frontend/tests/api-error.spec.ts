@@ -33,7 +33,7 @@ test('a bed in front of a wardrobe reaches the geometry solver without a false s
    ]));
   }
  }else{
-  await expect(page.locator('.generation-info')).toBeVisible();
+  await expect(page.locator('.toast')).toContainText('未找到满足当前要求的方案');
  }
  await expect(page.locator('.command-warning')).toHaveCount(0);
 });

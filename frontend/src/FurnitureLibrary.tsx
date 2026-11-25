@@ -13,12 +13,20 @@ const materialNames={unknown:'未知',wood:'木质外观',fabric:'织物外观',
 
 export function furnitureInstance(asset:FurnitureAsset,x:number,z:number):Item{
  const snapshot=clone(asset.snapshot);
- return {id:crypto.randomUUID(),label:snapshot.label,category:snapshot.category,width:snapshot.width,depth:snapshot.depth,height:snapshot.height,x,z,rotation:0,keep:true,locked:false,source:'brought',assetUrl:asset.assetUrl,photoUrl:asset.photoUrls[0],furnitureAssetId:asset.id,furnitureSnapshot:snapshot};
+ return {id:crypto.randomUUID(),label:snapshot.label,category:snapshot.category,width:snapshot.width,depth:snapshot.depth,height:snapshot.height,x,z,rotation:0,keep:false,locked:false,source:'brought',assetUrl:asset.assetUrl,photoUrl:asset.photoUrls[0],furnitureAssetId:asset.id,furnitureSnapshot:snapshot};
 }
 
 function LibraryModelPreview({asset}:{asset:FurnitureAsset}){
+ const host=useRef<HTMLDivElement>(null),[visible,setVisible]=useState(false);
  const item=useMemo(()=>furnitureInstance(asset,0,0),[asset]);
- return <FurniturePreview item={item}/>;
+ useEffect(()=>{
+  const element=host.current;if(!element)return;
+  const observer=new IntersectionObserver(entries=>setVisible(entries[0]?.isIntersecting||false));
+  observer.observe(element);return()=>observer.disconnect();
+ },[]);
+ return <div className="furniture-card-preview" ref={host} style={{height:160,minWidth:0}}>
+  {visible?<FurniturePreview item={item}/>:<p style={{padding:16}}>滚动查看三维模型</p>}
+ </div>;
 }
 
 async function multipart<T>(path:string,form:FormData):Promise<T>{
@@ -182,6 +190,10 @@ export default function FurnitureLibrary({catalog,onClose,onAdd,initialDraftId}:
     <label className="field">规范正面 / 床头方向<select value={properties.frontDirection||''} onChange={event=>update({frontDirection:(event.target.value||null) as FurnitureProperties['frontDirection']})}><option value="">无法判断，请核对</option><option value="positive_z">其他家具：使用面 +z</option><option value="negative_z">床：床头 -z</option></select></label>
     <label className="field">风格标签（逗号分隔）<input value={styleText} onChange={event=>{setStyleText(event.target.value);update({styleTags:event.target.value.split(/[,，]/).map(value=>value.trim()).filter(Boolean)})}}/></label>
    </div><div><FurniturePreview item={preview} onModelLoaded={setModelLoaded}/></div></div>
+   <details><summary>功能尺寸与使用空间（可选）</summary><p className="hint">填写后作为布局约束，单位为米；留空表示未知或使用默认建议。带显示器的书桌请填写实际台面高度。</p>
+    <div className="field-grid">{([['surfaceHeight','台面高度'],['seatHeight','座面高度'],['frontUseDepth','正面使用深度'],['rearUseDepth','椅后撤深度'],['bedsideAccess','床侧使用宽度']] as const).map(([key,label])=><label className="field" key={key}>{label} / m<input aria-label={label} type="number" min="0.01" max={key.endsWith('Height')?10:5} step="0.01" value={properties.functionalProfile?.[key]??''} onChange={event=>update({functionalProfile:{...properties.functionalProfile,[key]:event.target.value===''?null:Number(event.target.value)}})}/></label>)}</div>
+    <label className="field">功能参数来源说明<input value={properties.functionalProfile?.note||''} maxLength={500} onChange={event=>update({functionalProfile:{...properties.functionalProfile,note:event.target.value}})}/></label>
+   </details>
    <div className="furniture-parameters">{parameterKeys(properties.category).map(key=>{
     const value=properties.parameters[key];
     if(key==='material')return <label className="field" key={key}>{parameterNames[key]}<select value={properties.parameters.material} onChange={event=>updateParameter(key,event.target.value)}>{Object.entries(materialNames).map(([code,name])=><option value={code} key={code}>{name}</option>)}</select></label>;

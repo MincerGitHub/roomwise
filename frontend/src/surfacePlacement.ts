@@ -1,8 +1,9 @@
 import type {Item,Room,Scene} from './types';
+import {isWallMounted,wallPlacement} from './wallPlacement';
 
 const surfaces=new Set(['desk','table','coffee_table','nightstand','tv_stand','cabinet','children_cabinet']);
 export const edgeMargin=.03;
-export type Placement={x:number;z:number;y:number;supportId:string|null};
+export type Placement={x:number;z:number;y:number;supportId:string|null;rotation?:number};
 export const baseY=(item:Item)=>item.y??0;
 export const isSurface=(item:Item)=>surfaces.has(item.category)&&!item.supportId&&baseY(item)===0&&item.height<=1.5;
 const radians=(degrees:number)=>degrees*Math.PI/180;
@@ -11,7 +12,7 @@ function local(item:Item,x:number,z:number){const a=radians(item.rotation),dx=x-
 function world(item:Item,x:number,z:number){const a=radians(item.rotation);return {x:item.x+Math.cos(a)*x+Math.sin(a)*z,z:item.z-Math.sin(a)*x+Math.cos(a)*z}}
 function corners(item:Item){return [-1,1].flatMap(sx=>[-1,1].map(sz=>world(item,sx*item.width/2,sz*item.depth/2)))}
 export function fitsSurface(item:Item,target:Item){
- return item.category==='storage_box'&&item.height<=.6&&isSurface(target)&&corners(item).every(point=>{const p=local(target,point.x,point.z);return Math.abs(p.x)<=target.width/2-edgeMargin+.00001&&Math.abs(p.z)<=target.depth/2-edgeMargin+.00001});
+ return ['storage_box','laptop'].includes(item.category)&&item.height<=.6&&isSurface(target)&&corners(item).every(point=>{const p=local(target,point.x,point.z);return Math.abs(p.x)<=target.width/2-edgeMargin+.00001&&Math.abs(p.z)<=target.depth/2-edgeMargin+.00001});
 }
 function overlap(a:Item,b:Item){
  const ac=corners(a),bc=corners(b);
@@ -38,7 +39,8 @@ function inRoom(item:Item,room:Room){
 }
 export function surfacePlacement(item:Item,x:number,z:number,scene:Scene,preferredId=item.supportId):Placement{
  const floor={x:round(x),z:round(z),y:0,supportId:null};
- if(item.category!=='storage_box'||item.height>.6)return floor;
+ if(isWallMounted(item))return wallPlacement(item,x,z,scene.room)?.placement??{...floor,y:baseY(item),rotation:item.rotation};
+ if(!['storage_box','laptop'].includes(item.category)||item.height>.6)return floor;
  const options:{pose:Placement;distance:number}[]=[];
  for(const target of scene.items){
   if(target.id===item.id||!isSurface(target)||target.height+item.height>scene.room.height+.00001)continue;

@@ -22,9 +22,8 @@ async function point(page:Page,x:number,z:number,y=0,top=true){
  if(top){const scale=bounds.height/(2*6*.72);return {x:bounds.x+bounds.width/2+(x-3)*scale,y:bounds.y+bounds.height/2+(z-2.5)*scale}}
  return page.evaluate(async({bounds,x,z,y})=>{
   const THREE=await import('/node_modules/.vite/deps/three.js' as string);
-  const camera=new THREE.PerspectiveCamera(38,bounds.width/bounds.height,.05,150);
-  camera.position.set(3+6*1.13,6*1.13,2.5-5*1.15);camera.lookAt(3,.1,2.5);camera.updateMatrixWorld();
-  const p=new THREE.Vector3(x,y,z).project(camera);
+  const matrices=JSON.parse(document.querySelector('.scene-canvas')!.getAttribute('data-camera')!);
+  const p=new THREE.Vector3(x,y,z).applyMatrix4(new THREE.Matrix4().fromArray(matrices.view)).applyMatrix4(new THREE.Matrix4().fromArray(matrices.projection));
   return {x:bounds.x+(p.x+1)*bounds.width/2,y:bounds.y+(1-p.y)*bounds.height/2};
  },{bounds,x,z,y});
 }

@@ -16,11 +16,16 @@ test('existing GLB imports without reconstruction and remains usable after room 
  await expect(dialog.getByLabel('家具名称',{exact:true})).toHaveValue('imported-chair');
  const name='已有GLB测试椅-'+Date.now();await dialog.getByLabel('家具名称',{exact:true}).fill(name);
  await dialog.getByLabel('家具类别',{exact:true}).selectOption('armchair');
+ await dialog.getByText('功能尺寸与使用空间（可选）',{exact:true}).click();
+ await dialog.getByLabel('座面高度',{exact:true}).fill('0.48');
+ await dialog.getByLabel('椅后撤深度',{exact:true}).fill('0.55');
  await expect(dialog.getByRole('button',{name:'确认并保存到家具库'})).toBeEnabled();
  const publication=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/publish'));
  await dialog.getByRole('button',{name:'确认并保存到家具库'}).click();
  const response=await publication;expect(response.ok()).toBe(true);const asset=await response.json();
  expect(asset.photoUrls).toEqual([]);expect(asset.modelSource.kind).toBe('imported_glb');
+ expect(asset.snapshot.functionalProfile.seatHeight).toBe(.48);
+ expect(asset.snapshot.functionalProfile.rearUseDepth).toBe(.55);
  expect(asset.snapshot.dimensionSources.width).toBe('template');
  const card=dialog.locator('.owned-furniture-card').filter({hasText:name});
  await expect(card.locator('canvas')).toBeVisible();

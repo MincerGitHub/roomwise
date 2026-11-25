@@ -1,0 +1,4 @@
+.model-loading{position:absolute;left:18px;right:18px;top:62px;z-index:2;width:fit-content;max-width:calc(100% - 36px);padding:8px 12px;background:rgba(255,255,255,.92);border:1px solid #dae1d3;border-radius:8px;color:#52664d;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.model-loading [role=alert]{color:#925b39}
+.model-loading button{margin-top:6px;padding:5px 9px;border-radius:5px;background:#eaf0e3;color:#38553b}
+.furniture-preview>.model-loading{top:10px;left:10px;right:10px;max-width:calc(100% - 20px)}

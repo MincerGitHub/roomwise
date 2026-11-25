@@ -4,7 +4,6 @@ import io
 import json
 from pathlib import Path
 import struct
-import sys
 from threading import Event
 import uuid
 
@@ -18,7 +17,7 @@ from roomwise import furniture_api, furniture_reconstruction, furniture_vision, 
 from roomwise.catalog import demo_scene
 from roomwise.catalog import CATALOG
 from roomwise.furniture import FurnitureError, FurnitureService
-from roomwise.furniture_reconstruction import InstantMeshWorker, validate_generated_glb
+from roomwise.furniture_reconstruction import validate_generated_glb
 from roomwise.furniture_schemas import FurnitureProperties, FurnitureRecognition, PublishFurniture, SaveFurnitureDraft
 from roomwise.furniture_vision import VisionError, recognition_schema, recognize_furniture, vision_status
 from roomwise.generator import _sanitize_model_output
@@ -62,7 +61,7 @@ def environment(tmp_path, monkeypatch):
 
 
 def upload(client, count=1, content=None):
-    response = client.post("/api/furniture/analyze", data={"consent": "true"}, files=[("files", (f"view-{index}.jpg", content or photo_bytes(), "image/jpeg")) for index in range(count)])
+    response = client.post("/api/furniture/analyze", files=[("files", (f"view-{index}.jpg", content or photo_bytes(), "image/jpeg")) for index in range(count)])
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -86,87 +85,6 @@ def model_url(service):
     return "/uploads/assets/" + name
 
 
-def test_persistent_reconstruction_worker_reuses_process_and_closes(tmp_path):
-    (tmp_path / "roomwise_worker.py").write_text(
-        "import json,os,sys\n"
-        "print(json.dumps({'ready': True, 'pid': os.getpid()}), flush=True)\n"
-        "for line in sys.stdin:\n"
-        "    task=json.loads(line)\n"
-        "    if task.get('shutdown'): break\n"
-        "    print(json.dumps({'ok': True, 'pid': os.getpid()}), flush=True)\n",
-        encoding="utf-8",
-    )
-    worker = InstantMeshWorker(tmp_path, Path(sys.executable))
-    try:
-        first = worker.request([], tmp_path / "first.glb")
-        first_process = worker.process
-        second = worker.request([], tmp_path / "second.glb")
-        assert first["pid"] == second["pid"]
-        assert first_process is worker.process
-        process = first_process
-    finally:
-        worker.stop()
-    assert process.poll() is not None
-
-
-def test_persistent_reconstruction_worker_recovers_after_exit(tmp_path):
-    (tmp_path / "roomwise_worker.py").write_text(
-        "import json,os,sys\n"
-        "print(json.dumps({'ready': True}), flush=True)\n"
-        "for line in sys.stdin:\n"
-        "    task=json.loads(line)\n"
-        "    if task.get('shutdown'): break\n"
-        "    print(json.dumps({'ok': True, 'pid': os.getpid()}), flush=True)\n",
-        encoding="utf-8",
-    )
-    worker = InstantMeshWorker(tmp_path, Path(sys.executable))
-    try:
-        first = worker.request([], tmp_path / "first.glb")
-        exited_process = worker.process
-        exited_process.kill()
-        exited_process.wait(timeout=5)
-        second = worker.request([], tmp_path / "second.glb")
-        restarted_process = worker.process
-        third = worker.request([], tmp_path / "third.glb")
-        assert first["pid"] != second["pid"] == third["pid"]
-        assert exited_process is not restarted_process is worker.process
-    finally:
-        worker.stop()
-
-
-def test_furniture_service_closes_persistent_worker(tmp_path, monkeypatch):
-    class Worker:
-        stopped = False
-
-        def stop(self):
-            self.stopped = True
-
-    worker = Worker()
-    monkeypatch.setattr(furniture_reconstruction, "_worker", worker)
-    service = FurnitureService(tmp_path / "worker.sqlite3", tmp_path / "uploads", auto_run=False)
-    service.close()
-    assert worker.stopped
-    assert furniture_reconstruction._worker is None
-
-
-def test_existing_cuda_worker_does_not_require_directml_adapter(tmp_path, monkeypatch):
-    (tmp_path/'configs').mkdir();(tmp_path/'configs/instant-mesh-base.yaml').write_text('model_config: {}')
-    (tmp_path/'run.py').write_text('# existing upstream CUDA runner')
-    (tmp_path/'roomwise_worker.py').write_text('# existing Roomwise CUDA worker')
-    monkeypatch.setenv('ROOMWISE_INSTANTMESH_ROOT',str(tmp_path))
-    monkeypatch.setattr(furniture_reconstruction,'reconstruction_python',lambda:Path(sys.executable))
-    monkeypatch.setattr(furniture_reconstruction,'_worker',None)
-    commands=[]
-    def probe(command,**kwargs):
-        commands.append(command)
-        return type('Result',(),{'returncode':0})()
-    monkeypatch.setattr(furniture_reconstruction.subprocess,'run',probe)
-    assert furniture_reconstruction.reconstruction_status()['enabled']
-    assert commands and 'from device import' not in commands[0][-1]
-    (tmp_path/'roomwise_worker.py').unlink()
-    assert not furniture_reconstruction.reconstruction_status()['enabled']
-
-
 def publication(draft, service, **overrides):
     url = draft.get("modelUrl") or model_url(service)
     if not draft.get("modelUrl"):
@@ -180,15 +98,14 @@ def publication(draft, service, **overrides):
     return body
 
 
-def test_consent_file_count_format_and_invalid_images(environment):
+def test_file_count_format_and_invalid_images(environment):
     client, service = environment
-    assert client.post("/api/furniture/analyze", headers={"Origin": "https://untrusted.example"}, data={"consent": True}, files={"files": ("photo.jpg", photo_bytes())}).status_code == 403
-    assert client.post("/api/furniture/analyze", files={"files": ("photo.jpg", photo_bytes())}).status_code == 400
+    assert client.post("/api/furniture/analyze", headers={"Origin": "https://untrusted.example"}, files={"files": ("photo.jpg", photo_bytes())}).status_code == 403
     assert service.listing() == {"assets": [], "drafts": []}
-    assert client.post("/api/furniture/analyze", data={"consent": True}, files=[("files", ("p.jpg", photo_bytes()))] * 4).status_code == 400
-    assert client.post("/api/furniture/analyze", data={"consent": True}, files={"files": ("p.exe", b"x")}).status_code == 415
-    assert client.post("/api/furniture/analyze", data={"consent": True}, files={"files": ("p.png", b"not-an-image")}).status_code == 400
-    assert client.post("/api/furniture/analyze", data={"consent": True}, files={"files": ("p.jpg", b"x" * (10 * 1024 * 1024 + 1))}).status_code == 413
+    assert client.post("/api/furniture/analyze", files=[("files", ("p.jpg", photo_bytes()))] * 9).status_code == 400
+    assert client.post("/api/furniture/analyze", files={"files": ("p.exe", b"x")}).status_code == 415
+    assert client.post("/api/furniture/analyze", files={"files": ("p.png", b"not-an-image")}).status_code == 400
+    assert client.post("/api/furniture/analyze", files={"files": ("p.jpg", b"x" * (10 * 1024 * 1024 + 1))}).status_code == 413
     assert list((service.uploads / "furniture").iterdir()) == []
 
 
@@ -246,12 +163,13 @@ def test_publish_requires_confirmation_complete_dimensions_and_glb(environment):
 
 def test_three_view_local_reconstruction_uses_generated_mesh_for_publication(environment):
     client, service = environment
-    task = client.post("/api/furniture/analyze", data={"localOnly": "true"}, files=[
+    task = client.post("/api/furniture/analyze", files=[
         ("files", (f"view-{index}.jpg", photo_bytes(), "image/jpeg")) for index in range(3)
     ]).json()
-    assert task["jobId"] is None
+    assert task["jobId"]
+    service.process(task["jobId"])
     draft = service.draft(task["draftId"])
-    assert draft["recognition"] is None
+    assert draft["recognition"] is not None
 
     def reconstruct_three_views(photos, output):
         assert len(photos) == 3
@@ -279,11 +197,11 @@ def test_three_view_local_reconstruction_uses_generated_mesh_for_publication(env
 
 def test_single_image_local_reconstruction_keeps_one_source_and_publishes_generated_mesh(environment):
     client, service = environment
-    response = client.post('/api/furniture/analyze', data={'localOnly': 'true'},
-                           files=[('files', ('chair.jpg', photo_bytes(), 'image/jpeg'))])
+    response = client.post('/api/furniture/analyze', files=[('files', ('chair.jpg', photo_bytes(), 'image/jpeg'))])
     assert response.status_code == 200
     task = response.json()
-    assert task['jobId'] is None
+    assert task['jobId']
+    service.process(task['jobId'])
     reference = service.uploads / 'assets' / Path(model_url(service)).name
     seen = []
     def reconstruct_single(photos, output):
@@ -355,40 +273,12 @@ def test_imported_glb_rejects_missing_and_empty_mesh_without_creating_draft(envi
     assert service.listing() == {'assets':[], 'drafts':[]}
 
 
-def test_two_image_draft_is_rejected_before_any_reconstruction(environment):
-    client, service = environment
-    task = client.post('/api/furniture/analyze', data={'localOnly': 'true'}, files=[
-        ('files', (f'view-{i}.jpg', photo_bytes(), 'image/jpeg')) for i in range(2)
-    ]).json()
-    response = client.post(f"/api/furniture/drafts/{task['draftId']}/reconstruct")
-    assert response.status_code == 400
-    assert service.draft(task['draftId'])['reconstructionJobId'] is None
-
-
-@pytest.mark.parametrize('count', [1, 3])
-def test_one_shot_reconstruction_passes_only_the_supplied_views(tmp_path, monkeypatch, count):
-    photos = [tmp_path / f'{i}.jpg' for i in range(count)]
-    for path in photos:path.write_bytes(photo_bytes())
-    output = tmp_path / 'uploads/assets/output.glb'
-    output.parent.mkdir(parents=True)
-    calls = []
-    monkeypatch.setenv('ROOMWISE_INSTANTMESH_ROOT', str(tmp_path))
-    monkeypatch.setattr(furniture_reconstruction, 'reconstruction_status', lambda: {'enabled': True})
-    monkeypatch.setattr(furniture_reconstruction, 'validate_generated_glb', lambda p: None)
-    def run(command, **kwargs):
-        calls.append(command)
-        return type('Result', (), {'returncode': 0})()
-    monkeypatch.setattr(furniture_reconstruction.subprocess, 'run', run)
-    assert furniture_reconstruction.reconstruct(photos, output).endswith('output.glb')
-    assert ('--side_image' in calls[0]) == (count == 3)
-    assert ('--top_image' in calls[0]) == (count == 3)
-
-
 def test_failed_reconstruction_keeps_draft_unpublished_and_allows_retry(environment):
     client, service = environment
-    task = client.post("/api/furniture/analyze", data={"localOnly": "true"}, files=[
+    task = client.post("/api/furniture/analyze", files=[
         ("files", (f"view-{index}.jpg", photo_bytes(), "image/jpeg")) for index in range(3)
     ]).json()
+    service.process(task["jobId"])
     service.reconstructor = lambda photos, output: "/uploads/assets/" + output.name
     first = service.start_reconstruction(task["draftId"])
     service.process_reconstruction(first["jobId"])
@@ -401,9 +291,10 @@ def test_failed_reconstruction_keeps_draft_unpublished_and_allows_retry(environm
 
 def test_delete_running_reconstruction_never_restores_draft(environment):
     client, service = environment
-    task = client.post("/api/furniture/analyze", data={"localOnly": "true"}, files=[
+    task = client.post("/api/furniture/analyze", files=[
         ("files", (f"view-{index}.jpg", photo_bytes(), "image/jpeg")) for index in range(3)
     ]).json()
+    service.process(task["jobId"])
     started = service.start_reconstruction(task["draftId"])
     draft = service.draft(task["draftId"])
     service.delete_draft(task["draftId"], draft["version"])
@@ -464,7 +355,7 @@ def test_draft_and_asset_concurrency_guards(environment):
     client, service = environment
     task = upload(client)
     pending = service.draft(task["draftId"])
-    assert client.post(f"/api/furniture/drafts/{pending['id']}/retry", json={"consent": True}).status_code == 409
+    assert client.post(f"/api/furniture/drafts/{pending['id']}/retry").status_code == 409
     assert client.post(f"/api/furniture/drafts/{pending['id']}/save", json={"expectedVersion": 1, "properties": recognized()["properties"]}).status_code == 409
     service.process(task["jobId"])
     assert client.post(f"/api/furniture/drafts/{pending['id']}/save", json={"expectedVersion": 1, "properties": recognized()["properties"]}).status_code == 409
@@ -574,7 +465,7 @@ def test_delete_draft_is_persistent_and_blocks_save_retry_and_publish(environmen
         assert response.json() == {"id": draft["id"], "deleted": True}
     assert [body["id"] for body in service.listing()["drafts"]] == [other["id"]]
     assert client.get(endpoint).status_code == 404
-    assert client.post(endpoint + "/retry", json={"consent": True}).status_code == 404
+    assert client.post(endpoint + "/retry").status_code == 404
     assert client.post(endpoint + "/save", json={"expectedVersion": draft["version"], "properties": draft["properties"]}).status_code == 404
     assert client.post(endpoint + "/publish", json=request).status_code == 404
     restarted = FurnitureService(service.database, service.uploads, auto_run=False)
@@ -792,7 +683,7 @@ def test_vision_loads_private_env_from_app_root_without_global_mutation(tmp_path
     assert "ROOMWISE_VISION_API_KEY" not in furniture_vision.os.environ
     monkeypatch.setenv("ROOMWISE_VISION_PROVIDER", "disabled")
     assert not vision_status()["enabled"]
-    assert "覆盖" in vision_status()["message"]
+    assert "TokenLab未启用" in vision_status()["message"]
     monkeypatch.setenv("ROOMWISE_VISION_PROVIDER", "openai")
     monkeypatch.setenv("ROOMWISE_VISION_API_KEY", "process-key")
     assert furniture_vision.vision_config()["apiKey"] == "process-key"
@@ -867,7 +758,7 @@ def test_vision_defaults_to_requested_model_gateway_and_reasoning(monkeypatch):
     assert vision_status()["enabled"] is True
     assert vision_status()["model"] == "gpt-6-sol"
     assert vision_status()["reasoningEffort"] == "high"
-    assert "第三方网关 api.tokenlab.pro（非 OpenAI 官方域名）" in vision_status()["message"]
+    assert "TokenLab已就绪" in vision_status()["message"]
 
 
 def test_vision_joint_request_schema_evidence_and_no_external_context(tmp_path, monkeypatch):

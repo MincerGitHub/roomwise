@@ -78,13 +78,13 @@ def vision_config():
 def vision_status():
     config = vision_config()
     if config["configurationError"]:
-        message = "无法读取 .env.vision；请检查 UTF-8 编码、文件权限及 KEY=VALUE 格式。未发送图片。"
+        message = "无法读取.env.vision"
     elif config["enabled"]:
-        message = "图片将发送到第三方网关 api.tokenlab.pro（非 OpenAI 官方域名），请求 gpt-6-sol / high，可能产生费用；仅在同意后提交。"
+        message = "TokenLab已就绪"
     elif config["provider"] == "disabled":
-        message = "视觉服务已关闭。请在 app/.env.vision 设置 ROOMWISE_VISION_PROVIDER=openai；也请检查启动终端的同名变量是否覆盖了文件。图片可保留为本地草稿。"
+        message = "TokenLab未启用，可手填属性"
     else:
-        message = "视觉服务配置不符合 api.tokenlab.pro / gpt-6-sol / high 要求或缺少密钥；图片可保留为本地草稿，支持手工补全。"
+        message = "TokenLab配置无效"
     return {
         "enabled": config["enabled"], "provider": config["provider"], "model": config["model"], "reasoningEffort": config["reasoningEffort"],
         "message": message,
@@ -119,7 +119,7 @@ def response_text(body):
     if not isinstance(body, dict):
         raise ValueError("invalid response")
     if body.get("status") == "incomplete":
-        raise VisionError("incomplete", "视觉服务输出未完成，未采用部分结果；草稿已保留，可手动重试。")
+        raise VisionError("incomplete", "识别未完成，草稿已保留")
     if body.get("status") != "completed" or body.get("error") is not None:
         raise ValueError("response not completed")
     output = body.get("output")
@@ -137,7 +137,7 @@ def response_text(body):
             if not isinstance(part, dict):
                 raise ValueError("invalid content")
             if part.get("type") == "refusal":
-                raise VisionError("refused", "视觉服务未能处理这些图片；草稿已保留，请补图或手工补全。")
+                raise VisionError("refused", "识别失败，草稿已保留")
             if part.get("type") != "output_text" or not isinstance(part.get("text"), str):
                 raise ValueError("invalid text")
             texts.append(part["text"])
@@ -182,9 +182,9 @@ def recognize_furniture(paths: list[Path], *, transport=None):
         with httpx.Client(timeout=httpx.Timeout(180, connect=15), follow_redirects=False, trust_env=False, transport=transport) as client:
             with client.stream("POST", VISION_BASE_URL + "/responses", headers={"Authorization": "Bearer " + config["apiKey"]}, json=payload) as response:
                 if response.status_code == 429:
-                    raise VisionError("rate_limited", "视觉服务限流；草稿已保留，请稍后手动重试。")
+                    raise VisionError("rate_limited", "识别限流，草稿已保留")
                 if response.status_code >= 400 or response.is_redirect:
-                    raise VisionError("provider_error", "视觉服务请求失败；请检查服务配置与额度后手动重试。")
+                    raise VisionError("provider_error", "识别请求失败，请检查配置和额度")
                 chunks = bytearray()
                 for chunk in response.iter_bytes():
                     chunks.extend(chunk)
@@ -202,8 +202,8 @@ def recognize_furniture(paths: list[Path], *, transport=None):
             "usage": {key: value for key, value in (usage or {}).items() if key in {"input_tokens", "output_tokens", "total_tokens"} and type(value) is int},
         }
     except httpx.TimeoutException:
-        raise VisionError("timeout", "视觉服务超时；未自动重试以避免重复费用。草稿已保留。") from None
+        raise VisionError("timeout", "识别超时，草稿已保留") from None
     except httpx.HTTPError:
-        raise VisionError("network", "无法连接视觉服务；草稿已保留，可稍后手动重试。") from None
+        raise VisionError("network", "无法连接视觉服务，草稿已保留") from None
     except (ValidationError, ValueError, KeyError, IndexError, TypeError):
-        raise VisionError("invalid_result", "视觉服务结果不符合字段或尺寸来源协议，未采用结果。请补图或手动补全。") from None
+        raise VisionError("invalid_result", "识别结果无效，请补图或手填") from None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import threading
 import uuid
 from urllib.parse import urlsplit
@@ -9,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Reques
 from starlette.concurrency import run_in_threadpool
 
 from .furniture import FurnitureError, FurnitureService, prepare_photos
-from .furniture_schemas import ImportFurnitureModel, PublishFurniture, RetryFurniture, SaveFurnitureDraft
+from .furniture_schemas import ImportFurnitureModel, PublishFurniture, SaveFurnitureDraft
 from .furniture_vision import vision_status
 from .furniture_reconstruction import reconstruction_status
 from .storage import runtime_directory
@@ -23,7 +24,7 @@ def require_local_origin(request: Request):
         except ValueError:
             raise HTTPException(403, "来源地址无效") from None
         if parsed.scheme not in {"http", "https"} or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-            raise HTTPException(403, "仅允许本机应用访问家具接口")
+            raise HTTPException(403, "仅允许本机访问")
 
 
 router = APIRouter(prefix="/furniture", tags=["furniture"], dependencies=[Depends(require_local_origin)])
@@ -61,15 +62,21 @@ def status():
 
 
 @router.post("/analyze")
-async def analyze(files: list[UploadFile] = File(...), consent: bool = Form(False), localOnly: bool = Form(False)):
+async def analyze(files: list[UploadFile] = File(...), viewTypes: str = Form("")):
     directory = None
     try:
-        if not consent and not localOnly:
-            raise HTTPException(400, "必须先明确同意向视觉服务发送所选图片及可能的计费")
-        if not 1 <= len(files) <= 3:
-            raise HTTPException(400, "每件家具需要 1—3 张图片")
+        if not 1 <= len(files) <= 8:
+            raise HTTPException(400, "每件家具需要1—8张图片")
         if any(Path(file.filename or "").suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"} for file in files):
             raise HTTPException(415, "仅接受 JPEG、PNG、WebP")
+        try:
+            views = json.loads(viewTypes) if viewTypes else []
+        except json.JSONDecodeError:
+            raise HTTPException(400, "图片角度无效") from None
+        allowed_views = {"front", "left", "right", "back", "top", "bottom", "left_front", "right_front"}
+        if views and (len(views) != len(files) or any(view not in allowed_views for view in views) or views[0] != "front" or "front" in views[1:] or len(set(views)) != len(views)):
+            raise HTTPException(400, "图片角度无效")
+        views = views or ["front"] + ["left", "right", "back", "top", "bottom", "left_front", "right_front"][:len(files) - 1]
         target = service()
         identifier = uuid.uuid4().hex
         directory = target.uploads / "furniture" / identifier
@@ -85,7 +92,7 @@ async def analyze(files: list[UploadFile] = File(...), consent: bool = Form(Fals
             if not size:
                 raise HTTPException(400, "图片不能为空")
         photo_urls = await run_in_threadpool(prepare_photos, directory, len(files))
-        return invoke(target.create_local if localOnly else target.create, identifier, photo_urls)
+        return invoke(target.create, identifier, photo_urls, views)
     except (HTTPException, FurnitureError) as exc:
         if directory and directory.is_dir():
             for path in directory.iterdir():
@@ -136,7 +143,7 @@ def save(draft_id: str, request: SaveFurnitureDraft):
 
 
 @router.post("/drafts/{draft_id}/retry")
-def retry(draft_id: str, request: RetryFurniture):
+def retry(draft_id: str):
     return invoke(service().retry, draft_id)
 
 

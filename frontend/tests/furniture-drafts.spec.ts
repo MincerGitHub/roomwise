@@ -3,7 +3,7 @@ import {test,expect,type Page,type Route} from '@playwright/test';
 const photo={name:'draft-chair.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64')};
 
 async function createDraft(page:Page,label?:string){
- const response=await page.request.post('/api/furniture/analyze',{multipart:{consent:'true',files:photo}});
+ const response=await page.request.post('/api/furniture/analyze',{multipart:{files:photo}});
  expect(response.ok()).toBe(true);
  const task=await response.json();
  await expect.poll(async()=>(await (await page.request.get(`/api/furniture/jobs/${task.jobId}`)).json()).status).toBe('failed');
@@ -89,6 +89,6 @@ test('an active recognition draft can be deleted without late polling restoring 
  await row.getByRole('button',{name:/删除草稿/}).click();
  await expect(row).toHaveCount(0);await expect(page.getByLabel('家具名称',{exact:true})).toHaveCount(0);
  await expect(page.locator('.furniture-message')).toHaveCount(0);
- await expect(page.getByLabel('选择家具图片')).toBeEnabled();
+ await expect(page.getByLabel('上传主图')).toBeEnabled();
  expect((await page.request.get(`/api/furniture/drafts/${draft.id}`)).status()).toBe(404);
 });

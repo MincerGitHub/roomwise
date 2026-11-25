@@ -67,7 +67,7 @@ class FurnitureProperties(DataModel):
 
 
 class ViewEvidence(DataModel):
-    imageIndex: int = Field(ge=0, le=2, strict=True)
+    imageIndex: int = Field(ge=0, le=7, strict=True)
     view: Literal["front", "side", "back", "top", "composite", "unknown"] = "unknown"
     description: str = Field(default="", max_length=500)
 
@@ -120,9 +120,4 @@ class PublishFurniture(DataModel):
     expectedVersion: int = Field(ge=1)
     assetUrl: str = Field(pattern=r"^/uploads/assets/[a-f0-9]{32}\.glb$")
     confirmations: FurnitureConfirmations
-
-
-class RetryFurniture(DataModel):
-    consent: Literal[True]
-
 

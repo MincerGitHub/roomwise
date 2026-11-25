@@ -127,3 +127,5 @@ Desktop.ini
 
 # Generated machine-specific test reports remain local.
 docs/*checks.xml
+
+!/.env.hunyuan.example

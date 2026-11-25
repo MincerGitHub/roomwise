@@ -45,3 +45,5 @@ torch==2.8.0+cpu
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 uvicorn==0.54.0
+
+cos-python-sdk-v5==1.9.45

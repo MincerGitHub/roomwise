@@ -17,7 +17,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from .catalog import CATALOG
 from .furniture_schemas import FurnitureProperties, PublishFurniture, SaveFurnitureDraft
 from .furniture_vision import VisionError, recognize_furniture
-from .furniture_reconstruction import ReconstructionError, close_reconstruction_worker, reconstruct, validate_generated_glb
+from .furniture_reconstruction import ReconstructionError, reconstruct, validate_generated_glb
 from .schemas import FurnitureSnapshot
 
 
@@ -59,7 +59,7 @@ def prepare_photos(directory: Path, count: int):
             if path.is_file():
                 path.unlink(missing_ok=True)
         directory.rmdir()
-        raise FurnitureError(400, "图片无效、格式不支持或超过 4000 万像素；请换图后重试。") from None
+        raise FurnitureError(400, "图片无效或过大") from None
 
 
 class FurnitureService:
@@ -87,14 +87,12 @@ class FurnitureService:
             for row in connection.execute("SELECT id,body FROM furniture_reconstruction_jobs").fetchall():
                 job = json.loads(row["body"])
                 if job["status"] in {"queued", "processing"}:
-                    job.update(status="failed", error="Reconstruction was interrupted; retry from the draft.", updatedAt=now())
+                    job.update(status="failed", error="模型任务中断，请重试", updatedAt=now())
                     self.put(connection, "furniture_reconstruction_jobs", job)
 
     def close(self):
         self.executor.shutdown(wait=True, cancel_futures=True)
         self.reconstruction_executor.shutdown(wait=True, cancel_futures=True)
-        if self.reconstructor is reconstruct:
-            close_reconstruction_worker()
 
     @contextmanager
     def connect(self):
@@ -134,9 +132,9 @@ class FurnitureService:
             connection.execute("BEGIN IMMEDIATE")
             draft = self.get(connection, "furniture_drafts", identifier)
             if draft["version"] != expected_version:
-                raise FurnitureError(409, "草稿版本已变化，请重新打开草稿后再删除。")
+                raise FurnitureError(409, "草稿已变化，请重新打开")
             if draft.get("publishedAssetId"):
-                raise FurnitureError(409, "草稿已发布，请在已确认家具中操作。")
+                raise FurnitureError(409, "草稿已发布，请在家具库操作")
             if not draft.get("deletedAt"):
                 timestamp = now()
                 draft.update(deletedAt=timestamp, updatedAt=timestamp)
@@ -163,16 +161,16 @@ class FurnitureService:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             draft = self.active_draft(connection, identifier)
-            if draft.get("publishedAssetId") or draft.get("editingAssetId") or len(draft["photoUrls"]) not in {1, 3}:
-                raise FurnitureError(400, "请提供单张家具图片，或同一件家具的正面、右侧、顶面三张照片。")
+            if draft.get("publishedAssetId") or draft.get("editingAssetId") or not 1 <= len(draft["photoUrls"]) <= 8:
+                raise FurnitureError(400, "请提供1—8张图片")
             if draft.get("reconstructionJobId"):
                 previous = self.get(connection, "furniture_reconstruction_jobs", draft["reconstructionJobId"])
                 if previous["status"] in {"queued", "processing"}:
-                    raise FurnitureError(409, "Reconstruction is already running.")
+                    raise FurnitureError(409, "模型正在生成")
             if draft.get("jobId") and self.get(connection, "furniture_jobs", draft["jobId"])["status"] in {"queued", "processing"}:
-                raise FurnitureError(409, "Wait for property recognition before reconstructing.")
+                raise FurnitureError(409, "请等待属性识别")
             job = {"id": uuid.uuid4().hex, "draftId": identifier, "status": "queued", "error": None, "updatedAt": now()}
-            draft.update(reconstructionJobId=job["id"], modelUrl=None, version=draft["version"] + 1, updatedAt=now())
+            draft.update(reconstructionJobId=job["id"], version=draft["version"] + 1, updatedAt=now())
             self.put(connection, "furniture_reconstruction_jobs", job)
             self.put(connection, "furniture_drafts", draft)
         if self.auto_run:
@@ -189,12 +187,15 @@ class FurnitureService:
             self.put(connection, "furniture_reconstruction_jobs", job)
             draft = self.active_draft(connection, job["draftId"])
         directory_id = Path(draft["photoUrls"][0]).parent.name
-        photos = [self.uploads / "furniture" / directory_id / f"photo_{index}.jpg" for index in range(len(draft["photoUrls"]))]
+        photos = [self.uploads / "furniture" / directory_id / f"vision_{index}.jpg" for index in range(len(draft["photoUrls"]))]
         output_dir = self.uploads / "assets"
         output_dir.mkdir(exist_ok=True)
         output = output_dir / f"{uuid.uuid4().hex}.glb"
         try:
-            url = self.reconstructor(photos, output)
+            try:
+                url = self.reconstructor(photos, output, draft.get("viewTypes"))
+            except TypeError:
+                url = self.reconstructor(photos, output)
             validate_generated_glb(output)
             job.update(status="complete", modelUrl=url)
         except (ReconstructionError, OSError, ValueError) as exc:
@@ -202,7 +203,7 @@ class FurnitureService:
             job.update(status="failed", error=str(exc))
         except Exception:
             output.unlink(missing_ok=True)
-            job.update(status="failed", error="Reconstruction failed; verify InstantMesh and retry.")
+            job.update(status="failed", error="模型生成失败，请重试")
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self.get(connection, "furniture_drafts", draft["id"])
@@ -222,7 +223,7 @@ class FurnitureService:
     def active_asset(self, connection, identifier):
         asset = self.get(connection, "furniture_assets", identifier)
         if asset.get("deletedAt"):
-            raise FurnitureError(404, "家具已从家具库删除")
+            raise FurnitureError(404, "家具已删除")
         return asset
 
     def delete_asset(self, identifier, expected_version):
@@ -236,7 +237,7 @@ class FurnitureService:
             connection.execute("BEGIN IMMEDIATE")
             asset = self.get(connection, "furniture_assets", identifier)
             if asset["version"] != expected_version:
-                raise FurnitureError(409, "家具版本已变化，请刷新家具库后再删除。")
+                raise FurnitureError(409, "家具已变化，请刷新")
             if not asset.get("deletedAt"):
                 asset.update(deletedAt=now(), updatedAt=now())
                 self.put(connection, "furniture_assets", asset)
@@ -256,12 +257,12 @@ class FurnitureService:
         # Accept only an already uploaded local GLB, using the same mesh
         # validation as reconstruction. No inference or recognition job runs.
         if not re.fullmatch(r"/uploads/assets/[a-f0-9]{32}\.glb", asset_url):
-            raise FurnitureError(400, "请先上传本机GLB模型文件。")
+            raise FurnitureError(400, "请先上传GLB")
         path = self.uploads / "assets" / Path(asset_url).name
         try:
             validate_generated_glb(path)
         except (ReconstructionError, OSError, ValueError, KeyError, IndexError, struct.error, json.JSONDecodeError):
-            raise FurnitureError(400, "导入模型无效或已不存在，请重新上传GLB文件。") from None
+            raise FurnitureError(400, "GLB无效，请重新上传") from None
         draft = {"id": uuid.uuid4().hex, "version": 1, "photoUrls": [],
                  "properties": FurnitureProperties(label=label).model_dump(),
                  "recognition": None, "jobId": None, "reconstructionJobId": None,
@@ -271,14 +272,14 @@ class FurnitureService:
             self.put(connection, "furniture_drafts", draft)
         return deepcopy(draft)
 
-    def create_local(self, identifier: str, photo_urls: list[str]):
-        draft = {"id": identifier, "version": 1, "photoUrls": photo_urls, "properties": FurnitureProperties().model_dump(), "recognition": None, "jobId": None, "modelUrl": None, "reconstructionJobId": None, "updatedAt": now()}
+    def create_local(self, identifier: str, photo_urls: list[str], view_types: list[str] | None = None):
+        draft = {"id": identifier, "version": 1, "photoUrls": photo_urls, "viewTypes": view_types or ["front"] + ["left", "right", "back", "top", "bottom", "left_front", "right_front"][:max(0, len(photo_urls) - 1)], "properties": FurnitureProperties().model_dump(), "recognition": None, "jobId": None, "modelUrl": None, "reconstructionJobId": None, "updatedAt": now()}
         with self.connect() as connection:
             self.put(connection, "furniture_drafts", draft)
         return {"draftId": identifier, "jobId": None}
 
-    def create(self, identifier: str, photo_urls: list[str]):
-        self.create_local(identifier, photo_urls)
+    def create(self, identifier: str, photo_urls: list[str], view_types: list[str] | None = None):
+        self.create_local(identifier, photo_urls, view_types)
         return self.retry(identifier)
 
     def retry(self, identifier):
@@ -286,11 +287,11 @@ class FurnitureService:
             connection.execute("BEGIN IMMEDIATE")
             draft = self.active_draft(connection, identifier)
             if draft.get("publishedAssetId") or draft.get("editingAssetId"):
-                raise FurnitureError(409, "已发布家具的修订不再次调用识别；请使用图片新建草稿。")
+                raise FurnitureError(409, "已发布家具不能重新识别")
             if draft.get("jobId"):
                 previous = self.get(connection, "furniture_jobs", draft["jobId"])
                 if previous["status"] in {"queued", "processing"}:
-                    raise FurnitureError(409, "识别正在进行，请勿重复提交")
+                    raise FurnitureError(409, "识别正在进行")
             job = {"id": uuid.uuid4().hex, "draftId": identifier, "status": "queued", "updatedAt": now(), "error": None, "errorCode": None}
             draft.update(jobId=job["id"], updatedAt=now())
             self.put(connection, "furniture_jobs", job)
@@ -321,7 +322,7 @@ class FurnitureService:
         except VisionError as exc:
             job.update(status="failed", errorCode=exc.code, error=str(exc))
         except Exception:
-            job.update(status="failed", errorCode="processing_error", error="识别处理失败；原图和草稿已保留，可补图或手工填写。")
+            job.update(status="failed", errorCode="processing_error", error="识别失败，草稿已保留")
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self.get(connection, "furniture_drafts", draft["id"])
@@ -342,9 +343,9 @@ class FurnitureService:
         if draft["version"] != expected_version or draft.get("publishedAssetId"):
             raise FurnitureError(409, "草稿版本已变化或已发布，请重新打开。")
         if draft.get("jobId") and self.get(connection, "furniture_jobs", draft["jobId"])["status"] in {"queued", "processing"}:
-            raise FurnitureError(409, "请等待识别完成后再修改草稿")
+            raise FurnitureError(409, "请等待识别完成")
         if draft.get("reconstructionJobId") and self.get(connection, "furniture_reconstruction_jobs", draft["reconstructionJobId"])["status"] in {"queued", "processing"}:
-            raise FurnitureError(409, "请等待模型重建完成后再修改草稿")
+            raise FurnitureError(409, "请等待模型生成完成")
 
     def save(self, identifier, request: SaveFurnitureDraft):
         with self.connect() as connection:
@@ -385,7 +386,7 @@ class FurnitureService:
             previous = connection.execute("SELECT draft_id,body FROM furniture_publications WHERE request_id=?", (request.requestId,)).fetchone()
             if previous:
                 if previous["draft_id"] != identifier:
-                    raise FurnitureError(409, "发布请求标识已用于其他草稿")
+                    raise FurnitureError(409, "发布请求已使用")
                 publication = json.loads(previous["body"])
                 self.active_asset(connection, publication["id"])
                 return publication
@@ -393,24 +394,24 @@ class FurnitureService:
             self.editable(connection, draft, request.expectedVersion)
             properties = FurnitureProperties.model_validate(draft["properties"]).model_dump()
             if any(properties[key] is None for key in ("category", "label", "width", "depth", "height", "frontDirection")):
-                raise FurnitureError(400, "请补全名称、类别、宽深高和正面方向，再确认发布。")
+                raise FurnitureError(400, "请补全名称、类别、尺寸和方向")
             if not properties["label"].strip():
-                raise FurnitureError(400, "家具名称不能为空")
+                raise FurnitureError(400, "请填写家具名称")
             expected_direction = "negative_z" if "bed" in properties["category"] else "positive_z"
             if properties["frontDirection"] != expected_direction:
-                raise FurnitureError(400, "床头须为局部 -z，其余家具正面须为局部 +z，请核对方向。")
+                raise FurnitureError(400, "方向不正确，请检查")
             if not draft.get("modelUrl") or request.assetUrl != draft["modelUrl"]:
-                raise FurnitureError(400, "请先重建家具网格，再发布到家具库。")
+                raise FurnitureError(400, "请先生成模型")
             try:
                 validate_generated_glb(self.uploads / "assets" / Path(request.assetUrl).name)
             except (ReconstructionError, OSError, ValueError, struct.error, json.JSONDecodeError):
-                raise FurnitureError(400, "重建模型无效，请重新生成。") from None
+                raise FurnitureError(400, "模型无效，请重新生成") from None
             identifier_asset = draft.get("editingAssetId") or uuid.uuid4().hex
             version = 1
             if draft.get("editingAssetId"):
                 current_asset = self.active_asset(connection, identifier_asset)
                 if current_asset["version"] != draft["baseAssetVersion"]:
-                    raise FurnitureError(409, "家具已被其他修订更新，请重新打开当前版本。")
+                    raise FurnitureError(409, "家具已更新，请重新打开")
                 version = current_asset["version"] + 1
             snapshot = FurnitureSnapshot.model_validate({
                 **{key: properties[key] for key in ("label", "category", "width", "depth", "height", "parameters", "dimensionSources", "frontDirection", "subtype", "styleTags")},

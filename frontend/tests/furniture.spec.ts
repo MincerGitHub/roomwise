@@ -8,12 +8,12 @@ test('manual furniture publication, independent instances and library deletion p
  await page.goto('/');
  await page.getByRole('button',{name:'自有家具库',exact:true}).click();
  const dialog=page.getByRole('dialog');
- await expect(dialog.getByRole('button',{name:'上传并重建家具'})).toBeDisabled();
- await dialog.getByLabel('选择家具图片').setInputFiles(['front','side','top'].map(view=>fileURLToPath(new URL(`../../../data/photos/chair/${view}_view.jpg`,import.meta.url))));
- await expect(dialog.getByText('本地重建已就绪')).toBeVisible({timeout:60000});
- await dialog.getByRole('button',{name:'上传并重建家具'}).click();
+ await dialog.getByRole('tab',{name:'多视角'}).click();
+ await expect(dialog.getByRole('button',{name:'上传并建模'})).toBeDisabled();
+ await dialog.getByLabel('上传主图').setInputFiles(fileURLToPath(new URL('../../../data/photos/chair/front_view.jpg',import.meta.url)));await dialog.getByLabel('上传右侧').setInputFiles(fileURLToPath(new URL('../../../data/photos/chair/side_view.jpg',import.meta.url)));await dialog.getByLabel('上传顶部').setInputFiles(fileURLToPath(new URL('../../../data/photos/chair/top_view.jpg',import.meta.url)));
+ await dialog.getByRole('button',{name:'上传并建模'}).click();
  await expect.poll(async()=>{const response=await page.request.get('/api/furniture');const listing=await response.json();return listing.drafts.some((value:{modelUrl:string|null})=>!!value.modelUrl)},{timeout:360000}).toBe(true);
- await expect(dialog.getByRole('button',{name:'确认并保存到家具库'})).toBeDisabled();
+ await expect(dialog.getByRole('button',{name:'保存到家具库'})).toBeDisabled();
  const name=`浏览器测试自有椅-${Date.now()}`;
  await dialog.getByLabel('家具名称',{exact:true}).fill(name);
  await dialog.getByLabel('家具类别',{exact:true}).selectOption('armchair');
@@ -25,7 +25,7 @@ test('manual furniture publication, independent instances and library deletion p
  await expect.poll(async()=>{const bounds=JSON.parse((await preview.getAttribute('data-bounds'))!);return Math.abs(bounds.width-.8)+Math.abs(bounds.depth-.8)+Math.abs(bounds.height-.85)+Math.abs(bounds.minY)}).toBeLessThan(.00001);
  await expect(dialog.locator('.furniture-confirmations input')).toHaveCount(0);
  const publish=page.waitForResponse(response=>response.url().includes('/publish')&&response.request().method()==='POST');
- await dialog.getByRole('button',{name:'确认并保存到家具库'}).click();
+ await dialog.getByRole('button',{name:'保存到家具库'}).click();
  const response=await publish;expect(response.status()).toBe(200);
  const asset=await response.json();expect(asset.snapshot.dimensionsConfirmed).toBe(true);expect(asset.snapshot.dimensionSources.width).toBe('user');expect(asset.snapshot.dimensionSources.depth).toBe('template');expect(asset.snapshot.dimensionSources.height).toBe('template');
  const binary=await page.request.get(asset.assetUrl);expect(binary.ok()).toBe(true);expect((await binary.body()).subarray(0,4).toString()).toBe('glTF');
@@ -187,16 +187,12 @@ test('legacy library model uses independent scene IDs for selection drag rotatio
  await expect.poll(async()=>(await layout()).find(item=>item[0]===second[0])![1]).not.toBe(restored[1]);
 });
 
-test('two-view upload makes no model submission and crop stays local',async({page})=>{
+test('multi-view upload uses fixed angle slots',async({page})=>{
  let calls=0;await page.route('**/api/furniture/analyze',route=>{calls++;return route.abort()});
- await page.goto('/');await page.getByRole('button',{name:'从图片生成家具',exact:true}).click();
- await expect(page.getByLabel('我同意将所选图片发送到第三方网关 api.tokenlab.pro（非 OpenAI 官方域名），请求 gpt-6-sol / high 进行识别，可能产生服务费用。服务关闭时仅保存在本机。')).toBeVisible();
- await page.getByLabel('选择家具图片').setInputFiles([photo,{...photo,name:'side.png'}]);
- await expect(page.getByRole('button',{name:'上传并重建家具'})).toBeDisabled();
- const surface=page.locator('.crop-surface').first();const bounds=(await surface.boundingBox())!;
- await page.mouse.move(bounds.x+2,bounds.y+2);await page.mouse.down();await page.mouse.move(bounds.x+bounds.width*.8,bounds.y+bounds.height*.8);await page.mouse.up();
- await expect(page.getByRole('button',{name:'使用框选区域'}).first()).toBeEnabled();
- await page.getByRole('button',{name:'使用框选区域'}).first().click();expect(calls).toBe(0);
+ await page.goto('/');await page.getByRole('button',{name:'从图片新建',exact:true}).click();
+ await page.getByRole('tab',{name:'多视角'}).click();
+ await page.getByLabel('上传主图').setInputFiles(photo);await page.getByLabel('上传右侧').setInputFiles({...photo,name:'side.png'});
+ await expect(page.getByLabel('上传背面')).toBeVisible();expect(calls).toBe(0);
 });
 
 for(const missing of [false,true])test(`uncertain images require mesh with ${missing?'missing':'recognized'} dimensions`,async({page})=>{
@@ -234,23 +230,24 @@ for(const missing of [false,true])test(`uncertain images require mesh with ${mis
   return Array.from(new Uint8Array(binary));
  }));
  await page.getByRole('button',{name:'自有家具库',exact:true}).click();
- await page.getByLabel('选择家具图片').setInputFiles([photo,{...photo,name:'side.png'},{...photo,name:'top.png'}]);
- await page.locator('.furniture-upload input[type=checkbox]').check();await page.getByRole('button',{name:'上传并重建家具'}).click();
+ await page.getByRole('tab',{name:'多视角'}).click();await page.getByLabel('上传主图').setInputFiles(photo);await page.getByLabel('上传右侧').setInputFiles({...photo,name:'side.png'});await page.getByLabel('上传顶部').setInputFiles({...photo,name:'top.png'});
+ await page.getByRole('button',{name:'上传并建模'}).click();
  await expect(page.getByLabel('家具名称',{exact:true})).toHaveValue(missing?'扶手椅':properties.label!);
  await expect(page.getByLabel('家具宽（米）')).toHaveValue(missing?'0.75':'0.8');
  await expect(page.locator('.furniture-confirmations input')).toHaveCount(0);
  await expect(page.getByText('视图可能来自不同家具')).not.toBeVisible();
- await expect(page.getByRole('button',{name:'确认并保存到家具库'})).toBeEnabled();
+ await expect(page.getByRole('button',{name:'保存到家具库'})).toBeEnabled();
  await page.getByLabel('家具类别',{exact:true}).selectOption('rug');
  await expect(page.locator('.furniture-parameters').getByText('扶手',{exact:true})).toHaveCount(0);
  await expect(page.getByLabel('家具宽（米）')).toHaveValue(missing?'1.8':'0.8');
- await expect(page.getByRole('button',{name:'确认并保存到家具库'})).toBeEnabled();
+ await expect(page.getByRole('button',{name:'保存到家具库'})).toBeEnabled();
  await page.getByLabel('家具宽（米）').fill('');
- await expect(page.getByRole('button',{name:'确认并保存到家具库'})).toBeEnabled();
- await page.getByRole('button',{name:'确认并保存到家具库'}).click();
+ await expect(page.getByRole('button',{name:'保存到家具库'})).toBeEnabled();
+ await page.getByRole('button',{name:'保存到家具库'}).click();
  await expect(page.locator('.owned-furniture-card')).toBeVisible();
  expect(draft.properties.width).toBe(1.8);
  expect(draft.properties.dimensionSources.width).toBe('template');
  expect(publications).toBe(1);
  expect(submissions).toBe(1);
 });
+

@@ -4,6 +4,22 @@ Roomwise 是一个本地运行的单房间家具布局原型。用户输入房�
 
 项目使用 FastAPI 后端、React/Vite 前端、Three.js 三维视图和 Python `.venv` 虚拟环境。本地服务只绑定本机地址，基础网页、规则布局、编辑和离线指令不需要付费 API；可选 DeepSeek 语言接口需要用户自行配置密钥，调用按服务商规则计费。
 
+### TokenHub HY-3D-3.1
+
+家具库的图片建模使用腾讯 TokenHub HY-3D-3.1，通过 TokenHub 3D 接口异步提交和查询任务。先复制 `app/.env.hunyuan.example` 为 `app/.env.hunyuan`，在启动后端的 PowerShell 中设置：
+
+```powershell
+$env:ROOMWISE_TOKENHUB_API_KEY = '你的 TokenHub API Key'
+$env:ROOMWISE_TOKENHUB_BASE_URL = 'https://tokenhub.tencentmaas.com'
+$env:ROOMWISE_COS_PUBLIC_BASE_URL = 'https://roomwise-1359876761.cos.ap-guangzhou.myqcloud.com'
+$env:ROOMWISE_COS_SECRET_ID = '腾讯云 COS SecretId'
+$env:ROOMWISE_COS_SECRET_KEY = '腾讯云 COS SecretKey'
+$env:ROOMWISE_COS_BUCKET = 'roomwise-1359876761'
+$env:ROOMWISE_COS_REGION = 'ap-guangzhou'
+```
+
+接口固定使用 `model=hy-3d-3.1`、`face_count=10000` 和 PBR；不传 `result_format`，默认返回 GLB。上传面板支持 1 张主图或 2—8 张任意角度图片；每张附带 `left`、`right`、`back`、`top`、`bottom`、`left_front`、`right_front` 角度，后端先使用 COS SDK 上传图片，再生成短时预签名 GET URL 放入请求；COS 桶保持私有读写。生成的 GLB 会下载到本机 `runtime/uploads/assets`，模型任务链接按腾讯接口的有效期处理。
+
 ## 功能范围
 
 - 录入房间、家具尺寸、位置、保留状态和锁定状态。
@@ -19,11 +35,11 @@ Roomwise 是一个本地运行的单房间家具布局原型。用户输入房�
 - 离线解析有限中文指令，可选接入 DeepSeek 理解更多表达；最终仍限于已实现的动作和几何检查。
 - 支持“书架靠墙”“桌子靠窗，椅子面朝窗户方向”“床头柜放床头的右侧”“床放在衣柜前面”等要求，分别显示识别结果与位置验收。
 - 上传视频、抽取画面并为椅子、沙发、床、餐桌生成待确认候选。
-- 上传单张家具图片，或同一件家具的正面、右侧、顶面三张图片，经本地 InstantMesh 重建为带顶点色的 GLB 网格，确认尺寸和朝向后存入家具库并跨房间复用。单图由 Zero123++ 推测其他视角，遮挡部分和背面不代表实测。视觉属性识别仍可选：勾选同意时才向第三方网关 `api.tokenlab.pro` 请求 `gpt-6-sol` / `high`，否则只在本机建模和手动补全属性。重建失败保留草稿，不会把参数模板当成实物模型发布。
+- 上传单张家具图片，或从任意角度上传 2—8 张同一件家具的图片，经 TokenHub HY-3D-3.1 重建为 GLB 网格，确认尺寸和朝向后存入家具库并跨房间复用。视觉属性识别使用第三方网关 `api.tokenlab.pro` 的 `gpt-6-sol` / `high`。重建失败保留草稿，不会把参数模板当成实物模型发布。
 
-InstantMesh 的 Python 3.10 环境应独立于应用的 `roomwise` 环境，默认寻找同一 Miniconda 根目录下 `envs/instantmesh/python.exe`；其他路径可设置 `ROOMWISE_INSTANTMESH_PYTHON` 与 `ROOMWISE_INSTANTMESH_ROOT`。默认源码目录是上级 `InstantMesh`；CUDA、DirectML 和 CPU 的依赖及适配方式见 [安装说明](integrations/instantmesh/README.md)。首次运行会下载权重到 `InstantMesh/ckpts`。网络受限时可设置 `HF_ENDPOINT=https://hf-mirror.com`。本地使用带顶点色的 GLB 导出，不依赖 CUDA 专用的 `nvdiffrast` 纹理烘焙；原始 InstantMesh 权重和上游依赖的使用条件仍应分别核对。
+图片重建使用 TokenHub HY-3D-3.1。
 
-三视图要求单件物体、背景简洁、拍摄距离接近；顶面图中正面朝画面下方。三张实拍图会直接填入 InstantMesh 的稀疏视角；只上传正面时才使用 Zero123++ 补全视图。GLB 保留模型预测的原始顶点颜色；家具库预览及房间中的自有家具按顶点颜色显示，避免场景光照和色调映射压暗照片颜色。三视图不保证精确几何或尺寸，发布前请检查预览和输入真实宽深高。自有家具的属性配置与旧版回归见 [自有家具图片导入指南](docs/自有家具图片导入指南.md)。
+图片应属于同一件家具，上传面板允许 1 张主图或 2—8 张任意角度图片，并为每张图选择角度。生成模型的几何和尺寸仍需在预览中核对，发布前填写实测宽深高。
 
 已确认家具的卡片支持加入房间、修改和删除。删除前会确认名称；删除后该家具及其修订草稿不再显示在家具库中，已经加入房间或保存到方案中的家具仍保留，引用的照片和模型也继续可用。
 
@@ -62,9 +78,7 @@ roomwise/
 
 ### 图片重建适配
 
-单图和三视图重建使用独立 InstantMesh 环境。本次本地 CUDA/DirectML/CPU 兼容改动随仓库保存为可校验补丁，安装方法和设备限制见 [InstantMesh 适配说明](integrations/instantmesh/README.md)。已有常驻 CUDA worker 仍可使用三视图路径；尚未配置推理环境时，可直接使用已有 GLB 导入和布局功能。
-
-新克隆仓库不会自动拥有上级目录的 InstantMesh 代码。请按说明建立独立工作副本并应用补丁，避免在其他机器上只安装包却缺少 `device.py` 和应用参数。
+图片重建使用 TokenHub HY-3D-3.1 接口。配置 `ROOMWISE_TOKENHUB_API_KEY` 后，后端异步提交单图或多角度任务并轮询结果；生成的 GLB 下载到本机 `runtime/uploads/assets`。接口字段、图片角度和 COS 公共域名配置见上方说明。
 
 ## 环境要求
 
@@ -344,3 +358,4 @@ $env:PYTHONPATH = "$PWD\backend"
 $env:ROOMWISE_LANGUAGE_PROVIDER = 'disabled'
 python -m pytest backend\tests -q
 ```
+

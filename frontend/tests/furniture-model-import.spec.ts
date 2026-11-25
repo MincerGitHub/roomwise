@@ -12,13 +12,13 @@ test('existing GLB imports without reconstruction and remains usable after room 
  page.on('request',request=>{if(request.method()==='POST'&&/\/furniture\/(?:analyze|drafts\/[^/]+\/reconstruct)/.test(request.url()))inferenceRequests++});
  await page.getByRole('button',{name:'自有家具库',exact:true}).click();
  const dialog=page.getByRole('dialog');
- await dialog.getByLabel('选择家具GLB模型').setInputFiles({name:'imported-chair.glb',mimeType:'model/gltf-binary',buffer:Buffer.from(model)});
+ await dialog.getByLabel('上传GLB').setInputFiles({name:'imported-chair.glb',mimeType:'model/gltf-binary',buffer:Buffer.from(model)});
  await expect(dialog.getByLabel('家具名称',{exact:true})).toHaveValue('imported-chair');
  const name='已有GLB测试椅-'+Date.now();await dialog.getByLabel('家具名称',{exact:true}).fill(name);
  await dialog.getByLabel('家具类别',{exact:true}).selectOption('armchair');
- await expect(dialog.getByRole('button',{name:'确认并保存到家具库'})).toBeEnabled();
+ await expect(dialog.getByRole('button',{name:'保存到家具库'})).toBeEnabled();
  const publication=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/publish'));
- await dialog.getByRole('button',{name:'确认并保存到家具库'}).click();
+ await dialog.getByRole('button',{name:'保存到家具库'}).click();
  const response=await publication;expect(response.ok()).toBe(true);const asset=await response.json();
  expect(asset.photoUrls).toEqual([]);expect(asset.modelSource.kind).toBe('imported_glb');
  expect(asset.snapshot.dimensionSources.width).toBe('template');
@@ -35,3 +35,4 @@ test('existing GLB imports without reconstruction and remains usable after room 
  await page.reload();await page.getByRole('button',{name:'自有家具库',exact:true}).click();
  await expect(page.locator('.owned-furniture-card').filter({hasText:name}).locator('canvas')).toBeVisible();
 });
+

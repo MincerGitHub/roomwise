@@ -4,290 +4,241 @@ import json
 import os
 from pathlib import Path
 import struct
-import subprocess
-import sys
-from collections import deque
-from queue import Empty, Queue
-from threading import Lock, Thread
+import time
+
+import httpx
 
 
-INSTANTMESH_ROOT = Path(__file__).resolve().parents[3] / "InstantMesh"
-_worker = None
-_worker_lock = Lock()
+HUNYUAN_BASE_URL = "https://tokenhub.tencentmaas.com"
+HUNYUAN_MODEL = "hy-3d-3.0"
+HUNYUAN_FACE_COUNT = 10000
+HUNYUAN_TIMEOUT = httpx.Timeout(1800, connect=20)
+COS_BUCKET = "roomwise-1359876761"
+COS_REGION = "ap-guangzhou"
+COS_EXPIRED = 1800
+HUNYUAN_VIEWS = {"left", "right", "back", "top", "bottom", "left_front", "right_front"}
+APP_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReconstructionError(Exception):
     pass
 
 
-def model_cache(root: Path):
-    """Reuse a populated user cache before creating another multi-GB copy."""
-    project_cache = root / 'ckpts' / 'huggingface'
-    user_cache = Path.home() / '.cache' / 'huggingface'
-    for candidate in (project_cache, user_cache):
-        if any((candidate / 'hub' / 'models--TencentARC--InstantMesh' / 'snapshots').glob('*/instant_mesh_base.ckpt')):
-            return candidate
-    return project_cache
-
-
-def reconstruction_python():
-    configured = os.getenv("ROOMWISE_INSTANTMESH_PYTHON")
-    if configured:
-        return Path(configured).expanduser().resolve()
-    active = Path(sys.executable).resolve()
-    user_name = Path.home().name
-    conda_roots = [
-        Path.home() / "anaconda3",
-        Path(active.anchor) / "Users" / user_name / "anaconda3",
-        Path(active.anchor) / "Users" / user_name / "miniconda3",
-    ]
-    conda_exe = os.getenv("CONDA_EXE")
-    if conda_exe:
-        conda_roots.append(Path(conda_exe).resolve().parent.parent)
-    candidates = [
-        active.parent.parent / "instantmesh" / active.name,
-        Path(os.getenv("CONDA_PREFIX", "")) / active.name if os.getenv("CONDA_PREFIX") else Path(),
-        *(root / "envs" / "instantmesh" / active.name for root in conda_roots),
-    ]
-    for candidate in candidates:
-        if candidate.name and candidate.is_file():
-            return candidate.resolve()
-    return candidates[0].resolve()
+def _config():
+    values = {}
+    path = Path(os.getenv("ROOMWISE_HUNYUAN_ENV_FILE", str(APP_ROOT / ".env.hunyuan")))
+    if path.is_file() and path.stat().st_size <= 64_000:
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            name, value = line.split("=", 1)
+            name, value = name.strip(), value.strip().strip("'\"")
+            if name in {"ROOMWISE_TOKENHUB_API_KEY", "TOKENHUB_API_KEY", "ROOMWISE_TOKENHUB_BASE_URL", "ROOMWISE_COS_PUBLIC_BASE_URL", "ROOMWISE_COS_SECRET_ID", "COS_SECRET_ID", "ROOMWISE_COS_SECRET_KEY", "COS_SECRET_KEY", "ROOMWISE_COS_BUCKET", "COS_BUCKET", "ROOMWISE_COS_REGION", "COS_REGION", "ROOMWISE_COS_SESSION_TOKEN", "COS_SESSION_TOKEN"}:
+                values[name] = value
+    def setting(*names, default=""):
+        for name in names:
+            if os.getenv(name) is not None:
+                return os.getenv(name, "").strip()
+            if name in values:
+                return values[name].strip()
+        return default
+    key = setting("ROOMWISE_TOKENHUB_API_KEY", "TOKENHUB_API_KEY")
+    base = setting("ROOMWISE_TOKENHUB_BASE_URL", default=HUNYUAN_BASE_URL).rstrip("/")
+    cos = setting("ROOMWISE_COS_PUBLIC_BASE_URL", default="https://roomwise-1359876761.cos.ap-guangzhou.myqcloud.com").rstrip("/")
+    secret_id = setting("ROOMWISE_COS_SECRET_ID", "COS_SECRET_ID")
+    secret_key = setting("ROOMWISE_COS_SECRET_KEY", "COS_SECRET_KEY")
+    bucket = setting("ROOMWISE_COS_BUCKET", "COS_BUCKET", default=COS_BUCKET)
+    region = setting("ROOMWISE_COS_REGION", "COS_REGION", default=COS_REGION)
+    token = setting("ROOMWISE_COS_SESSION_TOKEN", "COS_SESSION_TOKEN")
+    return key, base, cos, secret_id, secret_key, bucket, region, token
 
 
 def reconstruction_status():
-    root = Path(os.getenv("ROOMWISE_INSTANTMESH_ROOT", str(INSTANTMESH_ROOT))).resolve()
-    python = reconstruction_python()
-    worker_script = root / "roomwise_worker.py"
-    worker_running = (_worker is not None and _worker.root == root and _worker.python == python
-                      and _worker.process is not None and _worker.process.poll() is None)
-    adapter_cli = (root / "run.py").is_file() and (root / "device.py").is_file()
-    ready = (adapter_cli or worker_script.is_file()) and (root / "configs/instant-mesh-base.yaml").is_file() and python.is_file()
-    if ready and not worker_running:
-        try:
-            modules = "('torch','diffusers','rembg','trimesh','onnxruntime')"
-            if adapter_cli and not worker_script.is_file():
-                probe_code = (
-                    "import importlib.util,sys; "
-                    f"sys.path.insert(0, {str(root)!r}); "
-                    f"assert all(importlib.util.find_spec(name) for name in {modules}); "
-                    "from device import resolve_device; "
-                    "from src.models.lrm_mesh import InstantMesh; "
-                    "print(resolve_device())"
-                )
-            else:
-                probe_code = f"import importlib.util; assert all(importlib.util.find_spec(name) for name in {modules})"
-            probe = subprocess.run([str(python), "-c", probe_code], cwd=root,
-                                   capture_output=True, text=True, timeout=60, check=False)
-            ready = probe.returncode == 0
-        except (OSError, subprocess.TimeoutExpired):
-            ready = False
+    key, base, cos, secret_id, secret_key, bucket, region, token = _config()
+    hunyuan_ready = bool(key)
+    try:
+        import qcloud_cos  # noqa: F401
+        cos_sdk_ready = True
+    except ImportError:
+        cos_sdk_ready = False
+    cos_ready = bool(secret_id and secret_key and bucket and region and cos_sdk_ready)
+    enabled = hunyuan_ready and cos_ready
+    missing = []
+    if not hunyuan_ready: missing.append("ROOMWISE_TOKENHUB_API_KEY")
+    if not cos_ready:
+        missing.extend(["ROOMWISE_COS_SECRET_ID", "ROOMWISE_COS_SECRET_KEY"])
+        if not cos_sdk_ready: missing.append("cos-python-sdk-v5")
     return {
-        "enabled": ready,
-        "python": str(python),
-        "root": str(root),
+        "enabled": enabled,
+        "provider": "tencent-tokenhub",
+        "model": HUNYUAN_MODEL,
+        "baseUrl": base,
+        "cosBaseUrl": cos,
+        "cosBucket": bucket,
+        "cosRegion": region,
         "message": (
-            "InstantMesh 本地推理已就绪（CUDA/DirectML/CPU）；首次使用会下载模型权重。"
-            if ready else
-            "InstantMesh 不可用；请检查独立 Python 环境、依赖及 ROOMWISE_INSTANTMESH_PYTHON。"
+            "TokenHub和COS已就绪"
+            if enabled else
+            "未配置：" + "、".join(missing)
         ),
     }
 
 
-class InstantMeshWorker:
-    """Optional persistent worker used when InstantMesh supplies its worker script."""
-
-    def __init__(self, root: Path, python: Path):
-        self.root = root
-        self.python = python
-        self.process = None
-        self.responses = Queue()
-        self.stderr_tail = deque(maxlen=20)
-
-    def start(self):
-        if self.process and self.process.poll() is None:
-            return
-        environment = os.environ.copy()
-        environment.setdefault("INSTANTMESH_DEVICE", "auto")
-        environment.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-        environment.setdefault("HF_HOME", str(model_cache(self.root)))
-        environment.setdefault("U2NET_HOME", str(self.root / "ckpts" / "u2net"))
-        cache = Path(environment["HF_HOME"]) / "hub"
-        cached_models = (
-            ("TencentARC--InstantMesh", "diffusion_pytorch_model.bin"),
-            ("TencentARC--InstantMesh", "instant_mesh_base.ckpt"),
-            ("sudo-ai--zero123plus-v1.2", "model_index.json"),
-            ("facebook--dino-vitb16", "pytorch_model.bin"),
-        )
-        if (Path(environment["U2NET_HOME"]) / "u2net.onnx").is_file() and all(
-            any(path.is_file() and path.stat().st_size > 0 for path in
-                (cache / f"models--{repo}" / "snapshots").glob(f"*/{filename}"))
-            for repo, filename in cached_models
-        ):
-            environment.setdefault("HF_HUB_OFFLINE", "1")
-        environment["PYTHONIOENCODING"] = "utf-8"
-        process = subprocess.Popen(
-            [str(self.python), "roomwise_worker.py"], cwd=self.root, env=environment,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace", bufsize=1,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        responses = Queue()
-        self.process = process
-        self.responses = responses
-        self.stderr_tail.clear()
-        Thread(target=self._read_stdout, args=(process, responses), daemon=True).start()
-        Thread(target=self._read_stderr, args=(process,), daemon=True).start()
-        try:
-            response = responses.get(timeout=1800)
-        except Empty as exc:
-            self.stop()
-            raise ReconstructionError("InstantMesh 常驻进程启动超时，请检查显卡和模型权重。") from exc
-        if not response.get("ready"):
-            self.stop()
-            raise ReconstructionError("InstantMesh 常驻进程启动失败：" + "；".join(list(self.stderr_tail)[-3:])[-500:])
-
-    def _read_stdout(self, process, responses):
-        try:
-            for line in process.stdout:
-                try:
-                    responses.put(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-        finally:
-            responses.put({"ok": False, "error": "InstantMesh 常驻进程已退出。"})
-
-    def _read_stderr(self, process):
-        for line in process.stderr:
-            self.stderr_tail.append(line.rstrip())
-
-    def request(self, photos, output):
-        self.start()
-        if not self.process or not self.process.stdin:
-            raise ReconstructionError("InstantMesh 常驻进程不可用。")
-        try:
-            request = {"photos": [str(Path(photo).resolve()) for photo in photos],
-                       "output": str(Path(output).resolve())}
-            self.process.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
-            self.process.stdin.flush()
-            response = self.responses.get(timeout=1800)
-        except (BrokenPipeError, OSError, Empty) as exc:
-            self.stop()
-            raise ReconstructionError("InstantMesh 常驻进程中断或超时，请重试。") from exc
-        if not response.get("ok"):
-            self.stop()
-            diagnostic = str(response.get("error", "")) + "\n" + "\n".join(self.stderr_tail)
-            if "out of memory" in diagnostic.lower():
-                raise ReconstructionError("GPU/共享显存不足，关闭其他图形程序后重试。")
-            if ("connection" in diagnostic.lower() or "timed out" in diagnostic.lower()) and "huggingface" in diagnostic.lower():
-                raise ReconstructionError("模型权重下载失败；检查网络或设置 HF_ENDPOINT 后重试。")
-            raise ReconstructionError("InstantMesh 重建失败：" + str(response.get("error") or "请检查进程日志。")[:300])
-        return response
-
-    def stop(self):
-        process, self.process = self.process, None
-        if not process:
-            return
-        try:
-            if process.poll() is None and process.stdin:
-                process.stdin.write(json.dumps({"shutdown": True}) + "\n")
-                process.stdin.flush()
-                process.wait(timeout=10)
-        except (BrokenPipeError, OSError, subprocess.TimeoutExpired):
-            if process.poll() is None:
-                process.kill()
-                process.wait(timeout=10)
-
-
-def close_reconstruction_worker():
-    global _worker
-    with _worker_lock:
-        if _worker is not None:
-            _worker.stop()
-            _worker = None
-
-
 def validate_generated_glb(path: Path):
     if not path.is_file() or path.stat().st_size < 256 or path.stat().st_size > 50 * 1024 * 1024:
-        raise ReconstructionError("Generated GLB is missing or exceeds 50 MB.")
+        raise ReconstructionError("混元返回的 GLB 文件不存在或超过 50 MB。")
     with path.open("rb") as handle:
         header = handle.read(20)
+        if len(header) < 20:
+            raise ReconstructionError("混元返回的 GLB 文件不完整。")
         magic, version, length = struct.unpack_from("<4sII", header)
         chunk_size, chunk_type = struct.unpack_from("<II", header, 12)
         if magic != b"glTF" or version != 2 or length != path.stat().st_size or chunk_type != 0x4E4F534A:
-            raise ReconstructionError("Generated GLB has an invalid header.")
+            raise ReconstructionError("混元返回的 GLB 文件头无效。")
         scene = json.loads(handle.read(chunk_size))
-        primitives = [primitive for mesh in scene.get("meshes", []) for primitive in mesh.get("primitives", [])]
+        primitives = [p for mesh in scene.get("meshes", []) for p in mesh.get("primitives", [])]
         accessors = scene.get("accessors", [])
         if not primitives or not accessors or not scene.get("buffers"):
-            raise ReconstructionError("Generated GLB has no mesh.")
-        if not any(accessors[primitive["attributes"]["POSITION"]]["count"] >= 4 for primitive in primitives):
-            raise ReconstructionError("Generated GLB has no usable geometry.")
+            raise ReconstructionError("混元返回的 GLB 没有可用网格。")
+        if not any(accessors[p["attributes"]["POSITION"]]["count"] >= 4 for p in primitives):
+            raise ReconstructionError("混元返回的 GLB 没有可用顶点。")
         handle.seek(20 + chunk_size)
         binary_chunk = handle.read(8)
         if len(binary_chunk) != 8 or struct.unpack("<II", binary_chunk)[1] != 0x004E4942:
-            raise ReconstructionError("Generated GLB has no vertex data.")
+            raise ReconstructionError("混元返回的 GLB 没有顶点数据。")
 
 
-def reconstruct(photos: list[Path], output: Path):
-    if len(photos) not in {1, 3} or any(not photo.is_file() for photo in photos):
-        raise ReconstructionError("请上传单张家具图片，或同一件家具的正面、右侧、顶面三张照片。")
-    status = reconstruction_status()
-    if not status["enabled"]:
-        raise ReconstructionError(status["message"])
-    root = Path(os.getenv("ROOMWISE_INSTANTMESH_ROOT", str(INSTANTMESH_ROOT))).resolve()
-    python = reconstruction_python()
-    worker_script = root / "roomwise_worker.py"
-    if worker_script.is_file() and len(photos) == 3:
-        global _worker
-        with _worker_lock:
-            if _worker is None or _worker.root != root or _worker.python != python:
-                if _worker is not None:
-                    _worker.stop()
-                _worker = InstantMeshWorker(root, python)
-            try:
-                _worker.request(photos, output)
-            except ReconstructionError:
-                output.unlink(missing_ok=True)
-                raise
+def _cos_client():
+    _, _, _, secret_id, secret_key, _, region, token = _config()
+    if not secret_id or not secret_key:
+        raise ReconstructionError("未配置COS密钥")
+    try:
+        from qcloud_cos import CosConfig, CosS3Client
+    except ImportError as exc:
+        raise ReconstructionError("缺少COS SDK") from exc
+    return CosS3Client(CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key, Token=token or None, Scheme="https"))
+
+
+def _upload_photos(photos: list[Path], job_id: str) -> list[str]:
+    client = _cos_client()
+    _, _, _, _, _, bucket, _, _ = _config()
+    urls = []
+    for index, path in enumerate(photos):
+        key = f"roomwise/furniture/{job_id}/photo_{index}.jpg"
         try:
-            validate_generated_glb(output)
-        except (OSError, ValueError, struct.error, json.JSONDecodeError):
-            output.unlink(missing_ok=True)
-            raise ReconstructionError("InstantMesh produced an invalid model.") from None
-        return f"/uploads/assets/{output.name}"
+            with path.open("rb") as handle:
+                client.put_object(Bucket=bucket, Key=key, Body=handle, ContentType="image/jpeg")
+            urls.append(client.get_presigned_download_url(Bucket=bucket, Key=key, Expired=COS_EXPIRED))
+        except Exception as exc:
+            raise ReconstructionError(f"COS上传失败：{str(exc)[:240]}") from exc
+    return urls
 
-    # Current Intel Arc installs use the tested DirectML adapter in run.py;
-    # fall back to that one-shot path until a compatible worker script exists.
-    command = [str(python), "run.py", "configs/instant-mesh-base.yaml", str(photos[0]),
-               "--glb_output", str(output), "--output_path", str(output.parent.parent.parent / "instantmesh-work" / output.stem)]
-    if len(photos) == 3:
-        command.extend(["--side_image", str(photos[1]), "--top_image", str(photos[2])])
-    environment = os.environ.copy()
-    environment.setdefault("INSTANTMESH_DEVICE", "auto")
-    # The default Hugging Face endpoint is intermittently unreachable on this
-    # Windows network; callers can override it with HF_ENDPOINT when needed.
-    environment.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-    environment.setdefault("HF_HOME", str(model_cache(root)))
-    environment.setdefault("U2NET_HOME", str(root / "ckpts" / "u2net"))
+
+def _response_body(response):
     try:
-        result = subprocess.run(command, cwd=root, env=environment, capture_output=True, text=True, timeout=1800, check=False)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        output.unlink(missing_ok=True)
-        raise ReconstructionError("InstantMesh 启动失败或超时，请检查显卡后端和独立 Python 环境。") from exc
-    if result.returncode:
-        output.unlink(missing_ok=True)
-        diagnostic = ((result.stderr or "") + (result.stdout or ""))[-4000:].lower()
-        if "out of memory" in diagnostic:
-            raise ReconstructionError("GPU/共享显存不足，关闭其他图形程序后重试。")
-        if "connection" in diagnostic or "timed out" in diagnostic:
-            raise ReconstructionError("模型权重下载失败；检查网络或设置 HF_ENDPOINT 后重试。")
-        detail = ((result.stderr or "") + (result.stdout or "")).strip().splitlines()
-        suffix = detail[-1][-240:] if detail else ""
-        raise ReconstructionError(f"InstantMesh 重建失败，请检查依赖、显存和模型权重。{suffix}")
+        body = response.json()
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise ReconstructionError("TokenHub返回无效") from exc
+    if response.status_code >= 400:
+        detail = None
+        if isinstance(body, dict):
+            error = body.get("error") or body.get("Error")
+            if isinstance(error, dict):
+                detail = error.get("message") or error.get("Message") or error.get("code") or error.get("Code")
+            detail = detail or body.get("message") or body.get("Message") or body.get("detail") or body.get("Msg") or body.get("Desc")
+        raise ReconstructionError(f"TokenHub 接口请求失败：{detail or response.status_code}")
+    if not isinstance(body, dict):
+        raise ReconstructionError("TokenHub返回无效")
+    return body
+
+
+def _auth_headers():
+    return {"Authorization": "Bearer " + _config()[0], "Content-Type": "application/json"}
+
+
+def _submit(client, endpoint, image_urls, view_types):
+    payload = {
+        "model": HUNYUAN_MODEL,
+        "image_url": image_urls[0],
+        "generate_type": "Normal",
+        "enable_pbr": True,
+        "face_count": HUNYUAN_FACE_COUNT,
+    }
+    if len(image_urls) > 1:
+        payload["multi_view_images"] = [
+            {"view_type": view, "view_image_url": image_url}
+            for image_url, view in zip(image_urls[1:], view_types[1:])
+        ]
+    response = client.post(endpoint + "/v1/api/3d/submit", headers=_auth_headers(), json=payload)
+    result = _response_body(response)
+    job_id = result.get("id")
+    if not job_id:
+        raise ReconstructionError("TokenHub未返回任务ID")
+    return str(job_id)
+
+
+def _query(client, endpoint, job_id):
+    response = client.post(endpoint + "/v1/api/3d/query", headers=_auth_headers(), json={"model": HUNYUAN_MODEL, "id": job_id})
+    return _response_body(response)
+
+
+def _result_url(result):
+    files = result.get("data") or []
+    if isinstance(files, dict):
+        files = [files]
+    for item in files:
+        if not isinstance(item, dict):
+            continue
+        url = item.get("url")
+        if url and str(item.get("type", "")).lower() == "glb":
+            return url
+    return None
+
+def reconstruct(photos: list[Path], output: Path, view_types: list[str] | None = None):
+    if not 1 <= len(photos) <= 8 or any(not photo.is_file() for photo in photos):
+        raise ReconstructionError("请上传1—8张图片")
+    key, endpoint, _, secret_id, secret_key, _, _, _ = _config()
+    if not key or not secret_id or not secret_key:
+        raise ReconstructionError(reconstruction_status()["message"])
+    views = list(view_types or (["front"] + ["left", "right", "back", "top", "bottom", "left_front", "right_front"][:len(photos) - 1]))
+    if len(views) != len(photos):
+        raise ReconstructionError("图片和角度数量不一致")
+    if len(photos) > 1 and (any(view not in HUNYUAN_VIEWS for view in views[1:]) or len(set(views[1:])) != len(views[1:])):
+        raise ReconstructionError("角度不能重复")
+    output.parent.mkdir(parents=True, exist_ok=True)
     try:
-        validate_generated_glb(output)
-    except (OSError, ValueError, struct.error, json.JSONDecodeError):
+        cos_urls = _upload_photos(photos, str(output.stem))
+        with httpx.Client(timeout=HUNYUAN_TIMEOUT, follow_redirects=False, trust_env=False) as client:
+            job_id = _submit(client, endpoint, cos_urls, views)
+            deadline = time.monotonic() + 1800
+            while time.monotonic() < deadline:
+                result = _query(client, endpoint, job_id)
+                status = str(result.get("status") or "").lower()
+                if status == "failed":
+                    raise ReconstructionError(str(result.get("error") or result.get("message") or "TokenHub 模型生成失败。"))
+                if status == "completed" or _result_url(result):
+                    url = _result_url(result)
+                    if not url:
+                        raise ReconstructionError("任务完成但无模型")
+                    downloaded = client.get(url)
+                    if downloaded.status_code >= 400:
+                        raise ReconstructionError("模型下载失败")
+                    output.write_bytes(downloaded.content)
+                    validate_generated_glb(output)
+                    return f"/uploads/assets/{output.name}"
+                time.sleep(4)
+            raise ReconstructionError("模型生成超时，请重试")
+    except ReconstructionError:
         output.unlink(missing_ok=True)
-        raise ReconstructionError("InstantMesh produced an invalid model.") from None
-    return f"/uploads/assets/{output.name}"
+        raise
+    except httpx.TimeoutException:
+        output.unlink(missing_ok=True)
+        raise ReconstructionError("TokenHub超时，请重试") from None
+    except httpx.HTTPError:
+        output.unlink(missing_ok=True)
+        raise ReconstructionError("无法连接TokenHub") from None
+    except (OSError, ValueError, KeyError, struct.error, json.JSONDecodeError):
+        output.unlink(missing_ok=True)
+        raise ReconstructionError("模型文件无效，请重试") from None
+

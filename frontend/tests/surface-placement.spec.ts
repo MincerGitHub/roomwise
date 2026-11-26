@@ -10,21 +10,25 @@ const fixture=(extra={})=>({id:'stacking-browser',name:'箱子台面拖动',vers
  ]});
 type Pose={id:string;x:number;z:number;y:number;rotation:number;supportId:string|null};
 async function poses(page:Page){return JSON.parse((await page.locator('.scene-canvas').getAttribute('data-placement'))!) as Pose[]}
+const closePreview=async(page:Page)=>{if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click()};
+async function openPreview(page:Page,top=true){
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
+ if(top)await page.getByRole('button',{name:'俯视',exact:true}).click();
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
+}
 async function load(page:Page,value=fixture(),top=true){
  await page.goto('/');
  await page.locator('input[type=file][accept=".json"]').setInputFiles({name:'surface.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(value))});
  await expect(page.locator('.canvas-header')).toContainText(value.name);
- if(top)await page.getByRole('button',{name:'俯视',exact:true}).click();
- await expect(page.locator('.scene-canvas canvas')).toBeVisible();
+ await openPreview(page,top);
 }
 async function point(page:Page,x:number,z:number,y=0,top=true){
  const bounds=(await page.locator('.scene-canvas canvas').boundingBox())!;
- if(top){const scale=bounds.height/(2*6*.72);return {x:bounds.x+bounds.width/2+(x-3)*scale,y:bounds.y+bounds.height/2+(z-2.5)*scale}}
+ if(top){const scale=Math.min(bounds.width,bounds.height)/(2*6*.72);return {x:bounds.x+bounds.width/2+(x-3)*scale,y:bounds.y+bounds.height/2+(z-2.5)*scale}}
  return page.evaluate(async({bounds,x,z,y})=>{
   const THREE=await import('/node_modules/.vite/deps/three.js' as string);
-  const camera=new THREE.PerspectiveCamera(38,bounds.width/bounds.height,.05,150);
-  camera.position.set(3+6*1.13,6*1.13,2.5-5*1.15);camera.lookAt(3,.1,2.5);camera.updateMatrixWorld();
-  const p=new THREE.Vector3(x,y,z).project(camera);
+  const matrices=JSON.parse(document.querySelector('.scene-canvas')!.getAttribute('data-camera')!);
+  const p=new THREE.Vector3(x,y,z).applyMatrix4(new THREE.Matrix4().fromArray(matrices.view)).applyMatrix4(new THREE.Matrix4().fromArray(matrices.projection));
   return {x:bounds.x+(p.x+1)*bounds.width/2,y:bounds.y+(1-p.y)*bounds.height/2};
  },{bounds,x,z,y});
 }
@@ -39,7 +43,9 @@ test('a box snaps near the table, slides on it, detaches and can be restored wit
  await expect.poll(async()=>(await poses(page)).find(item=>item.id==='box')!.supportId).toBe('table');
  let box=(await poses(page)).find(item=>item.id==='box')!;
  expect(box.y).toBe(.75);expect(box.x).toBeGreaterThanOrEqual(2.43-.00001);
+ await closePreview(page);
  await expect(page.locator('.support-inspector-note')).toContainText('台面');
+ await openPreview(page);
  await drag(page,await point(page,box.x,box.z),await point(page,3.25,2.7));
  box=(await poses(page)).find(item=>item.id==='box')!;
  expect(box.supportId).toBe('table');expect(box.x).toBeCloseTo(3.25,2);expect(box.z).toBeCloseTo(2.7,2);
@@ -49,10 +55,12 @@ test('a box snaps near the table, slides on it, detaches and can be restored wit
  expect(box.supportId).toBeNull();expect(box.y).toBe(0);expect(box.x).toBeCloseTo(4.4,2);
  await page.getByRole('button',{name:'撤销',exact:true}).click();
  await expect.poll(async()=>(await poses(page)).find(item=>item.id==='box')).toEqual(supported);
+ await closePreview(page);
  const saving=page.waitForResponse('**/api/scenes/save');await page.getByRole('button',{name:'另存',exact:true}).click();
  const identity=await (await saving).json(),saved=await (await page.request.get(`/api/scenes/${identity.id}`)).json();
  expect(saved.items.find((item:Pose)=>item.id==='box')).toMatchObject({y:.75,supportId:'table'});
  const validation=await (await page.request.post('/api/validate',{data:{scene:saved}})).json();expect(validation.valid).toBe(true);
+ await openPreview(page);
  const others=(await poses(page)).filter(item=>item.id!=='box');expect(others).toEqual(original.filter(item=>item.id!=='box'));
 });
 
@@ -64,13 +72,19 @@ test('rotated hosts carry boxes and a locked box prevents moving the host',async
  await drag(page,await point(page,3.5,2.3),await point(page,4,2.6));
  let current=await poses(page),host=current.find(item=>item.id==='table')!,box=current.find(item=>item.id==='box')!;
  expect(host.x).toBeCloseTo(3.5,2);expect(box.x).toBeCloseTo(host.x,4);expect(box.z).toBeCloseTo(host.z,4);expect(box.y).toBe(.75);
+ await closePreview(page);
  await page.locator('.item-card').filter({hasText:'table'}).click();
  await page.getByRole('button',{name:'旋转90°'}).click();
+ await openPreview(page);
  current=await poses(page);host=current.find(item=>item.id==='table')!;box=current.find(item=>item.id==='box')!;
  expect(host.rotation).toBe(127);expect(box.rotation).toBe(127);expect(box.supportId).toBe('table');
+ await closePreview(page);
  await page.locator('.item-card').filter({hasText:'box'}).click();await page.getByRole('button',{name:'切换位置锁定'}).click();
+ await openPreview(page);
  const before=await poses(page);
+ await closePreview(page);
  await page.locator('.item-card').filter({hasText:'table'}).click();await page.getByRole('button',{name:'旋转90°'}).click();
+ await openPreview(page);
  expect(await poses(page)).toEqual(before);
 });
 

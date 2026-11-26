@@ -25,6 +25,10 @@ CATALOG = [
     {"category": "children_cabinet", "label": "儿童柜", "width": .7, "depth": .4, "height": 1.2},
     {"category": "rug", "label": "地毯", "width": 1.8, "depth": 1.3, "height": .02},
     {"category": "storage_box", "label": "收纳箱", "width": .4, "depth": .3, "height": .3},
+    {"category": "floor_lamp", "label": "落地灯", "width": .45, "depth": .45, "height": 1.65},
+    {"category": "laptop", "label": "笔记本电脑", "width": .34, "depth": .25, "height": .24},
+    {"category": "wall_tv", "label": "壁挂电视", "width": 1.1, "depth": .08, "height": .65},
+    {"category": "air_conditioner", "label": "壁挂空调", "width": .9, "depth": .2, "height": .3},
 ]
 
 

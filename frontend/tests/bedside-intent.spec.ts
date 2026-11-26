@@ -14,7 +14,6 @@ const fixture=(rotation=0)=>({id:'bedside-ui-fixture',name:'床头关系自制�
 
 async function loadFixture(page:Page,rotation=0){
  await page.goto('/');
- await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  await page.locator('input[type="file"][accept=".json"]').setInputFiles({name:'bedside-fixture.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture(rotation)))});
  await expect(page.locator('.canvas-header')).toContainText('床头关系自制测试');
  await page.getByLabel('布局方法').selectOption('hybrid');
@@ -23,6 +22,7 @@ async function loadFixture(page:Page,rotation=0){
 test('bedside request means head-right in bed coordinates and remains a preview until applied',async({page},testInfo)=>{
  await loadFixture(page);
  const canvas=page.locator('.scene-canvas');
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  const original=JSON.parse((await canvas.getAttribute('data-layout'))!);
  // The selected bed exposes its actual head end, matching pillows at local -z.
  await expect(page.getByTestId('bed-head-marker')).toBeVisible();
@@ -30,6 +30,7 @@ test('bedside request means head-right in bed coordinates and remains a preview 
  expect(head.localDirection).toBe('-z');
  expect(head.rightLocalDirection).toBe('+x');
  expect(head.z).toBeCloseTo(1.2,5);
+ if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click();
  const commandResponse=page.waitForResponse(r=>r.url().endsWith('/api/command')&&r.request().method()==='POST');
  const generateResponse=page.waitForResponse(r=>r.url().endsWith('/api/generate')&&r.request().method()==='POST',{timeout:45000});
  await page.getByLabel('输入修改要求').fill('床头柜放床头的右侧');
@@ -64,9 +65,9 @@ test('bedside request means head-right in bed coordinates and remains a preview 
  }
  await page.getByLabel('预览方案 1').click();
  await expect(page.locator('.preview-banner')).toBeVisible();
- await expect(page.locator('main .preview-requirements, main .functional-relations')).toHaveCount(0);
- await expect(page.locator('.preview-check-details')).toHaveCount(0);
- await page.locator('.canvas-validation button').click();
+ await expect(page.locator('.plan-controls .preview-requirements, .plan-controls .functional-relations')).toHaveCount(0);
+ await expect(page.locator('.preview-check-details')).toBeHidden();
+ await page.locator('.preview-inspection summary').click();
  await expect(page.locator('.preview-check-details')).toContainText('床侧间距');
  await expect(page.locator('.preview-check-details')).toContainText('床头位置偏差');
  await expect(page.locator('.preview-check-details')).toContainText(' m');
@@ -77,7 +78,8 @@ test('bedside request means head-right in bed coordinates and remains a preview 
  await page.getByRole('button',{name:'俯视',exact:true}).click();
  await expect(page.getByTestId('bed-head-marker')).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('bedside-right-preview.png'),fullPage:true});
- await page.locator('.preview-banner').getByRole('button',{name:'退出预览'}).click();
+ await page.getByRole('button',{name:'返回当前布局'}).click();
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(original);
 });
 

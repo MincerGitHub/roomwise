@@ -1,7 +1,21 @@
-import {test,expect,type Route} from '@playwright/test';
+import {test,expect,type Page,type Route} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
 
 const photo={name:'owned-chair.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64')};
+const roomCanvas=(page:Page)=>page.locator('.scene-canvas');
+const roomLayout=async(page:Page)=>JSON.parse((await roomCanvas(page).getAttribute('data-layout'))!) as [string,number,number,number][];
+const closeRoom=async(page:Page)=>{if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click()};
+async function openRoom(page:Page,top=false){
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
+ await expect(roomCanvas(page).locator('canvas')).toBeVisible();
+ if(top)await page.getByRole('button',{name:'俯视',exact:true}).click();
+}
+async function snapshotRoom(page:Page){
+ await openRoom(page);
+ const layout=await roomLayout(page);
+ await closeRoom(page);
+ return layout;
+}
 
 test('manual furniture publication, independent instances and library deletion preserve saved rooms',async({page})=>{
  test.setTimeout(480000);
@@ -32,10 +46,10 @@ test('manual furniture publication, independent instances and library deletion p
  const card=dialog.locator('.owned-furniture-card').filter({hasText:name});
  await card.getByRole('button',{name:'加入当前房间'}).click();
  await expect(dialog).toHaveCount(0);
- const canvas=page.locator('.scene-canvas');const before=JSON.parse((await canvas.getAttribute('data-layout'))!);
+ const before=await snapshotRoom(page);
  await page.getByRole('button',{name:'自有家具库',exact:true}).click();
  await page.locator('.owned-furniture-card').filter({hasText:name}).getByRole('button',{name:'加入当前房间'}).click();
- const after=JSON.parse((await canvas.getAttribute('data-layout'))!);expect(after.length).toBe(before.length+1);
+ const after=await snapshotRoom(page);expect(after.length).toBe(before.length+1);
  expect(new Set(after.map((item:[string,number,number,number])=>item[0])).size).toBe(after.length);
  const savedResponse=page.waitForResponse('**/api/scenes/save');
  await page.getByRole('button',{name:'另存',exact:true}).click();
@@ -58,7 +72,7 @@ test('manual furniture publication, independent instances and library deletion p
  await expect(dialog.getByLabel('家具名称',{exact:true})).toHaveCount(0);
  await expect(dialog.getByRole('status').filter({hasText:'已从家具库删除'})).toBeVisible();
  await page.getByRole('button',{name:'关闭自有家具库'}).click();
- expect(JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(after);
+ expect(await snapshotRoom(page)).toEqual(after);
  const restored=await (await page.request.get(`/api/scenes/${saved.id}`)).json();
  const placed=restored.items.filter((item:{furnitureAssetId?:string})=>item.furnitureAssetId===asset.id);
  expect(placed).toHaveLength(2);for(const instance of placed)expect(instance.furnitureSnapshot).toEqual(asset.snapshot);
@@ -131,9 +145,8 @@ test('legacy library model uses independent scene IDs for selection drag rotatio
  await page.route('**/api/furniture',route=>route.fulfill({json:{assets:[asset],drafts:[]}}));
  await page.route('**/legacy-library-chair.glb',route=>route.fulfill({body:Buffer.from(binary),contentType:'model/gltf-binary'}));
  await page.route('**/mock-library-photo.png',route=>route.fulfill({body:photo.buffer,contentType:'image/png'}));
- const canvas=page.locator('.scene-canvas');
- const layout=async()=>JSON.parse((await canvas.getAttribute('data-layout'))!) as [string,number,number,number][];
- const original=await layout();
+ const canvas=roomCanvas(page),layout=()=>roomLayout(page);
+ const original=await snapshotRoom(page);
  async function add(){
   await page.getByRole('button',{name:'自有家具库',exact:true}).click();
   const loaded=page.waitForResponse('**/legacy-library-chair.glb');
@@ -141,33 +154,39 @@ test('legacy library model uses independent scene IDs for selection drag rotatio
   await (await loaded).finished();await page.waitForTimeout(500);
  }
  await add();
+ await openRoom(page,true);
  const first=(await layout()).find(item=>!original.some(previous=>previous[0]===item[0]))!;
  expect(first[0]).not.toBe('furniture-preview');
- await page.locator('.view-switch button').nth(1).click();
  const bounds=(await canvas.locator('canvas').boundingBox())!;
- const scale=bounds.height/(2*5.2*.72);
+ const scale=Math.min(bounds.width,bounds.height)/(2*5.2*.72);
  const point=(posX:number,posZ:number)=>({x:bounds.x+bounds.width/2+(posX-2.6)*scale,y:bounds.y+bounds.height/2+(posZ-2.1)*scale});
  const blank=point(.3,2);await page.mouse.click(blank.x,blank.y);
  await expect(page.locator('.selected-label')).toHaveCount(0);
  const center=point(first[1],first[2]);await page.mouse.click(center.x,center.y);
  await expect(page.locator('.selected-label')).toContainText(snapshot.label);
- await expect(page.getByLabel('名称',{exact:true})).toHaveValue(snapshot.label);
  await page.mouse.move(center.x,center.y);await page.mouse.down();await page.mouse.move(center.x-65,center.y+20,{steps:12});await page.mouse.up();
  await expect.poll(async()=>(await layout()).find(item=>item[0]===first[0])![1]).not.toBe(first[1]);
  const moved=(await layout()).find(item=>item[0]===first[0])!;
  for(const entry of original)expect((await layout()).find(item=>item[0]===entry[0])).toEqual(entry);
+ await closeRoom(page);
+ await page.locator('.item-card[aria-pressed=true]').click();
+ await expect(page.getByLabel('名称',{exact:true})).toHaveValue(snapshot.label);
  await page.getByRole('button',{name:'旋转90°'}).click();
- await expect.poll(async()=>(await layout()).find(item=>item[0]===first[0])![3]).toBe(90);
  await page.getByRole('button',{name:'切换位置锁定'}).click();
+ await openRoom(page,true);
+ await expect.poll(async()=>(await layout()).find(item=>item[0]===first[0])![3]).toBe(90);
  const locked=point(moved[1],moved[2]);await page.mouse.move(locked.x,locked.y);await page.mouse.down();await page.mouse.move(locked.x+35,locked.y-20,{steps:8});await page.mouse.up();
  expect((await layout()).find(item=>item[0]===first[0])).toEqual([first[0],moved[1],moved[2],90]);
+ await closeRoom(page);
  await page.getByRole('button',{name:'切换位置锁定'}).click();
  await add();
+ await openRoom(page,true);
  const second=(await layout()).find(item=>item[0]!==first[0]&&!original.some(previous=>previous[0]===item[0]))!;
  expect(second[0]).not.toBe(first[0]);
  const secondPoint=point(second[1],second[2]);await page.mouse.move(secondPoint.x,secondPoint.y);await page.mouse.down();await page.mouse.move(secondPoint.x-20,secondPoint.y-45,{steps:10});await page.mouse.up();
  await expect.poll(async()=>(await layout()).find(item=>item[0]===second[0])![2]).not.toBe(second[2]);
  expect((await layout()).find(item=>item[0]===first[0])).toEqual([first[0],moved[1],moved[2],90]);
+ await closeRoom(page);
  const savedResponse=page.waitForResponse('**/api/scenes/save');
  await page.getByRole('button',{name:'另存',exact:true}).click();
  const saved=await savedResponse;expect(saved.ok()).toBe(true);
@@ -177,8 +196,9 @@ test('legacy library model uses independent scene IDs for selection drag rotatio
   const instance=savedScene.items.find((item:{id:string})=>item.id===identifier);
   expect(instance.furnitureAssetId).toBe(asset.id);expect(instance.furnitureSnapshot).toEqual(snapshot);
  }
- const importedModel=page.waitForResponse('**/legacy-library-chair.glb');
  await page.locator('input[type=file][accept=".json"]').setInputFiles({name:'library-instances.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(savedScene))});
+ const importedModel=page.waitForResponse('**/legacy-library-chair.glb');
+ await openRoom(page,true);
  await (await importedModel).finished();await page.waitForTimeout(500);
  const restored=(await layout()).find(item=>item[0]===second[0])!;
  const restoredPoint=point(restored[1],restored[2]);await page.mouse.click(restoredPoint.x,restoredPoint.y);

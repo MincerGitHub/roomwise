@@ -1,0 +1,583 @@
+#root .app-shell .editor-workspace {
+  grid-template-areas: "heading heading" "editor planning";
+  grid-template-rows: auto 1fr;
+  gap: 24px;
+}
+#root .app-shell .editor-workspace .canvas-header { padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
+#root .app-shell .workspace-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
+#root .app-shell .room-details { position: relative; flex: none; z-index: 6; }
+#root .app-shell .room-details .details-trigger { min-height: 38px; border-radius: 999px !important; }
+#root .app-shell .room-details .details-trigger { position: relative; z-index: 2; }
+#root .app-shell .room-details .details-trigger::after {
+  content: "";
+  position: absolute;
+  top: calc(100% + 10px);
+  left: calc(50% - 6px);
+  z-index: 2;
+  width: 12px;
+  height: 12px;
+  rotate: 45deg;
+  border-top: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
+  background: #fff;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+#root .app-shell .room-details .details-trigger[aria-expanded=true]::after { opacity: 1; visibility: visible; }
+#root .app-shell .room-details-metrics {
+  position: absolute;
+  inset: calc(100% + 12px) auto auto 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  width: 100%;
+  margin: 0;
+  padding: 16px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--color-text-darkgreen);
+  box-shadow: 0 8px 24px rgb(63 95 69 / 15%);
+  opacity: 0;
+  translate: 0 -6px;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 180ms ease, translate 180ms ease, visibility 0s linear 180ms;
+}
+#root .app-shell .room-details-metrics::before {
+  content: "";
+  position: absolute;
+  inset: -14px 0 auto;
+  height: 14px;
+}
+#root .app-shell .room-details-metrics[data-open=true] {
+  opacity: 1;
+  translate: 0 0;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+#root .app-shell .room-details-metric {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  min-width: 0;
+  gap: 4px;
+  padding: 0 8px;
+}
+#root .app-shell .room-details-metric + .room-details-metric { border-left: 1px solid var(--color-border); }
+#root .app-shell .room-details-metric dt { font-size: 12px; white-space: nowrap; }
+#root .app-shell .room-details-metric dd { margin: 0; font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+#root .app-shell .editor-tools .tabs.tool-rail {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  width: 100%;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 16px;
+  border-color: #cadbbf;
+  border-radius: 8px;
+  background: #f7fbf5;
+}
+#root .app-shell .editor-tools .tabs.tool-rail button {
+  width: 100%;
+  min-height: 66px;
+  gap: 8px;
+  padding: 8px 4px !important;
+  border: 1px solid #dde8d4 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: #3f5f45 !important;
+  font-size: 14px !important;
+  font-weight: 600;
+}
+#root .app-shell .editor-tools .tabs.tool-rail button.active { border-color: #8fbf7f !important; background: #dcebd4 !important; }
+#root .app-shell .editor-tools .tool-icon { display: grid; place-items: center; flex: none; transition: translate 220ms ease, rotate 220ms ease; }
+#root .app-shell .editor-tools .tabs.tool-rail button.active .tool-icon { animation: roomwise-tool-select 220ms ease; }
+#root .app-shell .editor-tools .tabs.tool-rail button svg { width: 20px; height: 20px; }
+#root .app-shell .editor-tools .tabs.tool-rail button::before { display: none; }
+@keyframes roomwise-tool-select { 45% { translate: 0 -4px; rotate: -8deg; } }
+@media (hover:hover) {
+  #root .app-shell .editor-tools .tabs.tool-rail button:hover:not(.active) { background: #f1f7ed !important; border-color: #b8d9a8 !important; }
+  #root .app-shell .editor-tools .tabs.tool-rail button:hover .tool-icon { translate: 0 -2px; }
+}
+#root .app-shell .editor-workspace .editor-tools .sidebar { border: 1px solid #cadbbf; border-radius: 8px; background: #fff; }
+#root .app-shell .editor-workspace .editor-tools .sidebar-content { padding: 16px; }
+#root .app-shell .editor-workspace .editor-tools .sidebar-footer { padding-inline: 16px; background: #f7fbf5; }
+#root .app-shell .editor-workspace .planning-panel { gap: 16px; padding: 0; border: 0; }
+#root .app-shell .editor-workspace .editor-conversation,#root .app-shell .editor-workspace .plan-controls > .identified-requirements {
+  border: 1px solid #cadbbf !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+}
+#root .app-shell .editor-workspace .editor-conversation .conversation { margin: 0; padding: 16px !important; background: transparent !important; border: 0 !important; box-shadow: none !important; }
+#root .app-shell .editor-workspace .editor-conversation[aria-hidden=true] { visibility: hidden; }
+#root .app-shell .editor-workspace .plan-controls { gap: 16px; }
+#root .app-shell .editor-workspace .plan-controls > .identified-requirements { padding: 16px !important; }
+#root .app-shell .editor-workspace .plan-controls > .generation-bar { padding: 16px !important; border: 1px solid #e5d8a4 !important; border-inline-start: 3px solid #dfd095 !important; border-radius: 8px !important; }
+
+#root .app-shell .room-parameter-editor { width: min(480px,calc(100% - 24px)); max-height: calc(100dvh - 24px); color: var(--color-text-darkgreen); }
+#root .app-shell .room-parameter-editor::backdrop { background: rgb(36 62 44 / 28%); }
+#root .app-shell .room-parameter-editor fieldset { min-width: 0; padding: 8px 0 0; margin: 14px 0 0; border: 0; border-top: 1px solid var(--color-border); }
+#root .app-shell .room-parameter-editor legend { padding-inline-end: 8px; font-weight: 650; }
+#root .app-shell .room-parameter-editor .field-grid.two { grid-template-columns: repeat(2,minmax(0,1fr)); }
+
+@media (min-width: 960px) {
+  #root .app-shell .workspace-title { flex: 1 1 0; flex-wrap: nowrap; }
+  #root .app-shell .workspace-title h1 { min-width: 0; max-width: calc(100% - 380px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+@media (max-width: 780px) {
+  #root .app-shell .editor-workspace { grid-template-areas: "heading" "editor" "planning"; grid-template-rows: none; gap: 16px; }
+  #root .app-shell .editor-tools .tabs.tool-rail button { flex-direction: column; gap: 4px; }
+  #root .app-shell .preview-layout.has-candidates .preview-candidates { max-height: min(150px,25dvh); }
+}
+@media (max-width: 420px) {
+  #root .app-shell .editor-tools .tabs.tool-rail button { font-size: 12px !important; min-height: 62px; }
+  #root .app-shell .preview-viewport .canvas-tools { gap: 4px; }
+  #root .app-shell .preview-viewport .canvas-tools button { width: 38px; height: 38px; }
+}
+@media (max-height: 540px) {
+  #root .app-shell .preview-layout.has-candidates .preview-inspection { margin-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #root .app-shell :is(.room-details-metrics,.room-details-metric,.editor-tools .tool-icon) { transition: none !important; animation: none !important; }
+}
+
+
+/* Keep the scene and its editing tools visible together. */
+#root .app-shell .editor-workspace {
+  max-width: 1760px;
+  grid-template-columns: 336px minmax(0,1fr);
+  grid-template-areas: "heading heading" "editor planning";
+  grid-template-rows: auto 1fr;
+  gap: 20px;
+}
+#root .app-shell .editor-workspace .workspace-title h1 { max-width: none; }
+#root .app-shell .editor-workspace .editor-tools {
+  position: sticky;
+  top: 88px;
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  min-height: 0;
+  height: clamp(560px,calc(100dvh - 210px),900px);
+}
+#root .app-shell .editor-tools .tabs.tool-rail { flex: none; gap: 6px; padding: 6px; margin-bottom: 12px; }
+#root .app-shell .editor-tools .tabs.tool-rail button { flex-direction: column; font-size: 12px !important; gap: 4px; min-height: 64px; }
+#root .app-shell .editor-workspace .editor-tools .sidebar { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+#root .app-shell .editor-workspace .editor-tools .sidebar-content { flex: 1; min-width: 0; min-height: 0; margin: 0; border: 0; overflow: auto; }
+#root .app-shell .editor-tools .sidebar-footer { flex: none; }
+#root .app-shell .editor-tools .inventory-layout { flex-direction: column; gap: 16px; }
+#root .app-shell .editor-tools :is(.inventory-list,.inventory-inspector) { flex: none; width: 100%; }
+#root .app-shell .editor-tools .inventory-inspector { order: -1; padding: 0 0 16px; border: 0; border-bottom: 1px solid var(--color-border); }
+#root .app-shell .editor-tools .items-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+#root .app-shell .editor-workspace .room-preview {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: clamp(560px,calc(100dvh - 210px),900px);
+  min-width: 0;
+  border: 1px solid #cadbbf;
+  border-radius: 12px;
+}
+#root .app-shell .editor-workspace .room-preview .preview-banner { padding: 10px 16px; }
+#root .app-shell .editor-workspace .preview-banner h2 { font-size: 17px !important; }
+#root .app-shell .editor-workspace .preview-layout.has-candidates {
+  grid-template: "banner" auto "stage" minmax(0,1fr) "options" auto / minmax(0,1fr);
+}
+#root .app-shell .editor-workspace .preview-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  max-height: 160px;
+  padding: 10px 16px;
+  border-inline-start: 0;
+  border-top: 1px solid var(--color-border);
+}
+#root .app-shell .editor-workspace .preview-candidates h3 { margin: 0; }
+#root .app-shell .editor-workspace .preview-options { display: flex; flex-wrap: wrap; gap: 6px; }
+#root .app-shell .editor-workspace .preview-inspection { flex: 1 1 200px; margin: 0; padding: 0; border: 0; }
+#root .app-shell .editor-workspace .preview-inspection[open] { flex-basis: 100%; }
+#root .app-shell .editor-workspace .preview-check-details { max-height: 160px; overflow: auto; }
+#root .app-shell .editor-workspace.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  margin: 0;
+  padding: 16px;
+  grid-template-areas: "editor planning";
+  grid-template-rows: minmax(0,1fr);
+  gap: 16px;
+  overflow: hidden;
+  background: #f5f8f1;
+}
+#root .app-shell .editor-workspace.is-fullscreen > .canvas-header,
+#root .app-shell .editor-workspace.is-fullscreen .plan-controls { display: none; }
+#root .app-shell .editor-workspace.is-fullscreen .editor-tools { position: static; height: 100%; }
+#root .app-shell .editor-workspace.is-fullscreen .planning-panel { height: 100%; min-height: 0; grid-template-rows: minmax(0,1fr); }
+#root .app-shell .editor-workspace.is-fullscreen .room-preview { height: 100%; min-height: 0; }
+@media (max-width: 1100px) and (min-width: 901px) {
+  #root .app-shell .editor-workspace { grid-template-columns: 300px minmax(0,1fr); padding-inline: 20px; gap: 16px; }
+  #root .app-shell .preview-viewport .selected-label { top: 68px; right: 16px; max-width: calc(100% - 32px); }
+}
+@media (max-width: 900px) {
+  #root .app-shell .editor-workspace {
+    padding: 16px;
+    grid-template-columns: minmax(0,1fr);
+    grid-template-areas: "heading" "stage" "editor" "planning";
+    grid-template-rows: auto;
+    gap: 16px;
+  }
+  #root .app-shell .editor-workspace .planning-panel { display: contents; }
+  #root .app-shell .editor-workspace .room-preview { grid-area: stage; height: clamp(420px,65dvh,620px); }
+  #root .app-shell .editor-workspace .plan-controls { grid-area: planning; }
+  #root .app-shell .editor-workspace .editor-tools { position: static; height: 420px; }
+  #root .app-shell .editor-workspace .room-preview .preview-banner { padding: 8px; gap: 6px; }
+  #root .app-shell .editor-workspace .preview-header-actions { gap: 4px; }
+  #root .app-shell .editor-workspace .preview-header-actions .btn { padding-inline: 8px; }
+  #root .app-shell .editor-workspace.is-fullscreen { grid-template-areas: "stage" "editor"; grid-template-rows: minmax(0,1fr) minmax(220px,34dvh); padding: 8px; gap: 8px; }
+  #root .app-shell .editor-workspace.is-fullscreen .room-preview,
+  #root .app-shell .editor-workspace.is-fullscreen .editor-tools { height: 100%; }
+  #root .app-shell .editor-workspace.is-fullscreen .editor-tools .tabs.tool-rail { margin-bottom: 6px; }
+  #root .app-shell .editor-workspace.is-fullscreen .editor-tools .tabs.tool-rail button { min-height: 42px; flex-direction: row; }
+}
+@media (max-width: 420px) {
+  #root .app-shell .editor-workspace { padding-inline: 8px; }
+  #root .app-shell .editor-workspace .preview-header-actions .btn { min-height: 36px; font-size: 12px !important; }
+  #root .app-shell .editor-workspace .preview-candidates { padding: 6px 8px; gap: 4px 8px; max-height: 120px; }
+}
+
+@media (max-width: 900px) {
+  #root .app-shell .editor-workspace .room-preview .preview-banner { flex-direction: row; }
+  #root .app-shell .editor-workspace .preview-banner h2 { flex: 0 0 auto; width: auto; }
+  #root .app-shell .editor-workspace .preview-header-actions { flex: 0 1 auto; width: auto; justify-content: flex-end; }
+  #root .app-shell .editor-workspace.is-fullscreen { grid-template-rows: minmax(0,1fr) minmax(240px,38dvh); }
+  #root .app-shell .editor-workspace.is-fullscreen .editor-tools .sidebar-footer { display: none; }
+  #root .app-shell .editor-workspace.is-fullscreen .editor-tools .tabs.tool-rail button { min-height: 54px; flex-direction: column; }
+}
+@media (max-width: 420px) {
+  #root .app-shell .preview-viewport .scene-actions { gap: 6px; }
+  #root .app-shell .preview-viewport .view-switch { flex: none; gap: 0; padding: 2px; }
+  #root .app-shell .preview-viewport .view-switch button { gap: 4px; padding: 4px 6px !important; font-size: 12px !important; white-space: nowrap; }
+  #root .app-shell .preview-viewport .canvas-tools { gap: 4px; }
+  #root .app-shell .preview-viewport .canvas-tools button { flex: none; width: 34px; height: 36px; }
+}
+
+
+/* Compact the app chrome and align the scene with the room title. */
+#root .app-shell .app-header {
+  height: 48px;
+  min-height: 48px;
+  padding: 4px 24px;
+  gap: 12px;
+}
+#root .app-shell .app-header .brand { gap: 8px; }
+#root .app-shell .app-header .brand-mark { width: 30px; height: 30px; }
+#root .app-shell .app-header .header-actions .btn { min-height: 32px; padding-block: 5px !important; }
+#root .app-shell .editor-workspace {
+  --workspace-preview-height: clamp(560px,calc(100dvh - 72px),1000px);
+  padding-top: 12px;
+  grid-template-areas: "heading planning" "editor planning";
+  grid-template-rows: 38px minmax(0,1fr);
+  row-gap: 12px;
+}
+#root .app-shell .editor-workspace .canvas-header { align-self: start; min-height: 38px; padding: 0; border: 0; }
+#root .app-shell .editor-workspace .workspace-title { width: 100%; flex-wrap: nowrap; gap: 8px; }
+#root .app-shell .editor-workspace .workspace-title h1 { display: block; min-width: 0; font-size: 22px !important; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#root .app-shell .editor-workspace .details-trigger { min-height: 32px; padding: 4px 8px !important; }
+#root .app-shell .editor-workspace .editor-tools { top: 60px; height: calc(var(--workspace-preview-height) - 50px); }
+#root .app-shell .editor-workspace .room-preview { height: var(--workspace-preview-height); }
+#root .app-shell .editor-workspace.is-fullscreen {
+  padding: 16px;
+  grid-template-areas: "editor planning";
+  grid-template-rows: minmax(0,1fr);
+}
+#root .app-shell .editor-workspace.is-fullscreen .editor-tools,
+#root .app-shell .editor-workspace.is-fullscreen .room-preview { height: 100%; }
+@media (max-width: 900px) {
+  #root .app-shell .app-header { height: auto; padding: 6px 12px; gap: 6px 12px; }
+  #root .app-shell .editor-workspace {
+    grid-template-areas: "heading" "stage" "editor" "planning";
+    grid-template-rows: auto;
+    padding-top: 8px;
+    row-gap: 8px;
+  }
+  #root .app-shell .editor-workspace .room-preview { height: clamp(420px,65dvh,620px); }
+  #root .app-shell .editor-workspace .editor-tools { height: 420px; }
+  #root .app-shell .editor-workspace.is-fullscreen { padding: 8px; grid-template-areas: "stage" "editor"; grid-template-rows: minmax(0,1fr) minmax(240px,38dvh); }
+  #root .app-shell .editor-workspace.is-fullscreen .room-preview,
+  #root .app-shell .editor-workspace.is-fullscreen .editor-tools { height: 100%; }
+}
+
+
+#root .app-shell .editor-conversation .messages { max-height: 240px; overflow: auto; overscroll-behavior: contain; }
+
+
+/* Keep the main actions on screen and disclose their details on demand. */
+#root .app-shell .candidate-panel[hidden],
+#root .app-shell .identified-requirements[hidden],
+#root .app-shell .conversation-content[hidden] { display: none !important; }
+#root .app-shell .editor-workspace .plan-controls { gap: 8px; }
+#root .app-shell .editor-workspace .plan-controls > .generation-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px !important;
+}
+#root .app-shell .editor-workspace .generation-copy { gap: 8px; }
+#root .app-shell .editor-workspace .generation-actions { justify-content: flex-end; min-width: 0; gap: 8px; }
+#root .app-shell .editor-workspace .generation-actions select { flex: 0 1 200px; width: 200px; min-width: 100px; }
+#root .app-shell :is(.plans-toggle,.requirements-toggle,.conversation-toggle) { flex: none; gap: 6px; min-height: 36px; padding: 6px 10px !important; }
+#root .app-shell :is(.plans-toggle,.requirements-toggle,.conversation-toggle) > span:last-of-type { font-size: 12px !important; }
+#root .app-shell :is(.plans-toggle,.requirements-toggle,.conversation-toggle)[aria-expanded=true] > svg { rotate: 180deg; }
+#root .app-shell .editor-workspace .plan-controls > .identified-requirements {
+  max-height: 150px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px !important;
+}
+#root .app-shell .editor-workspace .editor-conversation .conversation { padding: 8px 12px !important; }
+#root .app-shell .conversation-composer { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#root .app-shell .conversation-composer .command-box { flex: 1; min-width: 0; margin: 0; }
+#root .app-shell .conversation-content { margin-bottom: 8px; }
+#root .app-shell .conversation-content .conversation-heading { margin: 0 0 8px; padding: 0; border: 0; }
+#root .app-shell .conversation-empty { margin: 0; font-size: 12px !important; color: var(--color-text-darkgreen); }
+#root .app-shell .editor-conversation .messages { max-height: 120px; margin: 0; padding: 4px 0; overflow: auto; overscroll-behavior: contain; }
+#root .app-shell .editor-conversation .message { padding: 6px 8px; }
+@media (min-width: 901px) {
+  #root .app-shell .editor-workspace:not(.is-fullscreen) {
+    height: calc(100dvh - 48px);
+    min-height: 0;
+    padding-bottom: 12px;
+  }
+  #root .app-shell .editor-workspace:not(.is-fullscreen) .editor-tools { position: static; height: 100%; min-height: 0; }
+  #root .app-shell .editor-workspace:not(.is-fullscreen) .planning-panel {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    gap: 10px;
+    height: 100%;
+    min-height: 0;
+  }
+  #root .app-shell .editor-workspace:not(.is-fullscreen) .room-preview { flex: 1 1 0; height: auto; min-height: 250px; }
+  #root .app-shell .editor-workspace:not(.is-fullscreen) .plan-controls {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: min(440px,calc(100% - 260px));
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  #root .app-shell .editor-workspace .plan-controls > :is(.generation-bar,.identified-requirements,.editor-conversation) { flex-shrink: 0; }
+}
+@media (max-width: 1100px) {
+  #root .app-shell .editor-workspace .plan-controls > .generation-bar { grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+  #root .app-shell .editor-workspace .generation-actions { grid-column: 1 / -1; grid-row: 2; }
+  #root .app-shell .editor-workspace .generation-actions select { flex: 1; width: auto; }
+  #root .app-shell .generation-disclosures { grid-column: 2; grid-row: 1; }
+}
+@media (max-width: 900px) {
+  #root .app-shell .editor-workspace:not(.is-fullscreen) { grid-template-areas: "heading" "stage" "planning" "editor"; }
+  #root .app-shell .editor-workspace:not(.is-fullscreen) .room-preview { height: clamp(230px,calc(100svh - 440px),400px); }
+}
+@media (max-width: 420px) {
+  #root .app-shell .editor-workspace .editor-conversation .conversation { padding: 8px !important; }
+  #root .app-shell :is(.plans-toggle,.requirements-toggle,.conversation-toggle) { gap: 4px; padding: 6px !important; }
+  #root .app-shell :is(.plans-toggle,.requirements-toggle,.conversation-toggle) > span { font-size: 12px !important; }
+  #root .app-shell .conversation-composer { gap: 4px; }
+}
+
+#root .app-shell .editor-workspace .plan-controls { width: 100%; }
+#root .app-shell .editor-workspace .plan-controls > .identified-requirements { max-height: min(150px,14dvh); }
+#root .app-shell .editor-conversation .messages { max-height: min(120px,12dvh); }
+
+/* Let the room form use the available panel height. */
+#root .app-shell .editor-workspace .editor-tools .tabs.tool-rail {
+  padding: 4px;
+  margin-bottom: 8px;
+}
+#root .app-shell .editor-workspace .editor-tools .tabs.tool-rail button {
+  min-height: 56px;
+  padding: 4px !important;
+  gap: 2px;
+}
+#root .app-shell .editor-workspace .editor-tools .tabs.tool-rail button svg { width: 18px; height: 18px; }
+#root .app-shell .editor-workspace .editor-tools .sidebar-footer {
+  min-height: 40px;
+  padding: 4px 12px;
+}
+#root .app-shell .editor-workspace .sidebar-content[data-tool=room] {
+  --room-control-height: clamp(32px,calc(8dvh - 22px),44px);
+  --room-field-gap: clamp(5px,calc(3dvh - 14px),12px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--room-field-gap);
+  padding: clamp(8px,calc(3dvh - 10px),16px);
+}
+#root .app-shell .sidebar-content[data-tool=room] > * { flex: none; min-width: 0; }
+#root .app-shell .sidebar-content[data-tool=room] .section-heading { margin: 0; }
+#root .app-shell .sidebar-content[data-tool=room] .section-heading h2 { font-size: 18px !important; }
+#root .app-shell .sidebar-content[data-tool=room] .field {
+  min-width: 0;
+  margin: 0;
+  gap: 4px;
+  font-size: 14px !important;
+}
+#root .app-shell .sidebar-content[data-tool=room] .field :is(input,select) {
+  min-width: 0;
+  min-height: var(--room-control-height);
+  height: var(--room-control-height);
+  padding: 5px 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+#root .app-shell .sidebar-content[data-tool=room] .field-grid { gap: 8px; }
+#root .app-shell .sidebar-content[data-tool=room] .room-inline-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+#root .app-shell .sidebar-content[data-tool=room] .room-inline-field input { flex: 1; width: 0; }
+#root .app-shell .sidebar-content[data-tool=room] .room-inline-field select { width: 76px; }
+#root .app-shell .room-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+#root .app-shell .sidebar-content[data-tool=room] h3 { margin: 0; font-size: 15px !important; white-space: nowrap; }
+#root .app-shell .sidebar-content[data-tool=room] .hint { margin: 0; line-height: 1.5; }
+#root .app-shell .sidebar-content[data-tool=room] .room-window-fields { grid-template-columns: repeat(4,minmax(0,1fr)); }
+#root .app-shell .room-reference { display: flex; align-items: center; gap: 8px; }
+#root .app-shell .room-reference > div { flex: 1; min-width: 0; }
+#root .app-shell .room-reference .btn { margin: 0; min-height: var(--room-control-height); padding: 5px 8px !important; font-size: 14px !important; }
+#root .app-shell .room-reference .hint { margin-top: 4px !important; }
+#root .app-shell .room-reference .floor-reference {
+  flex: none;
+  width: calc(var(--room-control-height) + 22px);
+  height: calc(var(--room-control-height) + 22px);
+  max-height: none;
+  margin: 0;
+  object-fit: contain;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+@media (max-width: 900px) {
+  #root .app-shell .editor-workspace:not(.is-fullscreen) .editor-tools:has([data-tool=room]) { height: auto; }
+  #root .app-shell .editor-workspace:not(.is-fullscreen) .sidebar:has([data-tool=room]) { flex: none; max-height: none; }
+  #root .app-shell .editor-workspace:not(.is-fullscreen) .sidebar-content[data-tool=room] { flex: none; max-height: none; }
+}
+
+@media (min-width: 901px) and (max-height: 680px) {
+  #root .app-shell .editor-workspace .editor-tools .sidebar-footer { padding-block: 3px; min-height: 34px; }
+  #root .app-shell .editor-workspace .editor-tools .tabs.tool-rail button { min-height: 40px; padding: 2px !important; gap: 0; }
+  #root .app-shell .editor-workspace .editor-tools .tabs.tool-rail button svg { width: 16px; height: 16px; }
+  #root .app-shell .editor-workspace .editor-tools .tabs.tool-rail button > span { font-size: 12px !important; line-height: 16px; }
+  #root .app-shell .editor-workspace .sidebar-content[data-tool=room] { --room-field-gap: 5px; padding: 8px; }
+  #root .app-shell .sidebar-content[data-tool=room] .section-heading h2 { font-size: 16px !important; }
+  #root .app-shell .sidebar-content[data-tool=room] .field { gap: 3px; font-size: 12px !important; }
+  #root .app-shell .sidebar-content[data-tool=room] .field :is(input,select) { font-size: 13px; }
+  #root .app-shell .sidebar-content[data-tool=room] h3 { font-size: 14px !important; }
+  #root .app-shell .sidebar-content[data-tool=room] .room-section-heading { padding-top: 4px; }
+  #root .app-shell .room-reference .floor-reference { width: 44px; height: 44px; }
+}
+
+#root .app-shell .sidebar-content[data-tool=room] .room-form-group { display: flex; flex-direction: column; gap: var(--room-field-gap); }
+#root .app-shell .editor-workspace .canvas-header { position: relative; z-index: 50; overflow: visible; }
+#root .app-shell .editor-workspace .workspace-title { position: relative; }
+#root .app-shell .editor-workspace .room-details { position: static; }
+
+/* Use green for text, control, and scene selection feedback. */
+#root .app-shell {
+  --selection-fill: #dcebd4;
+  --selection-ink: #2f5f37;
+  --selection-border: #8fbf7f;
+  --selection-outline: #5b8c4d;
+  accent-color: var(--selection-outline);
+}
+#root .app-shell ::selection { background: var(--selection-fill); color: var(--selection-ink); }
+#root .app-shell :is(button,a,input,select,textarea,summary,[tabindex]):focus-visible {
+  outline-color: var(--selection-outline) !important;
+}
+#root .app-shell :is(input[type=checkbox],input[type=radio],input[type=range]) { accent-color: var(--selection-outline); }
+#root .app-shell :is(.item-card.selected,.candidate-card.active,.preview-option[aria-pressed=true],.view-switch button.active,.room-inside-toggle[aria-pressed=true]):not(:disabled) {
+  --control-bg: var(--selection-fill);
+  --control-hover: var(--selection-fill);
+  --control-active: var(--selection-fill);
+  --control-border: var(--selection-border);
+  --control-ink: var(--selection-ink);
+  background: var(--selection-fill) !important;
+  border-color: var(--selection-border) !important;
+  color: var(--selection-ink) !important;
+}
+#root .app-shell :is(.selected-label,.bed-head-marker) {
+  background: var(--selection-fill) !important;
+  border-color: var(--selection-border) !important;
+  color: var(--selection-ink) !important;
+}
+#root .app-shell .crop-selection { border-color: var(--selection-outline); background: rgb(143 191 127 / 22%); }
+#root .app-shell select option:checked { background: var(--selection-fill); color: var(--selection-ink); }
+@supports (appearance: base-select) {
+  #root .app-shell select,
+  #root .app-shell select::picker(select) { appearance: base-select; }
+  #root .app-shell select { align-items: center; gap: 8px; }
+  #root .app-shell select::picker-icon { color: var(--selection-ink); }
+  #root .app-shell select::picker(select) {
+    padding: 4px;
+    border: 1px solid var(--selection-border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--color-text-darkgreen);
+  }
+  #root .app-shell select option {
+    min-height: 34px;
+    padding: 6px 10px;
+    gap: 8px;
+    border-radius: 4px;
+  }
+  #root .app-shell select option:is(:checked,:hover,:focus-visible):not(:disabled) {
+    background: var(--selection-fill);
+    color: var(--selection-ink);
+    outline: none;
+  }
+  #root .app-shell select option::checkmark { color: var(--selection-outline); }
+  #root .app-shell select option:disabled { color: var(--text-disabled); background: transparent; }
+}
+
+#root .app-shell .generation-disclosures { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+#root .app-shell .editor-workspace .plan-controls > .candidate-panel {
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 0;
+  max-height: min(180px,22dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+}
+#root .app-shell .candidate-panel .candidate-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr));
+  gap: 8px;
+  margin: 0;
+}
+#root .app-shell .candidate-panel .candidate-card { min-width: 0; padding: 10px; gap: 8px; }
+#root .app-shell .plans-empty { margin: 0; font-size: 13px; color: var(--color-text-darkgreen); }
+@media (max-width: 420px) {
+  #root .app-shell .generation-disclosures { gap: 4px; }
+  #root .app-shell .generation-disclosures :is(.plans-toggle,.requirements-toggle) { padding-inline: 4px !important; gap: 3px; }
+  #root .app-shell .editor-workspace .generation-copy h3 { font-size: 15px !important; white-space: nowrap; }
+}

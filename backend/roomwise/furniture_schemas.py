@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from .schemas import CATEGORIES, DataModel, DimensionSources, FurnitureParameters
+from .schemas import CATEGORIES, DataModel, DimensionSources, FurnitureParameters, FunctionalProfile
 
 
 CHAIRS = {"chair", "armchair", "dressing_chair", "stool", "sofa"}
@@ -34,6 +34,7 @@ class DimensionEvidence(DataModel):
 
 
 class FurnitureProperties(DataModel):
+    functionalProfile: FunctionalProfile | None = Field(default=None, exclude_if=lambda value: value is None)
     label: str | None = Field(default=None, min_length=1, max_length=100)
     category: str | None = Field(default=None, max_length=50)
     subtype: str | None = Field(default=None, max_length=100)

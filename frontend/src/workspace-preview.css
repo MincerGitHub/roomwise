@@ -1,0 +1,136 @@
+#root .app-shell .editor-workspace {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-areas: "heading heading" "summary summary" "editor planning";
+  grid-template-rows: auto auto 1fr;
+  max-width: 1440px;
+  gap: 16px 32px;
+}
+#root .app-shell .editor-workspace .canvas-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+#root .app-shell .editor-workspace .canvas-header h1 { margin: 0; font-size: 28px !important; }
+#root .app-shell .workspace-actions { display: flex; align-items: center; gap: 8px; }
+#root .app-shell .workspace-actions .open-room-preview { min-height: 42px; border-radius: 999px !important; }
+#root .app-shell .editor-workspace .room-summary { max-width: none; }
+#root .app-shell .editor-workspace .room-summary .room-summary-card.room-summary-card { min-height: 48px; }
+#root .app-shell .editor-workspace .room-summary-card > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+#root .app-shell .editor-tools { grid-area: editor; min-width: 0; }
+#root .app-shell .editor-tools .tool-rail { position: static; width: fit-content; max-width: 100%; margin-bottom: 12px; }
+#root .app-shell .editor-tools .tabs.tool-rail button { flex: 0 0 auto; padding-inline: 12px !important; }
+#root .app-shell .editor-tools .sidebar { position: static; max-height: none; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+#root .app-shell .editor-tools .sidebar-content { padding: 16px 0; max-height: none; overflow: visible; }
+#root .app-shell .editor-tools .sidebar-footer { padding-inline: 0; background: transparent; }
+#root .app-shell .editor-tools .items-list { grid-template-columns: repeat(3,minmax(0,1fr)); }
+#root .app-shell .inventory-layout { display: flex; flex-wrap: wrap; gap: 16px; }
+#root .app-shell .inventory-list { flex: 1 1 220px; min-width: 0; }
+#root .app-shell .inventory-inspector { flex: 1 1 224px; min-width: 0; padding-inline-start: 16px; border-inline-start: 1px solid var(--color-border); }
+#root .app-shell .inventory-inspector .inspector-fold { margin-top: 0; }
+#root .app-shell .inventory-list .suggest-box { margin-top: 16px; }
+#root .app-shell .editor-workspace .planning-panel { grid-template-columns: minmax(0,1fr); align-content: start; gap: 16px; padding-inline-start: 24px; border-inline-start: 1px solid var(--color-border); }
+#root .app-shell .editor-workspace .planning-panel > .conversation { padding: 4px 0 16px !important; border-bottom: 1px solid var(--color-border) !important; }
+#root .app-shell .editor-workspace .conversation .prompt-examples { margin-block: 12px; }
+#root .app-shell .editor-workspace .plan-controls { gap: 12px; }
+#root .app-shell .editor-workspace .plan-controls > .identified-requirements { padding-block: 4px !important; }
+#root .app-shell .editor-workspace .plan-controls .generation-copy { flex: 1 1 auto; }
+#root .app-shell .editor-workspace .plan-controls .generation-actions { flex: 1 1 240px; }
+#root .app-shell .editor-workspace .generation-actions .btn { flex: 0 0 auto; }
+
+html:has(.room-preview[open]) { overflow: hidden; }
+#root .app-shell .room-preview {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background: #eaf2e6;
+  color: var(--color-text-darkgreen);
+}
+#root .app-shell .preview-layout {
+  display: grid;
+  grid-template: "banner" auto "stage" minmax(0,1fr) / minmax(0,1fr);
+  height: 100%;
+}
+#root .app-shell .preview-layout.has-candidates {
+  grid-template: "banner banner" auto "stage options" minmax(0,1fr) / minmax(0,1fr) clamp(210px, 19vw, 280px);
+}
+#root .app-shell .room-preview .preview-banner {
+  grid-area: banner;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 12px 24px;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0 !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  color: var(--color-text-darkgreen);
+}
+#root .app-shell .room-preview .preview-banner h2 { display: flex; flex-wrap: wrap; align-items: baseline; min-width: 0; gap: 4px 12px; font-size: 20px !important; font-weight: 650; overflow-wrap: anywhere; }
+#root .app-shell .room-preview .preview-banner h2 > span { font-size: 13px; font-weight: 500; }
+#root .app-shell .room-preview .preview-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+#root .app-shell .room-preview .preview-header-actions .btn { min-height: 40px; }
+#root .app-shell .room-preview .preview-viewport { grid-area: stage; align-self: stretch; width: 100%; height: 100%; min-height: 0; max-height: none; }
+#root .app-shell .room-preview .preview-loading { position: absolute; inset: 50% 16px auto; text-align: center; }
+#root .app-shell .room-preview .selected-label { max-width: calc(100% - 320px); }
+#root .app-shell .room-preview .canvas-validation { margin: 0; }
+#root .app-shell .preview-candidates {
+  grid-area: options;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  border-inline-start: 1px solid var(--color-border);
+  background: #fff;
+}
+#root .app-shell .preview-candidates h3 { font-size: 15px; margin-bottom: 12px; }
+#root .app-shell .preview-options { display: grid; gap: 8px; }
+#root .app-shell .preview-options .preview-option { min-width: 0; min-height: 44px; justify-content: space-between; text-align: start; }
+#root .app-shell .preview-options .preview-option[aria-pressed=true] { --control-bg: var(--color-green-soft); --control-hover: var(--color-green-soft); --control-border: var(--color-green-main); }
+#root .app-shell .preview-inspection { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+#root .app-shell .preview-inspection > summary { display: flex; align-items: center; gap: 8px; padding: 8px; min-height: 40px; cursor: pointer; }
+#root .app-shell .preview-inspection > summary { --control-ink: var(--color-text-darkgreen); }
+#root .app-shell .preview-inspection > summary > svg { flex: none; }
+#root .app-shell .preview-inspection > summary > svg:last-child { margin-inline-start: auto; }
+#root .app-shell .preview-inspection[open] > summary > svg:last-child { rotate: 90deg; }
+#root .app-shell .preview-inspection .preview-check-details { padding: 8px 0; overflow-wrap: anywhere; }
+#root .app-shell .room-preview .furniture-context-menu { z-index: 30; }
+#root .app-shell .room-preview .context-menu-dismiss { z-index: 29; }
+
+@media (max-width: 1020px) {
+  #root .app-shell .editor-tools .items-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #root .app-shell .inventory-inspector { padding-inline-start: 0; border: 0; }
+}
+@media (max-width: 780px) {
+  #root .app-shell .editor-workspace { grid-template-columns: minmax(0,1fr); grid-template-areas: "heading" "summary" "editor" "planning"; grid-template-rows: none; gap: 16px; }
+  #root .app-shell .editor-workspace .canvas-header h1 { font-size: 22px !important; }
+  #root .app-shell .editor-workspace .planning-panel { padding: 12px 0 0; border-inline-start: 0; border-top: 1px solid var(--color-border); }
+  #root .app-shell .editor-tools .sidebar-content { padding-block: 8px; }
+  #root .app-shell .room-preview .preview-banner { padding: 8px 12px; }
+  #root .app-shell .room-preview .preview-banner h2 { flex-direction: column; gap: 0; font-size: 17px !important; }
+  #root .app-shell .preview-layout.has-candidates { grid-template: "banner" auto "stage" minmax(0,1fr) "options" auto / minmax(0,1fr); }
+  #root .app-shell .preview-candidates { padding: 8px 12px; max-height: 38dvh; overscroll-behavior: contain; border-inline-start: 0; border-top: 1px solid var(--color-border); }
+  #root .app-shell .preview-candidates h3 { margin-bottom: 4px; }
+  #root .app-shell .preview-options { display: flex; flex-wrap: wrap; gap: 4px; }
+  #root .app-shell .preview-options .preview-option { flex: 1 0 auto; justify-content: center; min-height: 40px; }
+  #root .app-shell .preview-inspection { margin-top: 4px; padding-top: 4px; }
+}
+@media (max-width: 520px) {
+  #root .app-shell .editor-tools .tool-rail { width: 100%; }
+  #root .app-shell .editor-tools .tabs.tool-rail button { flex: 1 1 0; padding-inline: 4px !important; }
+  #root .app-shell .room-preview .selected-label { max-width: calc(100% - 16px); }
+}

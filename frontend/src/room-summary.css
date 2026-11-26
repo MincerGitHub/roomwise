@@ -1,0 +1,37 @@
+.room-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 22px;
+  background:
+    repeating-linear-gradient(118deg, transparent 0 52px, rgba(67,205,207,.32) 64px, transparent 105px, transparent 178px),
+    repeating-linear-gradient(32deg, transparent 0 91px, rgba(198,97,176,.32) 115px, transparent 161px, transparent 233px),
+    linear-gradient(120deg, #667eea, #764ba2);
+  color: white;
+}
+.room-summary-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  min-width: 0;
+  background: rgba(255,255,255,0.15);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(30,21,70,.12);
+}
+.room-summary-card svg { flex: none; margin-top: 2px; opacity: .9; }
+.room-summary-card h3 { margin: 0; font-size: 13px; color: inherit; opacity: .94; }
+.room-summary-card strong { display: block; margin: 3px 0; font-size: 20px; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.room-summary-card p { margin: 0; font-size: 12px; line-height: 1.5; color: inherit; opacity: .88; }
+@media (max-width: 780px) {
+  .workspace .main-panel > .room-summary { order: 2; padding: 12px; gap: 8px; }
+}
+@media (max-width: 560px) {
+  .room-summary { grid-template-columns: 1fr; }
+  .room-summary-card { align-items: center; padding: 8px 12px; }
+  .room-summary-card > div { flex: 1; display: grid; grid-template-columns: 1fr auto; column-gap: 6px; align-items: center; }
+  .room-summary-card strong { grid-column: 2; grid-row: 1 / 3; }
+}

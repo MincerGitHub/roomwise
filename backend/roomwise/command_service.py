@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from .commands import apply_command, is_bedside_only_command, is_global_wall_command, is_vanity_or_wall_exemption_command, is_relative_furniture_command, is_face_item_command
+from .commands import is_window_only_command
 from .intent_planner import language_status, plan_command
 
 
@@ -12,6 +13,11 @@ def interpret_command(scene: dict, text: str, selected_id: str | None = None):
     # or availability. They do not infer an ambiguous design intention.
     if re.fullmatch(r"(?:请)?(?:撤销|撤销上一步|恢复上一步|回到上一版)[。！!\s]*", text.strip()):
         return apply_command(scene, text, selected_id)
+    if is_window_only_command(text, scene, selected_id):
+        response = apply_command(scene, text, selected_id)
+        response["language"] = language_status()
+        response["message"] = "本次由本地规则识别靠窗与朝向要求。" + response["message"]
+        return response
     if is_bedside_only_command(text):
         return apply_command(scene, text, selected_id)
     if is_vanity_or_wall_exemption_command(text):
@@ -41,7 +47,8 @@ def interpret_command(scene: dict, text: str, selected_id: str | None = None):
         action = "unsupported" if planned.get("action") == "unsupported" else "clarify"
         return {"baseVersion": scene.get("version", 0), "action": action,
                 "message": planned.get("message") or "本次要求尚未明确，未修改场景。",
-                "parser": "language_model", "interpretation": metadata, "language": status}
+                "parser": "language_model", "interpretation": metadata, "language": status,
+                **({"languageError": planned["error"]} if planned.get("error") else {})}
     executed = apply_command(scene, planned["canonicalText"], selected_id)
     executed["parser"] = "language_model_with_validated_executor"
     executed["interpretation"] = metadata

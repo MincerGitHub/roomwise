@@ -32,7 +32,9 @@ test('bed in front of a locked wardrobe follows its local front and stays a prev
  });
  await expect(page.locator('.canvas-header')).toContainText('相对位置回归测试');
  const canvas=page.locator('.scene-canvas');
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  const original=JSON.parse((await canvas.getAttribute('data-layout'))!);
+ if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click();
  const commandResponse=page.waitForResponse(r=>r.url().endsWith('/api/command')&&r.request().method()==='POST');
  const generateResponse=page.waitForResponse(r=>r.url().endsWith('/api/generate')&&r.request().method()==='POST',{timeout:45000});
  await page.locator('.command-box input').fill('\u628a\u5e8a\u653e\u5728\u8863\u67dc\u524d\u9762');
@@ -59,12 +61,13 @@ test('bed in front of a locked wardrobe follows its local front and stays a prev
  }
  await page.getByLabel('预览方案 1').click();
  await expect(page.locator('.preview-banner')).toBeVisible();
- await page.locator('.canvas-validation button').click();
+ await page.locator('.preview-inspection summary').click();
  await expect(page.locator('.preview-check-details')).toContainText('前方');
  await expect(page.locator('.preview-check-details')).toContainText('家具间距上限');
  await expect(page.locator('.header-actions .btn.primary')).toBeDisabled();
  await page.locator('.preview-banner .btn.primary').click();
- await expect(page.locator('.preview-banner')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'返回当前布局'})).toHaveCount(0);
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  const applied=JSON.parse((await canvas.getAttribute('data-layout'))!);
  expect(applied).not.toEqual(original);
  expect(applied.find((item:[string,number,number,number])=>item[0]==='wardrobe-target')).toEqual(['wardrobe-target',3,5,180]);
@@ -119,10 +122,10 @@ test('a chair can face a coffee table through command, preview and apply',async(
   expect([table.x,table.z,table.rotation,table.locked]).toEqual([4,4,0,true]);
  }
  await page.getByLabel('预览方案 1').click();
- await page.locator('.canvas-validation button').click();
+ await page.locator('.preview-inspection summary').click();
  await expect(page.locator('.preview-check-details')).toContainText('正面需朝向茶几');
  await page.locator('.preview-banner .btn.primary').click();
- await expect(page.locator('.preview-banner')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'返回当前布局'})).toHaveCount(0);
 });
 
 test('an overlapping unlocked target is staged before placing a chair toward it',async({page})=>{
@@ -188,19 +191,24 @@ for(const relation of [
    expect(gap).toBeLessThanOrEqual(1.5+1e-6);
   }
   const canvas=page.locator('.scene-canvas');
+  await expect(page.locator('.scene-canvas canvas')).toBeVisible();
   const original=await canvas.getAttribute('data-layout');
+  if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click();
   await page.getByLabel('预览方案 1').click();
   await expect(page.locator('.preview-banner')).toBeVisible();
-  await page.locator('.canvas-validation button').click();
+  await page.locator('.preview-inspection summary').click();
   await expect(page.locator('.preview-check-details')).toContainText(
    relation.direction==='left'?'左侧':relation.direction==='right'?'右侧':relation.label,
   );
-  await page.locator('.preview-banner').getByRole('button',{name:'退出预览'}).click();
+  await page.getByRole('button',{name:'返回当前布局'}).click();
+  await expect(page.locator('.scene-canvas canvas')).toBeVisible();
   await expect(canvas).toHaveAttribute('data-layout',original!);
+  if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click();
   await page.getByLabel('预览方案 1').click();
   const preview=await canvas.getAttribute('data-layout');
   await page.locator('.preview-banner .btn.primary').click();
-  await expect(page.locator('.preview-banner')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'返回当前布局'})).toHaveCount(0);
+  await expect(page.locator('.scene-canvas canvas')).toBeVisible();
   await expect(canvas).toHaveAttribute('data-layout',preview!);
  });
 }

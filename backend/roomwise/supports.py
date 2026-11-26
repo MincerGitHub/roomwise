@@ -4,6 +4,7 @@ from math import cos, radians, sin
 SURFACE_CATEGORIES = {"desk", "table", "coffee_table", "nightstand", "tv_stand", "cabinet", "children_cabinet"}
 EDGE_MARGIN = .03
 EPSILON = 1e-5
+WALL_APPLIANCES = {"wall_tv", "air_conditioner"}
 
 
 def elevation(item):
@@ -19,7 +20,7 @@ def is_surface(item):
 
 
 def fits_surface(item, target):
-    if item["category"] != "storage_box" or item["height"] > .6 or not is_surface(target):
+    if item["category"] not in {"storage_box", "laptop"} or item["height"] > .6 or not is_surface(target):
         return False
     angle, parent = radians(item.get("rotation", 0)), radians(target.get("rotation", 0))
     for sx, sz in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
@@ -35,6 +36,9 @@ def support_errors(scene):
     items = {item["id"]: item for item in scene["items"]}
     errors = []
     for item in items.values():
+        if item["category"] in WALL_APPLIANCES:
+            errors.extend(wall_mount_errors(item, scene["room"]))
+            continue
         target = items.get(item.get("supportId"))
         if not item.get("supportId") and elevation(item) <= EPSILON:
             continue
@@ -42,6 +46,25 @@ def support_errors(scene):
             errors.append({"type": "support", "severity": "error", "itemIds": [item["id"]] + ([target["id"]] if target else []),
                            "message": f"{item['label']}没有完整落在可承托的平整台面内，或离地高度与台面不一致"})
     return errors
+
+
+def wall_mount_errors(item, room):
+    """Check mounting height, back contact and front facing the room."""
+    from shapely.geometry import LineString
+    from .window_constraints import matching_wall_segments
+
+    angle = radians(item.get("rotation", 0))
+    forward = sin(angle), cos(angle)
+    back = item["x"] - forward[0]*item["depth"]/2, item["z"] - forward[1]*item["depth"]/2
+    tangent = cos(angle), -sin(angle)
+    edge = LineString([(back[0]+sign*tangent[0]*item["width"]/2,back[1]+sign*tangent[1]*item["width"]/2) for sign in (-1,1)])
+    attached = any(segment["segment"].buffer(.08).covers(edge) and
+                   sum(forward[i]*segment["inward"][i] for i in (0,1)) >= cos(radians(20))
+                   for segment in matching_wall_segments(room, {}))
+    if not item.get("supportId") and elevation(item) > 0 and top(item) <= room["height"]+EPSILON and attached:
+        return []
+    return [{"type":"wall_mount","severity":"error","itemIds":[item["id"]],
+             "message":f"{item['label']}需设置离地安装高度，背面贴合墙内侧且正面朝向房间，顶部不得超过层高。"}]
 
 
 def separated_vertically(a, b):

@@ -10,7 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 CATEGORIES = (
     "armchair", "bookshelf", "cabinet", "chair", "children_cabinet", "coffee_table",
     "desk", "double_bed", "dressing_chair", "dressing_table", "kids_bed", "nightstand",
-    "shelf", "single_bed", "sofa", "stool", "table", "tv_stand", "wardrobe", "rug", "storage_box",
+    "shelf", "single_bed", "sofa", "stool", "table", "tv_stand", "wardrobe", "rug", "storage_box", "floor_lamp",
+    "laptop", "wall_tv", "air_conditioner",
 )
 
 
@@ -41,6 +42,7 @@ class Window(DataModel):
     offset: float = Field(default=1, ge=0, le=100)
     width: float = Field(default=1.2, gt=0.1, le=20)
     sillHeight: float = Field(default=0.9, ge=0, le=10)
+    height: float | None = Field(default=None, gt=0.1, le=20, exclude_if=lambda value: value is None)
 
 
 class Room(DataModel):
@@ -65,6 +67,9 @@ class Room(DataModel):
                 raise ValueError("门窗位置超出对应墙体长度")
         if len({w.id for w in self.windows}) != len(self.windows):
             raise ValueError("窗户 id 必须唯一")
+        for window in self.windows:
+            if window.height is not None and window.sillHeight + window.height > self.height + 1e-6:
+                raise ValueError("窗台高度与窗高之和不能超过房间层高")
         if self.polygon is not None:
             from shapely.geometry import Polygon
 
@@ -101,6 +106,17 @@ class DimensionSources(DataModel):
     height: Literal["annotation", "estimated", "user", "template", "unknown"] = "unknown"
 
 
+class FunctionalProfile(DataModel):
+    """Declared use dimensions in metres; omitted measurements stay unknown."""
+    surfaceHeight: float | None = Field(default=None, gt=0, le=10)
+    seatHeight: float | None = Field(default=None, gt=0, le=10)
+    frontUseDepth: float | None = Field(default=None, gt=0, le=5)
+    rearUseDepth: float | None = Field(default=None, gt=0, le=5)
+    bedsideAccess: float | None = Field(default=None, gt=0, le=5)
+    seatCapacity: int | None = Field(default=None, ge=1, le=8, strict=True)
+    note: str = Field(default="", max_length=500)
+
+
 class FurnitureSnapshot(DataModel):
     version: int = Field(ge=1)
     label: str = Field(min_length=1, max_length=100)
@@ -115,6 +131,7 @@ class FurnitureSnapshot(DataModel):
     frontDirection: Literal["positive_z", "negative_z"]
     subtype: str | None = Field(default=None, max_length=100)
     styleTags: list[str] = Field(default_factory=list, max_length=10)
+    functionalProfile: FunctionalProfile | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @field_validator("photoUrls")
     @classmethod
@@ -142,12 +159,13 @@ class Item(DataModel):
     supportId: str | None = Field(default=None, min_length=1, max_length=100, exclude_if=lambda value: value is None)
     rotation: float = Field(default=0, ge=-36000, le=36000)
     locked: bool = False
-    keep: bool = True
+    keep: bool = False
     source: Literal["brought", "existing", "new"] = "brought"
     assetUrl: str | None = Field(default=None, max_length=500)
     photoUrl: str | None = Field(default=None, max_length=500)
     furnitureAssetId: str | None = Field(default=None, min_length=1, max_length=100, exclude_if=lambda value: value is None)
     furnitureSnapshot: FurnitureSnapshot | None = Field(default=None, exclude_if=lambda value: value is None)
+    functionalProfile: FunctionalProfile | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def confirmed_furniture(self):

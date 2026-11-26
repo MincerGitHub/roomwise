@@ -302,3 +302,116 @@ def test_functional_template_pairs_catalog_stool_with_vanity_before_desk():
                                     {"kind": "near_wall", "itemId": "vanity"})
     assert wall["satisfied"], wall
     assert evaluate_vanity_seating(proposed)["satisfied"]
+
+
+def test_dining_table_template_places_all_assigned_seats_without_overlaps():
+    from roomwise.functional_constraints import evaluate_functional_spaces, functional_pairs
+
+    scene = demo_scene()
+    scene["room"] = {"width": 7, "depth": 7, "height": 3, "door": None, "windows": []}
+    scene["preferences"] = []
+    scene["items"] = [
+        {"id": "dining", "label": "餐桌", "category": "table", "width": 1.8, "depth": .9,
+         "height": .75, "x": 3.5, "z": 3.5, "rotation": 0, "locked": False, "keep": True, "source": "brought",
+         "parameters": {"seatCount": 2}},
+        {"id": "chair-left", "label": "餐椅一", "category": "chair", "width": .48, "depth": .5,
+         "height": .85, "x": 3, "z": 2.3, "rotation": 0, "locked": False, "keep": True, "source": "brought"},
+        {"id": "chair-right", "label": "餐椅二", "category": "armchair", "width": .52, "depth": .55,
+         "height": .9, "x": 4, "z": 2.3, "rotation": 0, "locked": False, "keep": True, "source": "brought"},
+    ]
+    assert len(functional_pairs(scene)) == 2
+    proposed = functional_template(scene, random.Random(17))
+    assert proposed is not None
+    assert validate_scene(proposed)["valid"]
+    assert evaluate_functional_spaces(proposed)["satisfied"]
+    assert {edge[2] for edge in functional_pairs(proposed)} == {"chair-left", "chair-right"}
+
+
+def test_all_seats_can_stay_at_dining_table_while_window_desk_keeps_its_named_chair():
+    from roomwise.functional_constraints import evaluate_functional_spaces, functional_pairs
+    from roomwise.generator import generate_layouts
+
+    scene = {"id": "multi-seat-window", "name": "多座位窗口工作组", "version": 0,
+             "room": {"width": 8, "depth": 8, "height": 3, "door": None,
+                      "windows": [{"id": "window-1", "wall": "north", "offset": 2.5, "width": 3, "sillHeight": 1}]},
+             "preferences": [], "items": [
+        {"id": "dining", "label": "圆餐桌", "category": "table", "width": 1.8, "depth": .9,
+         "height": .75, "x": 2, "z": 3, "rotation": 0, "locked": False, "keep": True, "source": "brought",
+         "parameters": {"seatCount": 2}},
+        {"id": "desk", "label": "书桌", "category": "desk", "width": 1.2, "depth": .6,
+         "height": .75, "x": 5, "z": 3, "rotation": 0, "locked": False, "keep": True, "source": "brought",
+         "functionalProfile": {"surfaceHeight": .75, "frontUseDepth": .55}},
+        {"id": "seat-a", "label": "餐椅一", "category": "chair", "width": .48, "depth": .5,
+         "height": .85, "x": 1.5, "z": 1.8, "rotation": 0, "locked": False, "keep": True, "source": "brought"},
+        {"id": "seat-b", "label": "餐椅二", "category": "armchair", "width": .52, "depth": .55,
+         "height": .9, "x": 2.5, "z": 1.8, "rotation": 0, "locked": False, "keep": True, "source": "brought"},
+        {"id": "desk-seat", "label": "办公椅", "category": "chair", "width": .48, "depth": .5,
+         "height": .85, "x": 5, "z": 2.25, "rotation": 180, "locked": False, "keep": True, "source": "brought",
+         "functionalProfile": {"seatHeight": .45, "rearUseDepth": .55}},
+    ]}
+    scene["preferences"] = [
+        {"kind": "near_window", "itemId": "desk", "targetId": "window-1", "required": True},
+        {"kind": "face_window", "itemId": "desk-seat", "targetId": "window-1", "required": True},
+    ]
+    pairs = set(functional_pairs(scene))
+    assert ("work", "desk", "desk-seat") in pairs
+    assert {("work", "dining", "seat-a"), ("work", "dining", "seat-b")} <= pairs
+    result = generate_layouts(scene, mode="hybrid", count=3, seed=43)
+    assert result["candidates"], result["diagnostics"]
+    for candidate in result["candidates"]:
+        assert len(candidate["scene"]["items"]) == len(scene["items"])
+        assert validate_scene(candidate["scene"])["valid"]
+        assert candidate["requirements"]["satisfied"]
+        assert evaluate_functional_spaces(candidate["scene"])["satisfied"]
+        assigned = set(functional_pairs(candidate["scene"]))
+        assert pairs == assigned
+
+
+def test_template_uses_declared_model_front_for_desk_and_chair():
+    from roomwise.functional_constraints import evaluate_functional_spaces
+
+    scene = demo_scene()
+    scene["items"] = [item for item in scene["items"] if item["id"] in {"desk-1", "chair-1"}]
+    scene["preferences"] = []
+    for item in scene["items"]:
+        item["furnitureSnapshot"] = {"frontDirection": "negative_z"}
+        item["functionalProfile"] = {"frontUseDepth": .6}
+    proposed = functional_template(scene, random.Random(42))
+    assert proposed is not None
+    assert evaluate_functional_spaces(proposed, scene)["satisfied"]
+    assert validate_scene(proposed)["valid"]
+    assert_invariants(scene, proposed)
+
+
+def test_template_never_returns_locked_height_conflict_as_a_complete_proposal():
+    from test_functional_spaces import work_scene
+
+    scene = work_scene()
+    for item in scene["items"]:
+        item["locked"] = True
+    scene["items"][1]["functionalProfile"]["seatHeight"] = .7
+    assert validate_scene(scene)["valid"]
+    assert functional_template(scene, random.Random(42)) is None
+
+
+def test_crowded_two_table_room_generates_independently_usable_layouts(monkeypatch):
+    import json
+    from pathlib import Path
+    from roomwise.functional_constraints import evaluate_functional_spaces
+    from roomwise.generator import generate_layouts
+
+    monkeypatch.setattr("roomwise.generator.learning_status", lambda: {"available": False})
+    scene = json.loads((Path(__file__).parent / "fixtures" / "crowded-functional-room.json").read_text(encoding="utf-8"))
+    original = deepcopy(scene)
+    response = generate_layouts(scene, mode="hybrid", count=1, seed=43)
+    assert response["candidates"], response["diagnostics"]
+    for candidate in response["candidates"]:
+        proposed = candidate["scene"]
+        assert_invariants(scene, proposed)
+        assert validate_scene(proposed)["valid"]
+        assert evaluate_functional_spaces(proposed, scene)["satisfied"]
+        assert evaluate_functional_spaces(proposed)["satisfied"]
+        result = evaluate_functional_spaces(proposed)
+        assert not result["unsatisfied"]
+        assert all(not check["required"] for check in result["warnings"])
+    assert scene == original

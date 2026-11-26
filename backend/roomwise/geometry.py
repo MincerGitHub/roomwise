@@ -263,6 +263,13 @@ def placement_errors(item: dict, room: dict, placed: list[dict], gap: float = 0,
         return True
     if top(item) > room["height"] + EPSILON:
         return True
+    if item["category"] in {"wall_tv", "air_conditioner"} or any(other["category"] in {"wall_tv", "air_conditioner"} for other in placed):
+        from .supports import wall_mount_errors
+        if item["category"] in {"wall_tv", "air_conditioner"} and wall_mount_errors(item,room):
+            return True
+        from .wall_appliance_constraints import placement_blocked
+        if placement_blocked(item, room, placed):
+            return True
     zone = door_zone(room)
     if zone is not None and item["category"] != "rug" and fp.intersection(zone).area > EPSILON:
         return True
@@ -301,7 +308,8 @@ def accessibility(scene: dict, step: float = .18, radius: float = .15):
     if not door:
         return {"evaluated": False, "reachable": None, "unreachableItemIds": [], "gridStep": step, "walkingDiameter": 2 * radius, "reason": "未设置门，无法检查入口可达性"}
     shell = room_polygon(room).buffer(-radius)
-    solids = [footprint(i).buffer(radius, join_style=2) for i in scene["items"] if i["category"] != "rug" and not i.get("supportId")]
+    solids = [footprint(i).buffer(radius, join_style=2) for i in scene["items"] if i["category"] != "rug" and not i.get("supportId")
+              and (i["category"] not in {"wall_tv", "air_conditioner"} or elevation(i) < 1.8)]
     obstacle = unary_union(solids) if solids else Polygon()
     space = shell.difference(obstacle)
     minx, minz, maxx, maxz = room_polygon(room).bounds
@@ -347,10 +355,12 @@ def accessibility(scene: dict, step: float = .18, radius: float = .15):
 
 
 def validate_scene(scene: dict, check_access: bool = True):
+    from .wall_appliance_constraints import evaluate_wall_appliances
     room = scene["room"]
     shell = room_polygon(room)
     items = scene["items"]
-    issues = support_errors(scene)
+    appliances = evaluate_wall_appliances(scene)
+    issues = support_errors(scene) + appliances["issues"]
     polygons = {i["id"]: footprint(i) for i in items}
     collisions = out = door_count = cabinet_door_count = 0
     zone = door_zone(room)
@@ -405,6 +415,7 @@ def validate_scene(scene: dict, check_access: bool = True):
     return {
         "valid": not any(i["severity"] == "error" for i in issues),
         "issues": issues,
+        "wallAppliances": {key:value for key,value in appliances.items() if key != "issues"},
         "metrics": {"collisions": collisions, "outOfBounds": out, "doorConflicts": door_count, "cabinetDoorConflicts": cabinet_door_count, "reachable": access.get("reachable"), "checkedItems": len(items), "roomArea": round(shell.area, 3), "freeArea": round(free_area, 3), "accessibility": access},
         "limitations": ["边界和通行使用整体占地；有 GLB 资产时碰撞使用其三角形网格，未绑定资产的旧家具使用部件碰撞回退", f"带门柜体正面保留 {CABINET_DOOR_CLEARANCE:.2f} 米使用区，未模拟单扇柜门的精细转动轨迹", "台面承托按类别与完整占地检查，未推断实际材质承重", "局部桌椅交叠与地毯按类别例外处理", "通行检查为工程近似，不能代表建筑规范验收"],
     }
@@ -442,7 +453,7 @@ def evaluate_vanity_seating(scene: dict) -> dict:
     A pair that is both locked is reported as a warning and left untouched.
     """
     tables = [item for item in scene.get("items", []) if item.get("category") == "dressing_table"]
-    chairs = [item for item in scene.get("items", []) if item.get("category") in {"dressing_chair", "stool"}]
+    chairs = [item for item in scene.get("items", []) if item.get("category") in {"chair", "armchair", "dressing_chair", "stool"}]
     chairs_by_id = {chair["id"]: chair for chair in chairs}
     tables_by_id = {table["id"]: table for table in tables}
     available = set(chairs_by_id)
@@ -457,19 +468,13 @@ def evaluate_vanity_seating(scene: dict) -> dict:
             pairs.append((table, chair))
             available.remove(chair["id"])
             paired_tables.add(table["id"])
+    from .functional_constraints import functional_pairs
+    assigned = {(aid, bid) for kind, aid, bid in functional_pairs(scene) if kind == "work"}
     for table in tables:
-        if table["id"] in paired_tables:
-            continue
-        candidates = [chair for chair in chairs
-                      if chair["id"] in available and chair.get("category") == "dressing_chair"]
-        if not candidates:
-            candidates = [chair for chair in chairs
-                          if chair["id"] in available and chair.get("category") == "stool"]
-        if not candidates:
-            continue
-        chair = min(candidates, key=lambda item: math.dist((item["x"], item["z"]), (table["x"], table["z"])))
-        pairs.append((table, chair))
-        available.remove(chair["id"])
+        for chair in chairs:
+            if (table["id"], chair["id"]) in assigned and chair["id"] in available:
+                pairs.append((table, chair))
+                available.remove(chair["id"])
     checks = []
     unsatisfied = []
     warnings = []
@@ -591,21 +596,12 @@ def layout_quality(scene: dict) -> dict:
     tables = [i for i in items if i.get("category") in TABLE_CATEGORIES]
     beds = [i for i in items if "bed" in i.get("category", "")]
     nightstands = [i for i in items if i.get("category") == "nightstand"]
-    partners = {
-        "chair": {"desk", "table"},
-        "dressing_chair": {"dressing_table"},
-        "stool": {"desk", "table", "dressing_table", "coffee_table"},
-    }
+    from .functional_constraints import functional_pairs
+    assigned_tables = {bid: aid for kind, aid, bid in functional_pairs(scene) if kind == "work"}
     for seat in items:
-        partner_categories = partners.get(seat.get("category"), set())
-        seat_tables = [table for table in tables if table.get("category") in partner_categories]
-        if seat.get("category") == "stool":
-            vanity_tables = [table for table in seat_tables if table.get("category") == "dressing_table"]
-            if vanity_tables:
-                seat_tables = vanity_tables
-        if not seat_tables:
+        table = next((candidate for candidate in tables if candidate["id"] == assigned_tables.get(seat["id"])), None)
+        if table is None:
             continue
-        table = min(seat_tables, key=lambda candidate: footprint(seat).distance(footprint(candidate)))
         distance = footprint(seat).distance(footprint(table))
         # A seat belongs in front of its matching work surface, close enough
         # to use but with a small pull-out gap. Keep its centre near the

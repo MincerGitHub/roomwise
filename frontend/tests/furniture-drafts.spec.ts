@@ -16,8 +16,10 @@ async function createDraft(page:Page,label?:string){
 test('draft deletion can be cancelled and persists without changing another draft or the room',async({page})=>{
  const draft=await createDraft(page,'待删除的草稿'),other=await createDraft(page);
  await page.goto('/');
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  const canvas=page.locator('.scene-canvas');await expect(canvas.locator('canvas')).toBeVisible();
  const layout=await canvas.getAttribute('data-layout');
+ if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click();
  await page.getByRole('button',{name:'自有家具库',exact:true}).click();
  const dialog=page.getByRole('dialog'),section=dialog.locator('.furniture-draft-section');
  const row=section.locator('.furniture-draft').filter({hasText:draft.id.slice(0,8)});
@@ -40,6 +42,7 @@ test('draft deletion can be cancelled and persists without changing another draf
  expect((await page.request.get(`/api/furniture/drafts/${draft.id}`)).status()).toBe(404);
  expect(await (await page.request.get(`/api/furniture/drafts/${other.id}`)).json()).toEqual(other);
  await dialog.getByRole('button',{name:'关闭自有家具库'}).click();
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  expect(await canvas.getAttribute('data-layout')).toBe(layout);
  await page.reload();await page.getByRole('button',{name:'自有家具库',exact:true}).click();
  await expect(page.locator('.furniture-draft').filter({hasText:draft.id.slice(0,8)})).toHaveCount(0);

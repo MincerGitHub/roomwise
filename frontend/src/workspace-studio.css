@@ -1,0 +1,297 @@
+/* The stage, tools and planning area share the workspace grid. */
+#root .app-shell .workspace {
+  width: 100%;
+  max-width: 1680px;
+  margin-inline: auto;
+  padding: 24px 32px 32px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 336px);
+  grid-template-areas: "heading dock" "stage tools" "summary tools" "planning tools";
+  grid-template-rows: auto auto auto 1fr;
+  gap: 16px 24px;
+  background: transparent;
+}
+
+#root .app-shell .canvas-header {
+  grid-area: heading;
+  align-self: center;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+#root .app-shell .canvas-header h1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 4px 0 0;
+  font-size: 32px !important;
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--color-text-darkgreen);
+  overflow-wrap: anywhere;
+}
+#root .app-shell .canvas-header h1 > span {
+  display: inline-block;
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--color-bg-light-yellow);
+  color: var(--color-text-darkgreen);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+#root .app-shell .tabs.tool-rail {
+  grid-area: dock;
+  align-self: center;
+  position: sticky;
+  top: 92px;
+  z-index: 25;
+  width: 100%;
+  min-height: 0;
+  height: auto;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg-white);
+}
+#root .app-shell .tabs.tool-rail button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  flex-direction: row;
+  gap: 4px;
+  padding: 4px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  white-space: nowrap;
+}
+#root .app-shell .tabs.tool-rail button svg { width: 16px; height: 16px; flex: none; }
+#root .app-shell .tabs.tool-rail button.active { background: var(--color-green-soft) !important; }
+#root .app-shell .tabs.tool-rail button i { top: 0; right: 2px; }
+
+#root .app-shell .sidebar {
+  grid-area: tools;
+  top: 152px;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: max(300px, calc(100svh - 176px));
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(63, 95, 69, .06);
+}
+#root .app-shell .sidebar-content { padding: 16px 16px 24px; overscroll-behavior: contain; }
+#root .app-shell .sidebar-footer { padding: 12px 16px; border-radius: 0 0 8px 8px; }
+#root .app-shell .sidebar-content .section-heading { margin: 0 0 12px; }
+#root .app-shell .sidebar-content .section-heading h2 { font-size: 18px !important; }
+#root .app-shell .items-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#root .app-shell .items-list .empty-state { grid-column: 1 / -1; }
+#root .app-shell .items-list .item-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: 56px auto;
+  justify-items: start;
+  align-content: start;
+  min-width: 0;
+  min-height: 108px;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px !important;
+}
+#root .app-shell .item-card .item-symbol {
+  width: 100%;
+  height: 56px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--color-bg-light-green);
+}
+#root .app-shell .item-symbol > :is(img,svg) { width: 64px; height: 52px; object-fit: contain; }
+#root .app-shell .item-card.selected .item-symbol { background: #eaf2e6; }
+#root .app-shell .item-card .item-card-text { width: 100%; }
+#root .app-shell .item-card-text strong { font-size: 13px; overflow-wrap: anywhere; }
+#root .app-shell .item-card-text small { margin-top: 2px; }
+#root .app-shell .item-card > svg { position: absolute; top: 12px; right: 12px; width: 14px; height: 14px; }
+
+#root .app-shell .scene-stage { grid-area: stage; position: relative; top: auto; min-width: 0; scroll-margin-top: 84px; }
+#root .app-shell .viewport {
+  position: relative;
+  top: auto;
+  z-index: 0;
+  width: 100%;
+  height: clamp(396px, calc(100svh - 290px), 704px);
+  border: 0;
+  border-radius: 0;
+  background: #eaf2e6;
+  box-shadow: none;
+}
+#root .app-shell .viewport .scene-actions {
+  position: absolute;
+  z-index: 5;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+#root .app-shell .viewport .scene-actions > div { position: static; pointer-events: auto; }
+#root .app-shell .viewport .view-switch {
+  padding: 4px;
+  gap: 4px;
+  border-radius: 999px !important;
+}
+#root .app-shell .viewport .view-switch button { min-height: 32px; border-radius: 999px !important; }
+#root .app-shell .viewport .canvas-tools {
+  gap: 8px;
+  overflow: visible;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell .viewport .canvas-tools button { width: 42px; height: 42px; border: 1px solid var(--color-border) !important; border-radius: 50% !important; }
+#root .app-shell .viewport .canvas-tools button:disabled { background: var(--color-bg-white) !important; }
+#root .app-shell .viewport .selected-label { top: 16px; right: 16px; max-width: calc(100% - 312px); overflow-wrap: anywhere; }
+#root .app-shell .viewport .canvas-validation { right: 16px; bottom: 16px; max-width: calc(100% - 32px); }
+#root .app-shell .viewport .canvas-guide { bottom: 16px; left: 16px; }
+#root .app-shell .scene-canvas .room-inside-toggle { right: 16px; bottom: 76px; }
+
+#root .app-shell .workspace > .room-summary {
+  grid-area: summary;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding: 8px 0;
+  border-block: 1px solid var(--color-border);
+  background: transparent !important;
+  color: var(--color-text-darkgreen);
+}
+#root .app-shell .room-summary .room-summary-card.room-summary-card {
+  grid-column: auto;
+  min-width: 0;
+  min-height: 64px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell .room-summary .room-summary-card + .room-summary-card { border-inline-start: 1px solid var(--color-border); }
+#root .app-shell .room-summary-card strong { margin: 0; font-size: 21px !important; }
+
+#root .app-shell .planning-panel {
+  grid-area: planning;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.16fr);
+  gap: 16px 24px;
+  align-items: start;
+}
+#root .app-shell .plan-controls { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+#root .app-shell .planning-panel > .conversation,
+#root .app-shell .plan-controls > :is(.identified-requirements, .generation-bar) {
+  min-width: 0;
+  margin: 0;
+  padding: 16px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell .plan-controls > .generation-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-inline: 16px !important;
+  border-inline-start: 2px solid #dfd6aa !important;
+  background: var(--color-bg-light-yellow) !important;
+}
+#root .app-shell .plan-controls > :is(.command-warning, .generation-info, .candidate-strip) { margin: 0; }
+#root .app-shell .plan-controls > .candidate-strip { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+#root .app-shell .planning-panel > .conversation { padding: 8px 0 16px !important; }
+#root .app-shell .planning-panel :is(.conversation-heading h3, .generation-copy h3, .requirements-heading h3) { font-size: 17px !important; }
+#root .app-shell .conversation .language-status {
+  padding-inline: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+#root .app-shell .conversation .command-box { padding: 4px; border-radius: 999px; }
+#root .app-shell .conversation .command-box input { padding-inline-start: 12px; border-radius: 999px !important; }
+
+#root .app-shell :is(.header-actions .btn, .generation-actions .btn, .preview-banner .btn, .candidate-card .preview-action, .prompt-examples button, .sidebar .add-outline, .sidebar .text-btn, .canvas-validation button, .room-inside-toggle) {
+  border-radius: 999px !important;
+}
+#root .app-shell :is(.icon-btn, .command-box button, .identified-requirements li > button) { border-radius: 50% !important; }
+#root .app-shell .conversation .command-box button { flex: 0 0 36px; width: 36px; height: 36px; }
+
+#root .app-shell :is(button:not(.context-menu-dismiss), summary, [role=button]) {
+  transition: color 220ms ease, background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease, translate 220ms ease, scale 220ms ease;
+}
+#root .app-shell :is(.btn, .icon-btn, .canvas-tools button, .view-switch button, .tool-rail button, .command-box button) > svg {
+  flex-shrink: 0;
+  transition: translate 220ms ease, rotate 220ms ease;
+}
+@media (hover: hover) {
+  #root .app-shell :is(.btn, .add-outline, .item-card, .canvas-tools button, .room-inside-toggle):hover:not(:disabled):not([aria-disabled=true]) { translate: 0 -2px; }
+  #root .app-shell :is(.header-actions .primary, .generation-actions .primary, .tool-rail button):hover:not(:disabled) > svg { translate: 0 -2px; }
+  #root .app-shell .canvas-tools button[aria-label="撤销"]:hover:not(:disabled) > svg { rotate: -18deg; }
+  #root .app-shell .command-box button:hover:not(:disabled) > svg { translate: 2px -2px; }
+}
+#root .app-shell :is(.btn, .text-btn, .icon-btn, .add-outline, .item-card, .view-switch button, .tool-rail button, .canvas-tools button, .command-box button, .prompt-examples button, .room-inside-toggle):active:not(:disabled):not([aria-disabled=true]) {
+  translate: 0 1px;
+  scale: .96;
+}
+
+@media (max-width: 1120px) {
+  #root .app-shell .workspace { padding-inline: 24px; gap: 16px; }
+}
+@media (min-width: 961px) and (max-width: 1040px) {
+  #root .app-shell .planning-panel { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 960px) {
+  #root .app-shell .viewport .canvas-guide { display: none; }
+  #root .app-shell .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "heading" "stage" "summary" "dock" "tools" "planning";
+    grid-template-rows: none;
+    padding: 16px 12px 24px;
+    gap: 12px;
+  }
+  #root .app-shell .canvas-header h1 { font-size: 24px !important; }
+  #root .app-shell .scene-stage { scroll-margin-top: 84px; }
+  #root .app-shell .viewport { height: clamp(328px, 51svh, 488px); }
+  #root .app-shell .tabs.tool-rail { top: 8px; }
+  #root .app-shell .sidebar { position: relative; top: auto; max-height: none; scroll-margin-top: 128px; }
+  #root .app-shell .sidebar-content { max-height: 49svh; }
+  #root .app-shell .planning-panel { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 780px) {
+  #root .app-shell .scene-stage { scroll-margin-top: 8px; }
+  #root .app-shell .sidebar { scroll-margin-top: 68px; }
+}
+@media (min-width: 521px) and (max-width: 960px) {
+  #root .app-shell .items-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  #root .app-shell .viewport .scene-actions { top: 8px; right: 8px; left: 8px; justify-content: space-between; }
+  #root .app-shell .viewport .selected-label { top: 56px; left: 8px; right: auto; max-width: calc(100% - 16px); }
+  #root .app-shell .viewport .canvas-validation { right: 8px; bottom: 8px; max-width: calc(100% - 16px); }
+  #root .app-shell .scene-canvas .room-inside-toggle { right: 8px; bottom: 68px; }
+  #root .app-shell .room-summary .room-summary-card.room-summary-card { align-items: start; gap: 4px; min-height: 0; padding: 4px 8px; }
+  #root .app-shell .room-summary .room-summary-card > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  #root .app-shell .room-summary .room-summary-card > svg { display: none; }
+  #root .app-shell .room-summary-card h3 { white-space: normal; }
+  #root .app-shell .room-summary-card strong { grid-column: 1; grid-row: auto; font-size: 17px !important; }
+  #root .app-shell .room-summary-card p { overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #root .app-shell :is(button, summary, [role=button], button > svg) { transition: none !important; translate: none !important; scale: none !important; rotate: none !important; }
+}

@@ -1,26 +1,38 @@
 import {test,expect} from '@playwright/test';
 
 test('window command is recognized and preview satisfies both requests without moving locks',async({page})=>{
+ await page.route('**/api/health',async route=>{
+  const response=await route.fetch(),body=await response.json();
+  body.language={enabled:true,configured:true,provider:'responses',model:'gpt-6-sol',message:'语言模型已配置'};
+  await route.fulfill({response,json:body});
+ });
  await page.goto('/');
  const canvas=page.locator('.scene-canvas');
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  await expect(canvas.locator('canvas')).toBeVisible();
  const original=JSON.parse((await canvas.getAttribute('data-layout'))!);
+ if(await page.getByRole('button',{name:'返回当前布局'}).count())await page.getByRole('button',{name:'返回当前布局'}).click();
  await page.getByLabel('布局方法').selectOption('hybrid');
  const commandResponse=page.waitForResponse(r=>r.url().endsWith('/api/command')&&r.request().method()==='POST');
  const generatedResponse=page.waitForResponse(r=>r.url().endsWith('/api/generate')&&r.request().method()==='POST',{timeout:45000});
- await page.getByLabel('输入修改要求').fill('桌子靠窗，椅子面朝窗户方向');
+ await page.getByLabel('输入修改要求').fill('书桌靠窗，办公椅面朝窗户方向');
  await page.getByLabel('发送要求').click();
  const command=await (await commandResponse).json();
  expect(command.action).toBe('generate');
+ expect(command.parser).toBe('offline_restricted_chinese');
+ expect(command.message).toContain('本地规则');
  expect(command.scene.preferences).toEqual(expect.arrayContaining([
   expect.objectContaining({kind:'near_window',itemId:'desk-1',required:true}),
   expect.objectContaining({kind:'face_window',itemId:'chair-1',required:true}),
  ]));
- const recognized=page.getByLabel('已识别的布局要求');
+ const generated=await (await generatedResponse).json();
+ if(await page.getByRole('button',{name:'展开已识别的布局要求',exact:true}).count()){
+  await page.getByRole('button',{name:'展开已识别的布局要求',exact:true}).click();
+ }
+ const recognized=page.getByLabel('已识别的布局要求',{exact:true});
  await expect(recognized).toContainText('旧书桌：靠近');
  await expect(recognized).toContainText('办公椅：面朝');
  await expect(page.getByRole('alert')).toHaveCount(0);
- const generated=await (await generatedResponse).json();
  expect(generated.candidates.length).toBeGreaterThan(0);
  for(const candidate of generated.candidates){
   expect(candidate.validation.valid).toBe(true);
@@ -31,9 +43,9 @@ test('window command is recognized and preview satisfies both requests without m
  const candidate=generated.candidates[0];
  await page.getByLabel('预览方案 1').click();
  await expect(page.locator('.preview-banner')).toBeVisible();
- await expect(page.locator('main .preview-requirements, main .functional-relations')).toHaveCount(0);
- await expect(page.locator('.preview-check-details')).toHaveCount(0);
- await page.locator('.canvas-validation button').click();
+ await expect(page.locator('.plan-controls .preview-requirements, .plan-controls .functional-relations')).toHaveCount(0);
+ await expect(page.locator('.preview-check-details')).toBeHidden();
+ await page.locator('.preview-inspection summary').click();
  await expect(page.locator('.preview-check-details')).toContainText('距窗');
  await expect(page.locator('.preview-check-details')).toContainText('朝向偏差');
  await expect(page.locator('.preview-check-details .requirement-check.unmet')).toHaveCount(0);
@@ -63,7 +75,8 @@ test('window command is recognized and preview satisfies both requests without m
  const forwardX=Math.sin(chair.rotation*Math.PI/180),forwardZ=Math.cos(chair.rotation*Math.PI/180);
  const error=Math.acos(Math.max(-1,Math.min(1,(forwardX*dx+forwardZ*dz)/Math.hypot(dx,dz))))*180/Math.PI;
  expect(error).toBeLessThanOrEqual(20.001);
- await page.locator('.preview-banner').getByRole('button',{name:'退出预览'}).click();
+ await page.getByRole('button',{name:'返回当前布局'}).click();
+ await expect(page.locator('.scene-canvas canvas')).toBeVisible();
  await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-layout'))!)).toEqual(original);
  expect(preview).not.toEqual(original);
 });
@@ -91,12 +104,11 @@ test('unrecognized command removes stale candidates and requires explicit acknow
  expect(generatedAfterRejection).toBe(0);
 });
 
-test('no accepted candidate explains requirements instead of claiming the plan passed',async({page})=>{
+test('no accepted candidate shows concise feedback without generation diagnostics',async({page})=>{
  await page.goto('/');
  await page.route('**/api/generate',route=>route.fulfill({json:{candidates:[],diagnostics:{message:'必须靠窗要求未满足；请检查锁定家具。'}}}));
  await page.locator('.generation-actions button.primary').click();
- await expect(page.locator('.generation-info')).toContainText('未找到同时满足空间检查和必须要求的候选');
- await expect(page.locator('.generation-info')).toContainText('必须靠窗要求未满足');
- await expect(page.locator('.generation-info')).toContainText('不表示一定无解');
+ await expect(page.locator('.generation-info')).toHaveCount(0);
+ await expect(page.locator('.toast')).toContainText('未找到满足当前要求的方案，请调整布局要求或房间参数后重试。');
  await expect(page.locator('.candidate-card')).toHaveCount(0);
 });

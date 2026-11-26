@@ -11,21 +11,30 @@ import os
 from decimal import Decimal
 from pathlib import Path
 import re
+from urllib.error import HTTPError, URLError
 from typing import Literal
 from urllib.parse import urlsplit
 from urllib.request import Request
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
 MAX_RESPONSE_BYTES = 65_536
 TIMEOUT_SECONDS = 30
+RESPONSES_TIMEOUT_SECONDS = 120
 APP_ROOT = Path(__file__).resolve().parents[2]
-LANGUAGE_ENV_KEYS = {"PROVIDER", "MODEL", "URL", "API_KEY", "RESPONSE_FORMAT"}
+LANGUAGE_ENV_KEYS = {"PROVIDER", "MODEL", "URL", "API_KEY", "RESPONSE_FORMAT", "REASONING_EFFORT"}
 OPERATION_NAMES = Literal[
     "near_wall", "near_window", "face_window", "min_move", "lock", "unlock",
     "keep", "rotate", "move", "generate", "only_adjust", "undo", "bedside", "vanity_seating", "relative_position", "face_item",
 ]
+
+
+class LanguageModelError(ValueError):
+    """A classified public error; provider response bodies stay private."""
+    def __init__(self, code, message, status=None):
+        super().__init__(message)
+        self.code, self.message, self.status = code, message, status
 
 
 class IntentOperation(BaseModel):
@@ -155,6 +164,7 @@ def _configuration():
     endpoint = setting("URL", "url", default_url)
     key = setting("API_KEY", "apiKey")
     response_format = setting("RESPONSE_FORMAT", "responseFormat")
+    reasoning_effort = setting("REASONING_EFFORT", "reasoningEffort").lower()
     deepseek = False
     try:
         deepseek = urlsplit(endpoint).hostname == "api.deepseek.com"
@@ -169,7 +179,7 @@ def _configuration():
         reason = "语言模型配置文件无法读取，请检查格式。"
     elif provider == "disabled":
         reason = "语言模型未启用；使用离线指令识别。"
-    elif provider not in ("ollama", "chatcompletions"):
+    elif provider not in ("ollama", "chatcompletions", "responses"):
         reason = "语言模型提供方配置无效。"
     elif not model or len(model) > 200:
         reason = "尚未配置有效的语言模型名称。"
@@ -179,23 +189,25 @@ def _configuration():
             if url.scheme not in ("http", "https") or not url.hostname or url.username or url.password or url.query or url.fragment:
                 reason = "语言模型地址需为不含凭据、查询参数和片段的 HTTP(S) 完整接口地址。"
             deepseek = url.hostname == "api.deepseek.com"
-            if not reason and provider == "chatcompletions" and url.path.rstrip("/") in ("", "/v1"):
-                endpoint = endpoint.rstrip("/") + "/chat/completions"
+            if not reason and provider in ("chatcompletions", "responses") and url.path.rstrip("/") in ("", "/v1"):
+                endpoint = endpoint.rstrip("/") + ("/responses" if provider == "responses" else "/chat/completions")
         except ValueError:
             reason = "语言模型地址无效。"
-        if not reason and provider == "chatcompletions" and not key:
+        if not reason and provider in ("chatcompletions", "responses") and not key:
             reason = "尚未配置语言模型 API 密钥；继续使用离线识别。"
     response_format = response_format or ("json_object" if deepseek else "json_schema")
     if not reason and response_format not in ("json_object", "json_schema"):
         reason = "语言模型输出格式配置无效。"
-    return provider, model, endpoint, key, reason, response_format, deepseek
+    if not reason and provider == "responses" and reasoning_effort not in ("", "none", "minimal", "low", "medium", "high", "xhigh"):
+        reason = "语言模型推理强度配置无效。"
+    return provider, model, endpoint, key, reason, response_format, deepseek, reasoning_effort
 
 
 def language_status():
     """Safe status only: no network, URL, credentials, or environment dump."""
-    provider, model, _, _, reason, response_format, _ = _configuration()
+    provider, model, _, _, reason, response_format, _, reasoning_effort = _configuration()
     return {"enabled": not bool(reason), "configured": provider != "disabled", "provider": provider, "model": model or None,
-            "responseFormat": response_format,
+            "responseFormat": response_format, "reasoningEffort": reasoning_effort or None,
             "message": reason or "语言模型已配置；仅识别已实现的操作，布局仍需几何校验。"}
 
 
@@ -232,7 +244,7 @@ def _strict_schema():
     return schema
 
 
-def _post_json(endpoint, payload, key):
+def _post_json(endpoint, payload, key, *, timeout=TIMEOUT_SECONDS):
     """Small bounded HTTP transport; callers never expose raw transport errors."""
     # Do not follow redirects: an Authorization header must not reach another host.
     from urllib.request import HTTPRedirectHandler, build_opener
@@ -245,11 +257,72 @@ def _post_json(endpoint, payload, key):
     if key:
         headers["Authorization"] = f"Bearer {key}"
     request = Request(endpoint, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers=headers, method="POST")
-    with build_opener(RejectRedirect).open(request, timeout=TIMEOUT_SECONDS) as response:
-        body = response.read(MAX_RESPONSE_BYTES + 1)
+    try:
+        with build_opener(RejectRedirect).open(request, timeout=timeout) as response:
+            body = response.read(MAX_RESPONSE_BYTES + 1)
+    except HTTPError as error:
+        provider_code = ""
+        try:
+            detail = json.loads(error.read(8192)).get("error", {})
+            if isinstance(detail, dict):
+                provider_code = detail.get("code", "")
+        except (OSError, ValueError, AttributeError, TypeError):
+            pass
+        if error.code == 403 and provider_code in ("cyber_policy", "content_policy_violation", "policy_violation"):
+            code, message = "provider_policy", "语言服务商的内容策略拒绝了本次请求（HTTP 403）；未获得布局计划，未修改场景。"
+        elif error.code == 401:
+            code, message = "authentication_failed", "语言接口认证失败（HTTP 401），请检查 API 密钥；本次未修改。"
+        elif error.code == 403:
+            code, message = "permission_denied", "语言接口拒绝访问（HTTP 403），请检查账户和模型权限；本次未修改。"
+        elif error.code == 429:
+            code, message = "rate_limited", "语言接口限流或额度不足（HTTP 429）；本次未修改，可稍后重试。"
+        elif error.code >= 500:
+            code, message = "provider_unavailable", f"语言服务暂时不可用（HTTP {error.code}）；本次未修改，可稍后重试。"
+        else:
+            code, message = "request_rejected", f"语言接口未接受请求（HTTP {error.code}），请检查接口与模型配置；本次未修改。"
+        raise LanguageModelError(code, message, error.code) from None
+    except TimeoutError:
+        raise LanguageModelError("timeout", "等待语言服务超时；本次未修改，可稍后重试。") from None
+    except URLError as error:
+        code = "timeout" if isinstance(error.reason, TimeoutError) else "network"
+        message = "等待语言服务超时；本次未修改，可稍后重试。" if code == "timeout" else "无法连接语言服务；本次未修改，请检查网络和接口地址。"
+        raise LanguageModelError(code, message) from None
     if len(body) > MAX_RESPONSE_BYTES:
-        raise ValueError("response exceeds size limit")
-    return json.loads(body)
+        raise LanguageModelError("response_too_large", "语言服务返回内容过大，未采用结果；本次未修改。")
+    try:
+        return json.loads(body)
+    except ValueError:
+        raise LanguageModelError("invalid_response", "语言接口没有返回有效 JSON 响应；本次未修改。") from None
+
+
+def _responses_text(response):
+    """Only completed assistant output may become an executable intent plan."""
+    if isinstance(response, dict) and response.get("status") == "incomplete":
+        raise LanguageModelError("incomplete_response", "语言模型输出未完成，未采用部分计划；本次未修改。")
+    if not isinstance(response, dict) or response.get("status") != "completed" or response.get("error") is not None:
+        raise ValueError("response not completed")
+    output = response.get("output")
+    if not isinstance(output, list):
+        raise ValueError("invalid response output")
+    texts = []
+    for item in output:
+        if not isinstance(item, dict):
+            raise ValueError("invalid response item")
+        if item.get("type") == "reasoning":
+            continue
+        if item.get("type") != "message" or item.get("role") != "assistant" or item.get("status") != "completed":
+            raise ValueError("unexpected response output")
+        if not isinstance(item.get("content"), list):
+            raise ValueError("invalid response content")
+        for part in item["content"]:
+            if isinstance(part, dict) and part.get("type") == "refusal":
+                raise LanguageModelError("provider_refused", "语言模型拒绝处理本次请求；未获得布局计划，未修改场景。")
+            if not isinstance(part, dict) or part.get("type") != "output_text" or not isinstance(part.get("text"), str):
+                raise ValueError("missing or refused output text")
+            texts.append(part["text"])
+    if not texts:
+        raise ValueError("missing response text")
+    return "".join(texts)
 
 
 def validate_plan_against_scene(plan: IntentPlan | dict, scene: dict):
@@ -586,7 +659,7 @@ def plan_command(scene: dict, text: str, selected_id: str | None = None, history
     history is optional recent USER instructions only (at most six, no files).
     Plans are suggestions for the existing executor, never executable code.
     """
-    provider, model, endpoint, key, reason, response_format, deepseek = _configuration()
+    provider, model, endpoint, key, reason, response_format, deepseek, reasoning_effort = _configuration()
     base = {"provider": provider, "model": model, "canonicalText": "", "operations": []}
     if reason:
         return None if provider == "disabled" else {**base, "action": "clarify", "message": reason}
@@ -599,13 +672,22 @@ def plan_command(scene: dict, text: str, selected_id: str | None = None, history
         context["recentInstructions"] = [str(value)[:600] for value in history[-6:]]
     schema = _strict_schema()
     system_prompt = SYSTEM_PROMPT
-    if provider == "chatcompletions" and response_format == "json_object":
+    if provider in ("chatcompletions", "responses") and response_format == "json_object":
         system_prompt += "\n只返回一个 JSON 对象，符合下面 JSON schema（无需markdown）：\n" + json.dumps(schema, ensure_ascii=False)
     payload = {"model": model, "stream": False, "messages": [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
     ]}
-    if provider == "ollama":
+    if provider == "responses":
+        output_format = ({"type": "json_object"} if response_format == "json_object" else {
+            "type": "json_schema", "name": "roomwise_intent_plan", "strict": True, "schema": schema,
+        })
+        payload = {"model": model, "instructions": system_prompt,
+                   "input": [{"role": "user", "content": [{"type": "input_text", "text": json.dumps(context, ensure_ascii=False)}]}],
+                   "text": {"format": output_format}, "store": False, "stream": False, "max_output_tokens": 8192}
+        if reasoning_effort:
+            payload["reasoning"] = {"effort": reasoning_effort}
+    elif provider == "ollama":
         payload.update(format=schema, options={"temperature": 0, "num_predict": 2048})
     else:
         payload.update(temperature=0, max_tokens=2048)
@@ -615,10 +697,14 @@ def plan_command(scene: dict, text: str, selected_id: str | None = None, history
         if deepseek:
             payload["thinking"] = {"type": "disabled"}
     try:
-        response = _post_json(endpoint, payload, key)
-        if provider == "ollama":
+        if provider == "responses":
+            response = _post_json(endpoint, payload, key, timeout=RESPONSES_TIMEOUT_SECONDS)
+            content = _responses_text(response)
+        elif provider == "ollama":
+            response = _post_json(endpoint, payload, key)
             content = response["message"]["content"]
         else:
+            response = _post_json(endpoint, payload, key)
             content = response["choices"][0]["message"]["content"]
         if not isinstance(content, str) or len(content.encode("utf-8")) > MAX_RESPONSE_BYTES:
             raise ValueError("invalid model content")
@@ -644,6 +730,15 @@ def plan_command(scene: dict, text: str, selected_id: str | None = None, history
         except ValueError as error:
             return {**base, "action": "clarify", "message": str(error)}
         return {**plan.model_dump(), "canonicalText": canonical, "provider": provider, "model": model}
+    except LanguageModelError as error:
+        detail = {"code": error.code}
+        if error.status is not None:
+            detail["httpStatus"] = error.status
+        return {**base, "action": "clarify", "message": error.message, "error": detail}
+    except (ValueError, ValidationError, KeyError, IndexError, TypeError):
+        return {**base, "action": "clarify", "message": "语言模型返回内容不符合布局计划格式，未执行任何修改。",
+                "error": {"code": "invalid_plan"}}
     except Exception:
         # Never include exception text: HTTP errors can echo Authorization or URLs.
-        return {**base, "action": "clarify", "message": "语言模型未返回有效计划，未执行任何修改；可稍后重试或使用明确的离线指令。"}
+        return {**base, "action": "clarify", "message": "语言处理未完成，未执行任何修改；可稍后重试。",
+                "error": {"code": "language_error"}}

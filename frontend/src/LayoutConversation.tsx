@@ -33,7 +33,7 @@ export default function LayoutConversation({draft,onDraft,onSend,busy,messages,c
     <button aria-label="发送要求" disabled={busy||!draft.trim()}><Send size={17}/></button>
    </form>
    <button type="button" className="btn conversation-toggle" aria-expanded={expanded} aria-controls={contentId} aria-label={expanded?'折叠历史记录':'展开历史记录'} onClick={()=>setExpanded(open=>!open)}>
-    <span>历史记录</span><span>{expanded?'折叠':'展开'}</span><ChevronDown size={15} aria-hidden="true"/>
+    <span>历史记录</span><ChevronDown size={15} aria-hidden="true"/>
    </button>
   </div>
  </section>;
